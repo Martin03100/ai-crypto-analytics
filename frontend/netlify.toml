@@ -1,5 +1,5 @@
 [build]
-  command = "npm install && npm run build"
+  command = "npm install --dangerously-allow-all-scripts && npm run build"
   publish = "dist"
 
 # 1) Proxy: vsetko na /api/* presmeruje na tvoj Render backend, ale v
