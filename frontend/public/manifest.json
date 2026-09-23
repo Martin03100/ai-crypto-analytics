@@ -1,0 +1,12 @@
+{
+  "name": "AI Crypto Analytics",
+  "short_name": "AI Crypto",
+  "description": "AI-powered predikcia a analyza kryptomien",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#030712",
+  "theme_color": "#030712",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

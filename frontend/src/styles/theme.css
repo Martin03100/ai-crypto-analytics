@@ -1,0 +1,228 @@
+/* ==========================================================================
+   theme.css — AI Crypto Analytics 2026 design system
+   Obsidian / glass-cyber aesthetic. Every color, radius, and shadow used
+   anywhere in the app is a token defined here — no ad-hoc hex values.
+   ========================================================================== */
+
+:root {
+  /* --- surfaces (true OLED black, faint blue undertone) --- */
+  --bg-void: #030712;
+  --bg-void-2: #060a16;
+  --bg-card: rgba(18, 24, 38, 0.55);
+  --bg-card-hover: rgba(24, 31, 48, 0.68);
+  --bg-inset: rgba(10, 14, 24, 0.6);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  /* --- accents --- */
+  --cyan: #22d3ee;
+  --cyan-dim: rgba(34, 211, 238, 0.14);
+  --emerald: #34d399;
+  --emerald-dim: rgba(52, 211, 153, 0.14);
+  --crimson: #fb5a6a;
+  --crimson-dim: rgba(251, 90, 106, 0.14);
+  --amber: #fbbf24;
+  --amber-dim: rgba(251, 191, 36, 0.14);
+  --violet: #a78bfa;
+  --violet-dim: rgba(167, 139, 250, 0.14);
+
+  /* --- aurora accent hues (mesh gradient blobs) --- */
+  --aurora-violet: #7c3aed;
+  --aurora-cyan: #0ea5e9;
+  --aurora-mint: #10b981;
+
+  /* --- text --- */
+  --text-primary: #f3f5f9;
+  --text-secondary: #99a2b8;
+  --text-tertiary: #626d82;
+
+  /* --- type --- */
+  --font-sans: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", monospace;
+
+  /* --- geometry --- */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+
+  /* --- motion --- */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration: 300ms;
+}
+
+* { box-sizing: border-box; }
+
+/* --- light mode: prepnute cez data-theme="light" na <html> (ThemeContext) --- */
+:root[data-theme="light"] {
+  --bg-void: #f4f6fa;
+  --bg-void-2: #eceff5;
+  --bg-card: rgba(255, 255, 255, 0.72);
+  --bg-card-hover: rgba(255, 255, 255, 0.88);
+  --bg-inset: rgba(240, 242, 247, 0.8);
+  --border-subtle: rgba(15, 23, 42, 0.08);
+  --border-strong: rgba(15, 23, 42, 0.14);
+
+  --text-primary: #10151f;
+  --text-secondary: #4b5468;
+  --text-tertiary: #7c8598;
+}
+:root[data-theme="light"] body { background: var(--bg-void); }
+:root[data-theme="light"] .aurora-layer { opacity: 0.35; filter: blur(90px) saturate(140%); }
+:root[data-theme="light"] ::selection { background: var(--cyan-dim); color: var(--text-primary); }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--bg-void);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "tnum" 1;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* ==========================================================================
+   Ambient aurora mesh gradient — 3 slowly drifting neon blobs (violet/cyan/
+   mint) fixed behind all content. Pure CSS, GPU-friendly (transform/opacity
+   only), respects prefers-reduced-motion.
+   ========================================================================== */
+.aurora-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0.4;
+}
+.aurora-layer::before,
+.aurora-layer::after,
+.aurora-layer .aurora-blob-3 {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(110px);
+  will-change: transform;
+}
+.aurora-layer::before {
+  width: 60vw; height: 60vw; max-width: 780px; max-height: 780px;
+  top: -18%; left: -12%;
+  background: radial-gradient(circle at 30% 30%, var(--aurora-violet), transparent 70%);
+  animation: aurora-drift-a 26s ease-in-out infinite alternate;
+}
+.aurora-layer::after {
+  width: 55vw; height: 55vw; max-width: 700px; max-height: 700px;
+  top: 10%; right: -15%;
+  background: radial-gradient(circle at 60% 40%, var(--aurora-cyan), transparent 70%);
+  animation: aurora-drift-b 32s ease-in-out infinite alternate;
+}
+.aurora-layer .aurora-blob-3 {
+  width: 50vw; height: 50vw; max-width: 640px; max-height: 640px;
+  bottom: -20%; left: 22%;
+  background: radial-gradient(circle at 40% 60%, var(--aurora-mint), transparent 70%);
+  animation: aurora-drift-c 38s ease-in-out infinite alternate;
+}
+
+@keyframes aurora-drift-a {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(6%, 8%) scale(1.08); }
+}
+@keyframes aurora-drift-b {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-8%, 6%) scale(1.05); }
+}
+@keyframes aurora-drift-c {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(5%, -6%) scale(1.1); }
+}
+
+/* Everything else renders above the aurora layer */
+#root { position: relative; z-index: 1; }
+
+/* ==========================================================================
+   Tech grid overlay — jemna perspektivna mriezka (fintech/trading-terminal
+   feel), pod aurora vrstvou. Cisto CSS gradient (ziadne obrazky), takze
+   funguje offline a nema vahu suboru.
+   ========================================================================== */
+.grid-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(34, 211, 238, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 211, 238, 0.055) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 0%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 0%, transparent 75%);
+}
+:root[data-theme="light"] .grid-layer {
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.05) 1px, transparent 1px);
+}
+
+/* ==========================================================================
+   Grain / noise texture — jemna zrnitost cez SVG fractal noise filter,
+   pridava "premium" hmatatelnu texturu namiesto ploche hladkeho gradientu.
+   ========================================================================== */
+.grain-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+::selection { background: var(--cyan-dim); color: var(--text-primary); }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: var(--radius-pill); }
+
+a { color: inherit; }
+
+button { font-family: inherit; }
+
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* --- reduced motion --- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+/* --- focus visibility --- */
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Shared spin animation for loading spinners (Loader2 icon etc.) */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.8s linear infinite; }
+
+/* ---------- backdrop-filter fallback ---------- */
+/* Stare Safari/Android WebView bez podpory backdrop-filter by inak videli
+   priesvitne, tazko citatelne karty - tu im damy takmer nepriehladne pozadie
+   namiesto skla, aby appka zostala citatelna aj bez glassmorphism efektu. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .card, .sidebar, .chat-drawer, .confirm-modal, .quick-link-card {
+    background: var(--bg-void-2) !important;
+  }
+}
+
+/* ---------- Plynuly prechod pri prepnuti Dark/Light ---------- */
+html {
+  transition: background-color var(--duration) var(--ease);
+}
+body, .card, .sidebar, .quick-link-card, .chat-drawer, .confirm-modal,
+.badge, .btn, .nav-link, .aurora-layer {
+  transition-property: background-color, border-color, color, box-shadow, opacity;
+  transition-duration: var(--duration);
+  transition-timing-function: var(--ease);
+}

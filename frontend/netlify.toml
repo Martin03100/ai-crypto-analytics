@@ -1,0 +1,23 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# 1) Proxy: vsetko na /api/* presmeruje na tvoj Render backend, ale v
+#    prehliadaci ostane URL adresa netlify.app domeny (takze cookies
+#    fungujú ako "same-origin" - CSRF a session cookie z backendu budu
+#    fungovat presne tak, ako lokalne). DOLEZITE: nahrad
+#    "https://TVOJ-BACKEND-NAZOV.onrender.com" za skutocnu URL, ktoru ti
+#    Render pridelí v Kroku 2 navodu DEPLOYMENT.md.
+[[redirects]]
+  from = "/api/*"
+  to = "https://TVOJ-BACKEND-NAZOV.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+# 2) SPA fallback: React Router rieši smerovanie na strane klienta, takze
+#    kazda ina cesta (napr. priamy vstup na /forecast) musi vratit
+#    index.html, inak Netlify vrati 404.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

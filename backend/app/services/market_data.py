@@ -1,0 +1,267 @@
+"""
+app/services/market_data.py
+=============================
+Integracia verejnych, bezplatnych API pre trhove data (Fear & Greed Index,
+RSS krypto spravy) plus staticke udalosti. Ziadna funkcia nikdy nepusti
+nezachytenu vynimku von.
+"""
+
+from __future__ import annotations
+
+import re
+import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
+from typing import Any, Dict, List, Optional, Tuple
+
+import requests
+
+from app.config import CRYPTO_NEWS_RSS_URL, FEAR_GREED_API_URL, REQUEST_TIMEOUT_SECONDS
+from app.i18n_content import market_events_for_lang
+from app.utils.ttl_cache import TTLCache
+
+# Alternative.me sa realne prepocitava len ~raz za 24h, takze nema zmysel
+# bombardovat ho pri kazdom nacitani stranky. Kratky cache (15 min) znizuje
+# zataz a zaroven chrani pred tym, aby doslo k tichemu MOCK fallbacku
+# kvoli prilis castym requestom.
+_fear_greed_cache = TTLCache(ttl_seconds=900)  # 15 min
+_FEAR_GREED_KEY = "fear_greed"
+
+_DEFAULT_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; AICryptoAnalytics/2.0)"}
+
+
+def get_fear_greed_index() -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
+    cached = _fear_greed_cache.get(_FEAR_GREED_KEY)
+    if cached is not None:
+        return True, cached, None
+
+    try:
+        # Bez User-Agent hlavicky vie Cloudflare pred alternative.me
+        # obcas vratit 403 a appka by ticho spadla do MOCK rezimu.
+        response = requests.get(FEAR_GREED_API_URL, timeout=REQUEST_TIMEOUT_SECONDS, headers=_DEFAULT_HEADERS)
+        response.raise_for_status()
+        body = response.json()
+        entries = body.get("data", [])
+        if not entries:
+            return False, None, "API vratilo prazdnu odpoved pre Fear & Greed Index."
+        latest = entries[0]
+        raw_ts = latest.get("timestamp", "")
+        try:
+            updated_at = datetime.fromtimestamp(int(raw_ts), tz=timezone.utc).isoformat()
+        except (TypeError, ValueError):
+            updated_at = ""
+        data = {
+            "value": int(latest.get("value", 50)),
+            "classification": str(latest.get("value_classification", "Nezname")),
+            "timestamp": raw_ts,
+            "updated_at": updated_at,
+        }
+        _fear_greed_cache.set(_FEAR_GREED_KEY, data)
+        return True, data, None
+    except requests.exceptions.RequestException as exc:
+        # Ak mame stary cache (aj expirovany), radsej ho vratime (oznaceny ako
+        # mierne zastaraly) nez appku hodit do MOCK rezimu s vymyslenou hodnotou 50.
+        stale = _fear_greed_cache.get(_FEAR_GREED_KEY, allow_stale=True)
+        if stale is not None:
+            return True, stale, f"Pouzivam starsiu cachovanu hodnotu (chyba siete: {exc})"
+        return False, None, f"Chyba siete pri nacitani Fear & Greed Index: {exc}"
+    except (ValueError, KeyError, TypeError) as exc:
+        return False, None, f"Chyba pri spracovani Fear & Greed Index: {exc}"
+
+
+def get_dummy_fear_greed_index() -> Dict[str, Any]:
+    now = datetime.now(timezone.utc)
+    return {"value": 50, "classification": "[DUMMY] Neutral",
+            "timestamp": str(int(now.timestamp())), "updated_at": now.isoformat()}
+
+
+_TAG_STRIP_PATTERN = re.compile(r"<[^>]+>")
+
+
+def _clean_html(text: str) -> str:
+    if not text:
+        return ""
+    return _TAG_STRIP_PATTERN.sub("", text).strip()
+
+
+def _parse_rss_date(raw: str) -> Optional[datetime]:
+    try:
+        dt = parsedate_to_datetime(raw)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except (TypeError, ValueError):
+        return None
+
+
+def get_crypto_headlines(limit: int = 8) -> Tuple[bool, List[Dict[str, str]], Optional[str]]:
+    try:
+        response = requests.get(CRYPTO_NEWS_RSS_URL, timeout=REQUEST_TIMEOUT_SECONDS)
+        response.raise_for_status()
+        root = ET.fromstring(response.content)
+        items = root.findall(".//item")
+        if not items:
+            return False, [], "RSS feed neobsahuje ziadne spravy."
+        channel_title_el = root.find(".//channel/title")
+        source_name = _clean_html(channel_title_el.text) if channel_title_el is not None and channel_title_el.text else "Krypto Spravy"
+        headlines: List[Dict[str, str]] = []
+        for item in items[:limit]:
+            title_el = item.find("title")
+            link_el = item.find("link")
+            pubdate_el = item.find("pubDate")
+            title = _clean_html(title_el.text) if title_el is not None and title_el.text else ""
+            link = link_el.text.strip() if link_el is not None and link_el.text else ""
+            published_at = _parse_rss_date(pubdate_el.text) if pubdate_el is not None and pubdate_el.text else None
+            if title:
+                headlines.append({
+                    "title": title, "link": link, "source": source_name,
+                    "published_at": published_at.isoformat() if published_at else "",
+                })
+        if not headlines:
+            return False, [], "Nepodarilo sa spracovat ziadnu polozku z RSS feedu."
+        return True, headlines, None
+    except requests.exceptions.RequestException as exc:
+        return False, [], f"Chyba siete pri nacitani krypto sprav: {exc}"
+    except ET.ParseError as exc:
+        return False, [], f"Chyba pri spracovani RSS XML: {exc}"
+
+
+def get_dummy_crypto_headlines(limit: int = 6) -> List[Dict[str, str]]:
+    templates = [
+        "Bitcoin dosahuje nove lokalne maximum uprostred institucionalneho zaujmu",
+        "Regulatori vysetruju velku burzu kvoli suladu s predpismi",
+        "Ethereum upgrade slubuje nizsie transakcne poplatky",
+        "Trh kryptomien zaznamenava vypredaj po makroekonomickych datach",
+        "DeFi protokol oznamuje partnerstvo s tradicnou bankou",
+        "Nova L2 siet prekonala milnik v pocte dennych transakcii",
+    ]
+    now = datetime.now(timezone.utc)
+    return [
+        {
+            "title": f"[DUMMY] {t}", "link": "#", "source": "Demo Zdroj",
+            "published_at": (now - timedelta(hours=i * 2 + 1)).isoformat(),
+        }
+        for i, t in enumerate(templates[:limit])
+    ]
+
+
+def get_upcoming_market_events(lang: str = "en") -> List[Dict[str, str]]:
+    today = datetime.now(timezone.utc).date()
+    result = []
+    for event in market_events_for_lang(lang):
+        event_date = today + timedelta(days=int(event["offset_days"]))
+        result.append({"datum": event_date.strftime("%d.%m.%Y"), "udalost": event["event"], "typ": event["type"]})
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Live ceny (CoinGecko) s jednoduchou in-memory cache (TTL), aby sme
+# neprekrocili rate limit bezplatneho CoinGecko API (chyba 429).
+# ---------------------------------------------------------------------------
+from app.config import (  # noqa: E402
+    COINGECKO_SEARCH_URL, COINGECKO_SIMPLE_PRICE_URL, PRICE_CACHE_TTL_SECONDS,
+)
+
+_price_cache = TTLCache(ttl_seconds=PRICE_CACHE_TTL_SECONDS)
+_market_chart_cache = TTLCache(ttl_seconds=PRICE_CACHE_TTL_SECONDS)
+_search_cache = TTLCache(ttl_seconds=300)  # vyhladavacie vysledky sa menia zriedka
+
+
+def get_live_prices(coin_ids: List[str], vs_currency: str = "usd") -> Tuple[bool, Optional[Dict[str, float]], Optional[str]]:
+    """Vrati ceny pre zoznam CoinGecko id v zvolenej mene (usd/eur/czk/btc).
+    Vysledky su cachovane na PRICE_CACHE_TTL_SECONDS (predvolene 60s), aby
+    opakovane requesty z frontendu (napr. prepocet portfolia) nevolali
+    CoinGecko znova a znova."""
+    if not coin_ids:
+        return True, {}, None
+
+    vs_currency = (vs_currency or "usd").lower()
+    cache_key = ",".join(sorted(set(coin_ids))) + f"|{vs_currency}"
+
+    cached = _price_cache.get(cache_key)
+    if cached is not None:
+        return True, cached, None
+
+    try:
+        response = requests.get(
+            COINGECKO_SIMPLE_PRICE_URL,
+            params={"ids": cache_key.split("|")[0], "vs_currencies": vs_currency, "include_24hr_change": "true"},
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        body = response.json()
+        prices: Dict[str, float] = {}
+        for coin_id, values in body.items():
+            if isinstance(values, dict) and vs_currency in values:
+                prices[coin_id] = {
+                    vs_currency: float(values[vs_currency]),
+                    f"{vs_currency}_24h_change": float(values.get(f"{vs_currency}_24h_change", 0.0) or 0.0),
+                }
+        _price_cache.set(cache_key, prices)
+        return True, prices, None
+    except requests.exceptions.RequestException as exc:
+        # Ak mame stary cache (aj expirovany), radsej ho vratime nez zlyhat celkom.
+        stale = _price_cache.get(cache_key, allow_stale=True)
+        if stale is not None:
+            return True, stale, f"Pouzivam starsie cachovane ceny (CoinGecko chyba: {exc})"
+        return False, None, f"Chyba siete pri nacitani cien z CoinGecko: {exc}"
+    except (ValueError, KeyError, TypeError) as exc:
+        return False, None, f"Chyba pri spracovani odpovede CoinGecko: {exc}"
+
+
+def get_market_chart(coin_id: str, vs_currency: str = "usd", days: str = "7") -> Tuple[bool, List[List[float]], Optional[str]]:
+    """Historicke cenove data pre interaktivny graf (Trhovy Sentiment stranka):
+    zoom/prepinanie casovych ramcov. Vracia zoznam [timestamp_ms, cena]."""
+    vs_currency = (vs_currency or "usd").lower()
+    cache_key = f"{coin_id}|{vs_currency}|{days}"
+    cached = _market_chart_cache.get(cache_key)
+    if cached is not None:
+        return True, cached, None
+    try:
+        response = requests.get(
+            f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart",
+            params={"vs_currency": vs_currency, "days": days},
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        body = response.json()
+        prices = body.get("prices", [])
+        _market_chart_cache.set(cache_key, prices)
+        return True, prices, None
+    except requests.exceptions.RequestException as exc:
+        stale = _market_chart_cache.get(cache_key, allow_stale=True)
+        if stale is not None:
+            return True, stale, f"Pouzivam starsie cachovane data (chyba: {exc})"
+        return False, [], f"Chyba siete pri nacitani historickych cien: {exc}"
+    except (ValueError, KeyError, TypeError) as exc:
+        return False, [], f"Chyba pri spracovani historickych cien: {exc}"
+
+
+def search_coins(query: str, limit: int = 8) -> Tuple[bool, List[Dict[str, str]], Optional[str]]:
+    """Vyhladavanie ktorejkolvek mincy podporovanej na CoinGecko (pre custom
+    vyber mincí v Portfolio Advisor aj globalne vyhladavanie v hlavicke),
+    s kratkym cachovanim opakovanych dopytov."""
+    query = (query or "").strip()
+    if not query:
+        return True, [], None
+    cache_key = f"{query.lower()}|{limit}"
+    cached = _search_cache.get(cache_key)
+    if cached is not None:
+        return True, cached, None
+    try:
+        response = requests.get(
+            COINGECKO_SEARCH_URL, params={"query": query}, timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        body = response.json()
+        coins = body.get("coins", [])[:limit]
+        result = [
+            {"id": c.get("id", ""), "symbol": str(c.get("symbol", "")).upper(), "name": c.get("name", "")}
+            for c in coins if c.get("id")
+        ]
+        _search_cache.set(cache_key, result)
+        return True, result, None
+    except requests.exceptions.RequestException as exc:
+        return False, [], f"Chyba siete pri vyhladavani mincí: {exc}"
+    except (ValueError, KeyError, TypeError) as exc:
+        return False, [], f"Chyba pri spracovani vysledkov vyhladavania: {exc}"
