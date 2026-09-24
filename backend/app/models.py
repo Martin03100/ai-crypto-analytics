@@ -35,7 +35,12 @@ class User(Base):
     # Zvysi sa pri "odhlasit zo vsetkych zariadeni" / zmene hesla - kazdy JWT
     # vydany PRED touto zmenou tym okamzite prestane platit (viz app/deps.py).
     token_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    # Volitelny email - potrebny iba pre "Zabudnuté heslo" (viz routers/auth.py).
+    # Email - povinny pri registracii (routers/auth.py), pouziva sa na
+    # prihlasovaci identifikator pre "Zabudnuté heslo" aj ako jedinecny
+    # identifikator naprieč uctami. Stlpec ostava nullable na urovni DB
+    # (spatna kompatibilita s uctami vytvorenymi este pred touto zmenou),
+    # ale API vrstva ho pri registracii vzdy vyzaduje a kontroluje na
+    # jedinecnost (viz routers/auth.py, routers/account.py).
     email: Mapped[str] = mapped_column(String(255), nullable=True, default=None)
     # Ochrana proti hrubej sile pri prihlaseni (viz app/config.py MAX_FAILED_LOGIN_ATTEMPTS).
     failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

@@ -71,15 +71,16 @@ def update_email(payload: UpdateEmailRequest, user: User = Depends(get_current_u
                   db: Session = Depends(get_db)) -> dict:
     """Email sa pouziva na prihlasenie/reset hesla - musi byt jedinecny naprieč
     vsetkymi uctami (inak by "zabudnute heslo" nevedelo spolahlivo najst
-    spravny ucet)."""
-    email = sanitize_text(payload.email, max_length=255).lower() if payload.email else None
-    if email and ("@" not in email or "." not in email.split("@")[-1]):
+    spravny ucet). Odkedy je email povinny pri registracii, tento endpoint
+    uz nedovoluje email VYMAZAT (poslat prazdny/null) - inak by si tym
+    pouzivatel sam zablokoval "Zabudnuté heslo" bez akehokolvek varovania."""
+    email = sanitize_text(payload.email, max_length=255).lower() if payload.email else ""
+    if not email or "@" not in email or "." not in email.split("@")[-1]:
         raise HTTPException(status_code=400, detail="Zadaj platnú emailovú adresu.")
-    if email:
-        existing = db.query(User).filter(User.email == email, User.id != user.id).first()
-        if existing is not None:
-            raise HTTPException(status_code=400, detail="Tento email už používa iný účet.")
-    user.email = email or None
+    existing = db.query(User).filter(User.email == email, User.id != user.id).first()
+    if existing is not None:
+        raise HTTPException(status_code=400, detail="Tento email už používa iný účet.")
+    user.email = email
     db.commit()
     return {"success": True, "email": user.email}
 

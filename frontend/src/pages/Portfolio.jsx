@@ -166,7 +166,7 @@ export default function Portfolio() {
     try {
       const res = await api.analyzePortfolio(provider, holdings.map(({ minca, mnozstvo, coin_id }) => ({ minca, mnozstvo, coin_id })));
       setResult(res);
-      if (res.is_mock) push(res.error_message ? humanizeError(res.error_message, lang) : t("forecast.mockNotice"), "warn");
+      if (res.is_mock) push(res.error_message ? humanizeError(res.error_message, lang) : t("portfolio.mockNotice"), "warn");
     } catch (err) {
       push(err, "error");
     } finally {

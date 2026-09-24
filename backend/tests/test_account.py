@@ -53,6 +53,16 @@ def test_update_email_valid_accepted(registered):
     assert res.json()["email"] == "user@example.com"
 
 
+def test_update_email_rejects_clearing_to_empty(registered):
+    """Odkedy je email povinny, nesmie sa dat vymazat cez toto API - inak by
+    si pouzivatel sam zablokoval "Zabudnuté heslo" bez akehokolvek varovania."""
+    client, _username, _password = registered
+    res = client.put("/api/account/email", json={"email": ""}, headers=csrf_headers(client))
+    assert res.status_code == 400
+    res = client.put("/api/account/email", json={"email": None}, headers=csrf_headers(client))
+    assert res.status_code == 400
+
+
 def test_update_email_rejects_duplicate_from_another_account(client):
     """Ak si pouzivatel B zmeni email v Nastaveniach na taky, ktory uz ma
     pouzivatel A, musi to zlyhat - inak by "zabudnute heslo" nevedelo

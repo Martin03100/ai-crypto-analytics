@@ -1,6 +1,5 @@
 import { Brain, ChevronDown, Copy, Loader2, RefreshCw, Rocket, Save, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
 import {
   Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
@@ -150,12 +149,11 @@ export default function Forecast() {
   const { push } = useToast();
   const { t } = useLanguage();
   usePageTitle("forecast.title");
-  const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState("new");
   const providersCtx = useProviders();
   const providers = providersCtx.providers;
   const [provider, setProvider] = useState(null);
-  const [coin, setCoin] = useState(() => searchParams.get("coin")?.toUpperCase() || "BTC");
+  const [coin, setCoin] = useState("BTC");
   const [horizon, setHorizon] = useState("1T");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -167,17 +165,6 @@ export default function Forecast() {
   const HISTORY_PAGE_SIZE = 20;
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-
-  // Ak niekto pride z globalneho vyhladavania s ?coin=XYZ, nastav ho hned
-  // ako aktivnu mincu (aj ked nie je v predvolenom zozname COINS).
-  useEffect(() => {
-    const fromUrl = searchParams.get("coin");
-    if (fromUrl) {
-      setCoin(fromUrl.toUpperCase());
-      setSearchParams({}, { replace: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     if (providersCtx.defaultProvider) setProvider(providersCtx.defaultProvider);

@@ -10,7 +10,7 @@
 #    Render pridelí v Kroku 2 navodu DEPLOYMENT.md.
 [[redirects]]
   from = "/api/*"
-  to = "https://ai-crypto-analytics.onrender.com/api/:splat"
+  to = "https://TVOJ-BACKEND-NAZOV.onrender.com/api/:splat"
   status = 200
   force = true
 

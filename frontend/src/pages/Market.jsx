@@ -130,9 +130,9 @@ export default function Market() {
         <Card title={t("market.communityTitle")} icon={Vote}>
           {myVote && <p className="text-sub" style={{ marginTop: -4, marginBottom: 10 }}>{t("market.myLastVote")} <SentimentBadge sentiment={myVote} /></p>}
           <div className="grid grid-3" style={{ gap: 8, marginBottom: 14 }}>
-            <button className="btn btn-ghost btn-sm" onClick={() => castVote("Bullish")}>{t("market.voteBullish")}</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => castVote("Neutral")}>{t("market.voteNeutral")}</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => castVote("Bearish")}>{t("market.voteBearish")}</button>
+            <button className={`btn btn-sm ${myVote === "Bullish" ? "btn-primary" : "btn-ghost"}`} onClick={() => castVote("Bullish")} aria-pressed={myVote === "Bullish"}>{t("market.voteBullish")}</button>
+            <button className={`btn btn-sm ${myVote === "Neutral" ? "btn-primary" : "btn-ghost"}`} onClick={() => castVote("Neutral")} aria-pressed={myVote === "Neutral"}>{t("market.voteNeutral")}</button>
+            <button className={`btn btn-sm ${myVote === "Bearish" ? "btn-primary" : "btn-ghost"}`} onClick={() => castVote("Bearish")} aria-pressed={myVote === "Bearish"}>{t("market.voteBearish")}</button>
           </div>
           {percentages && percentages.total_votes > 0 ? (
             <>

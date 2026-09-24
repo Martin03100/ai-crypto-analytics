@@ -1,7 +1,7 @@
 {
   "name": "AI Crypto Analytics",
   "short_name": "AI Crypto",
-  "description": "AI-powered predikcia a analyza kryptomien",
+  "description": "AI-powered crypto price forecasts, portfolio analysis and live market sentiment.",
   "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#030712",

@@ -56,6 +56,11 @@ describe("humanizeError()", () => {
     expect(result.length).toBeLessThan(80);
   });
 
+  it("translates an invalid/expired password-reset code message", () => {
+    const raw = "Kód je nesprávny alebo expirovaný.";
+    expect(humanizeError(raw, "en")).toBe("The code is incorrect or has expired.");
+  });
+
   it("accepts an Error-like object with .message as well as a plain string", () => {
     const err = new Error("Nespravne pouzivatelske meno alebo heslo.");
     expect(humanizeError(err, "en")).toBe("Incorrect username or password.");

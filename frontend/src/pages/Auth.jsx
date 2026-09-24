@@ -117,6 +117,7 @@ export default function Auth() {
 
   async function handleResendCode() {
     setError("");
+    setInfo("");
     setResending(true);
     try {
       await requestCode(forgotEmail);
@@ -130,6 +131,7 @@ export default function Auth() {
   async function handleVerifyCode(e) {
     e.preventDefault();
     setError("");
+    setInfo("");
     if (code.trim().length !== 6) {
       setError(t("auth.validationCodeLength"));
       return;

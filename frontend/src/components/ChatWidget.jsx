@@ -1,6 +1,7 @@
 import { AlertCircle, History, MessageCircle, Plus, Send, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import { useConfirm } from "../context/ConfirmContext";
 import { useToast } from "../context/ToastContext";
 import { useProviders } from "../context/ProvidersContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -42,6 +43,7 @@ function makeTitle(firstMessage, fallback) {
 export default function ChatWidget() {
   const { push } = useToast();
   const { t, lang } = useLanguage();
+  const confirm = useConfirm();
   const [open, setOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const providersCtx = useProviders();
@@ -89,7 +91,9 @@ export default function ChatWidget() {
     setShowHistory(false);
   }
 
-  function deleteConversation(id) {
+  async function deleteConversation(id) {
+    const ok = await confirm(t("chat.deleteConfirm"));
+    if (!ok) return;
     setConversations((prev) => {
       const next = prev.filter((c) => c.id !== id);
       saveConversations(next);
