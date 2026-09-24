@@ -51,7 +51,11 @@ const TECHNICAL_PATTERNS = [
   { test: /429|rate limit|too many requests/i, key: "errors.providerRateLimit" },
   { test: /401|unauthorized|invalid.?api.?key|incorrect api key/i, key: "errors.providerInvalidKey" },
   { test: /403|forbidden/i, key: "errors.providerForbidden" },
-  { test: /404|not found/i, key: "errors.providerNotFound" },
+  // Zamerne VYZADUJE aj nazov/domenu AI providera vedla "404"/"not found" -
+  // ina by tento vzor omylom chytil AJ generickú 404 z rozbiteho routingu
+  // (napr. zle nastaveny Netlify proxy k backendu), ktora s AI providerom
+  // vobec nesuvisi, a zavadzajuco by ju oznacil ako "chyba AI providera".
+  { test: /(openai|anthropic|googleapis|gemini|deepseek|x\.ai|grok)[\s\S]{0,120}(404|not found)|(404|not found)[\s\S]{0,120}(openai|anthropic|googleapis|gemini|deepseek|x\.ai|grok)/i, key: "errors.providerNotFound" },
   { test: /timeout|timed out/i, key: "errors.timeout" },
   { test: /network|connection|econnrefused|failed to fetch/i, key: "errors.networkError" },
   { test: /insufficient_quota|quota|billing/i, key: "errors.providerQuota" },
@@ -65,6 +69,7 @@ function keyFromStatus(status) {
     case 401: return "errors.sessionExpired";
     case 403: return "errors.csrfInvalid";
     case 422: return "errors.validationError";
+    case 404: return "errors.routeNotFound";
     case 429: return "errors.rateLimited";
     case 500: case 502: case 504: return "errors.serverError";
     default: return null;

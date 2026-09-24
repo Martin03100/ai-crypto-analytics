@@ -164,6 +164,7 @@
   "errors.providerQuota": "Your AI provider account is out of credit/quota.",
   "errors.providerRateLimit": "You've hit the AI provider's rate limit. Wait a moment and try again.",
   "errors.rateLimited": "Too many requests. Try again in {seconds}s.",
+  "errors.routeNotFound": "Couldn't reach the server (404). Check the backend connection/deployment.",
   "errors.serverError": "A server error occurred. Please try again later.",
   "errors.sessionExpired": "Your session has expired or is invalid. Please log in again.",
   "errors.timeout": "The request timed out. Check your connection and try again.",

@@ -164,6 +164,7 @@
   "errors.providerQuota": "Účet AI providera nemá dostatečný kredit/kvótu.",
   "errors.providerRateLimit": "Překročil jsi limit požadavků u AI providera. Počkej chvíli a zkus to znovu.",
   "errors.rateLimited": "Příliš mnoho požadavků. Zkus to znovu za {seconds}s.",
+  "errors.routeNotFound": "Server se nepodařilo dosáhnout (404). Zkontroluj připojení/nasazení backendu.",
   "errors.serverError": "Nastala chyba na straně serveru. Zkus to prosím později.",
   "errors.sessionExpired": "Přihlášení vypršelo nebo je neplatné. Přihlas se prosím znovu.",
   "errors.timeout": "Vypršel časový limit požadavku. Zkontroluj připojení a zkus to znovu.",

@@ -61,6 +61,19 @@ describe("humanizeError()", () => {
     expect(humanizeError(raw, "en")).toBe("The code is incorrect or has expired.");
   });
 
+  it("does NOT mislabel a generic routing 404 (e.g. broken Netlify proxy) as an AI-provider error", () => {
+    const err = { message: "Server error (404)", status: 404 };
+    const result = humanizeError(err, "en");
+    expect(result).not.toMatch(/AI resource|AI provider/i);
+    expect(result).toBe("Couldn't reach the server (404). Check the backend connection/deployment.");
+  });
+
+  it("still recognizes a genuine AI-provider 404 (mentions the provider's own domain)", () => {
+    const raw = "API chyba (https://api.openai.com/v1/chat/completions): 404 Client Error: Not Found for url: ...";
+    const result = humanizeError(raw, "en");
+    expect(result).toBe("The requested AI resource was not found.");
+  });
+
   it("accepts an Error-like object with .message as well as a plain string", () => {
     const err = new Error("Nespravne pouzivatelske meno alebo heslo.");
     expect(humanizeError(err, "en")).toBe("Incorrect username or password.");
