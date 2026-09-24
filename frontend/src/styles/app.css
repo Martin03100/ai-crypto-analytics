@@ -215,6 +215,7 @@
        display: inline-flex; align-items: center; justify-content: center;
        width: 36px; height: 36px; border-radius: var(--radius-sm);
        background: var(--bg-card); border: 1px solid var(--border-subtle); color: var(--text-primary);
+       margin-bottom: 14px;
      }
    }
    
@@ -641,26 +642,6 @@
      .provider-status-dot { order: 0; }
    }
    
-   /* ---------- Global header search ---------- */
-   .header-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-   .global-search {
-     position: relative; flex: 1; max-width: 420px;
-     display: flex; align-items: center; gap: 8px;
-     background: var(--bg-inset); border: 1px solid var(--border-subtle);
-     border-radius: var(--radius-md); padding: 8px 12px;
-   }
-   .global-search-icon { color: var(--text-tertiary); flex-shrink: 0; }
-   .global-search-input {
-     flex: 1; background: none; border: none; outline: none; color: var(--text-primary); font-size: 13px;
-   }
-   .global-search-input::placeholder { color: var(--text-tertiary); }
-   .global-search-clear { background: none; border: none; color: var(--text-tertiary); cursor: pointer; display: flex; }
-   .global-search-results { left: 0; right: auto; width: 100%; min-width: 260px; }
-   @media (max-width: 760px) {
-     .header-row { flex-wrap: wrap; }
-     .global-search { max-width: none; order: 3; flex-basis: 100%; }
-   }
-   
    /* ---------- Daily Digest banner ---------- */
    .daily-digest {
      display: flex; gap: 12px; align-items: flex-start;
@@ -696,7 +677,6 @@
      .fab-chat { width: 48px; height: 48px; bottom: 16px; right: 14px; }
      .grid-2, .grid-3 { grid-template-columns: 1fr !important; }
      .card { padding: 14px !important; }
-     .global-search-results { max-height: 180px; }
    }
    @media (max-width: 400px) {
      .page-title { font-size: 17px; }
