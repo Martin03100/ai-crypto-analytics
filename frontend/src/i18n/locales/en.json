@@ -25,7 +25,7 @@
   "auth.featureModels": "AI forecasts with 5 models (Gemini, GPT, Claude…)",
   "auth.featurePortfolio": "Portfolio analysis with real market data",
   "auth.featureSecurity": "AES-256 encrypted API keys, HttpOnly session",
-  "auth.forgotInstructions": "Enter your username — we'll send a password reset link to the email on your account.",
+  "auth.forgotInstructions": "Enter the email address on your account — we'll send a password reset link to it.",
   "auth.forgotPasswordLink": "Forgot your password?",
   "auth.login": "Log in",
   "auth.newPasswordLabel": "New password",

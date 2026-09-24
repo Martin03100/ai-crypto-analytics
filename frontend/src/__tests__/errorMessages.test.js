@@ -49,6 +49,13 @@ describe("humanizeError()", () => {
     expect(() => humanizeError("", "en")).not.toThrow();
   });
 
+  it("shortens a real Gemini 429 quota-exceeded dump to a short translated message", () => {
+    const raw = "Gemini API chyba: 429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details.', 'status': 'RESOURCE_EXHAUSTED'}}";
+    const result = humanizeError(raw, "en");
+    expect(result).toBe("You've hit the AI provider's rate limit. Wait a moment and try again.");
+    expect(result.length).toBeLessThan(80);
+  });
+
   it("accepts an Error-like object with .message as well as a plain string", () => {
     const err = new Error("Nespravne pouzivatelske meno alebo heslo.");
     expect(humanizeError(err, "en")).toBe("Incorrect username or password.");

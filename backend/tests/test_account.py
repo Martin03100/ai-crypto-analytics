@@ -53,6 +53,18 @@ def test_update_email_valid_accepted(registered):
     assert res.json()["email"] == "user@example.com"
 
 
+def test_update_email_rejects_duplicate_from_another_account(client):
+    """Ak si pouzivatel B zmeni email v Nastaveniach na taky, ktory uz ma
+    pouzivatel A, musi to zlyhat - inak by "zabudnute heslo" nevedelo
+    spolahlivo urcit spravny ucet pre dany email."""
+    client.post("/api/auth/register", json={"username": "userA", "password": "GoodPass123", "email": "shared@example.com"})
+    client.post("/api/auth/logout", headers=csrf_headers(client))
+    client.post("/api/auth/register", json={"username": "userB", "password": "GoodPass123", "email": "userb@example.com"})
+
+    res = client.put("/api/account/email", json={"email": "shared@example.com"}, headers=csrf_headers(client))
+    assert res.status_code == 400
+
+
 def test_change_password_wrong_current_rejected(registered):
     client, _username, password = registered
     res = client.post("/api/account/change-password",

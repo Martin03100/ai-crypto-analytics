@@ -90,10 +90,23 @@ def test_forgot_password_always_returns_generic_success(client):
     """Anti-enumeration: aj pre neexistujuceho pouzivatela musi vratit
     rovnaku uspesnu odpoved, aby sa cez tento endpoint nedalo zistit,
     ktore ucty existuju."""
-    res = client.post("/api/auth/forgot-password", json={"username": "nobody-here"},
+    res = client.post("/api/auth/forgot-password", json={"email": "nobody-here@example.com"},
                        headers=anon_csrf_headers(client))
     assert res.status_code == 200
     assert res.json()["success"] is True
+
+
+def test_forgot_password_looks_up_by_email_not_username(registered):
+    """Zabudnute heslo teraz pyta EMAIL (nie pouzivatelske meno) - over, ze
+    lookup podla emailu (nastaveneho pri registracii) realne funguje."""
+    client, username, _password = registered
+    client.post("/api/auth/logout", headers=csrf_headers(client))
+    res = client.post("/api/auth/forgot-password", json={"email": "testuser1@example.com"},
+                       headers=anon_csrf_headers(client))
+    assert res.status_code == 200
+    assert res.json()["success"] is True
+    if "dev_reset_link" in res.json():
+        assert "resetToken=" in res.json()["dev_reset_link"]
 
 
 def test_forgot_password_never_leaks_reset_link_in_production(client, monkeypatch):
@@ -103,11 +116,10 @@ def test_forgot_password_never_leaks_reset_link_in_production(client, monkeypatc
     mohol cez tento endpoint ziskat funkcny reset odkaz bez pristupu k
     tomu emailu."""
     monkeypatch.setattr("app.routers.auth.APP_ENV", "production")
-    client.post("/api/auth/register", json={"username": "prodtest", "password": "GoodPass123", "email": "prodtest-original@example.com"})
-    client.put("/api/account/email", json={"email": "prodtest@example.com"}, headers=csrf_headers(client))
+    client.post("/api/auth/register", json={"username": "prodtest", "password": "GoodPass123", "email": "prodtest@example.com"})
     client.post("/api/auth/logout", headers=csrf_headers(client))
 
-    res = client.post("/api/auth/forgot-password", json={"username": "prodtest"},
+    res = client.post("/api/auth/forgot-password", json={"email": "prodtest@example.com"},
                        headers=anon_csrf_headers(client))
     assert res.status_code == 200
     assert "dev_reset_link" not in res.json()

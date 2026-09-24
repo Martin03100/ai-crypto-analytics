@@ -25,7 +25,7 @@
   "auth.featureModels": "AI predikcie s 5 modelmi (Gemini, GPT, Claude…)",
   "auth.featurePortfolio": "Portfólio analýza s reálnymi trhovými dátami",
   "auth.featureSecurity": "AES-256 šifrované API kľúče, HttpOnly session",
-  "auth.forgotInstructions": "Zadaj svoje používateľské meno — pošleme odkaz na obnovenie hesla na email priradený k tvojmu účtu.",
+  "auth.forgotInstructions": "Zadaj emailovú adresu priradenú k tvojmu účtu — pošleme na ňu odkaz na obnovenie hesla.",
   "auth.forgotPasswordLink": "Zabudnuté heslo?",
   "auth.login": "Prihlásiť sa",
   "auth.newPasswordLabel": "Nové heslo",

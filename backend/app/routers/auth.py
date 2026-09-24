@@ -46,7 +46,7 @@ def register(payload: RegisterRequest, response: Response, db: Session = Depends
     if existing is not None:
         raise HTTPException(status_code=400, detail="Toto pouzivatelske meno je uz obsadene.")
 
-    email = sanitize_text(payload.email, max_length=255)
+    email = sanitize_text(payload.email, max_length=255).lower()
     if "@" not in email or "." not in email.split("@")[-1]:
         raise HTTPException(status_code=400, detail="Zadaj platnú emailovú adresu.")
     existing_email = db.query(User).filter(User.email == email).first()
@@ -121,8 +121,8 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
         "success": True,
         "message": "Ak účet s emailom existuje, poslali sme naň odkaz na reset hesla.",
     }
-    username = sanitize_text(payload.username, max_length=64)
-    user = db.query(User).filter(User.username == username).first()
+    email = sanitize_text(payload.email, max_length=255).lower()
+    user = db.query(User).filter(User.email == email).first()
     if user is None or not user.email:
         return generic_response
 

@@ -69,11 +69,16 @@ def test_api_key_endpoint(provider: str, user: User = Depends(get_current_user),
 @router.put("/email", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
 def update_email(payload: UpdateEmailRequest, user: User = Depends(get_current_user),
                   db: Session = Depends(get_db)) -> dict:
-    """Email je volitelny a pouziva sa VYHRADNE pre 'Zabudnuté heslo'. Nie je
-    to prihlasovacie meno a nikde inde sa nezobrazuje."""
-    email = sanitize_text(payload.email, max_length=255) if payload.email else None
-    if email and "@" not in email:
+    """Email sa pouziva na prihlasenie/reset hesla - musi byt jedinecny naprieč
+    vsetkymi uctami (inak by "zabudnute heslo" nevedelo spolahlivo najst
+    spravny ucet)."""
+    email = sanitize_text(payload.email, max_length=255).lower() if payload.email else None
+    if email and ("@" not in email or "." not in email.split("@")[-1]):
         raise HTTPException(status_code=400, detail="Zadaj platnú emailovú adresu.")
+    if email:
+        existing = db.query(User).filter(User.email == email, User.id != user.id).first()
+        if existing is not None:
+            raise HTTPException(status_code=400, detail="Tento email už používa iný účet.")
     user.email = email or None
     db.commit()
     return {"success": True, "email": user.email}

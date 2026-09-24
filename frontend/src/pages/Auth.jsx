@@ -46,6 +46,7 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [email, setEmail] = useState("");
+  const [forgotEmail, setForgotEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
@@ -94,13 +95,13 @@ export default function Auth() {
     e.preventDefault();
     setError("");
     setInfo("");
-    if (!username || username.trim().length < 3) {
-      setError(t("auth.validationUsernameRequiredForgot"));
+    if (!forgotEmail || !forgotEmail.includes("@") || !forgotEmail.split("@").pop().includes(".")) {
+      setError(t("auth.validationEmailRequired"));
       return;
     }
     setLoading(true);
     try {
-      const res = await api.forgotPassword(username);
+      const res = await api.forgotPassword(forgotEmail);
       setInfo(res.message + (res.dev_reset_link ? t("auth.devResetLinkNote", { link: res.dev_reset_link }) : ""));
     } catch (err) {
       setError(humanizeError(err, lang));
@@ -210,8 +211,8 @@ export default function Auth() {
                 {t("auth.forgotInstructions")}
               </p>
               <div className="field">
-                <label>{t("auth.username")}</label>
-                <input className="input" value={username} onChange={(e) => setUsername(e.target.value)} />
+                <label>{t("auth.email")}</label>
+                <input className="input" type="email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} placeholder={t("auth.emailPlaceholder")} />
               </div>
               <button className="btn btn-primary btn-block" type="submit" disabled={loading}>
                 {loading && <Loader2 size={15} className="spin" />} {t("auth.sendResetLink")}

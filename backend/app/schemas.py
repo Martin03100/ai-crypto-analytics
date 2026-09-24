@@ -44,7 +44,7 @@ class UpdateEmailRequest(BaseModel):
 
 
 class ForgotPasswordRequest(BaseModel):
-    username: str
+    email: str
 
 
 class ResetPasswordRequest(BaseModel):
