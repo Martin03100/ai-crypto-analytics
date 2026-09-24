@@ -13,6 +13,7 @@ import { useToast } from "../context/ToastContext";
 import { useProviders } from "../context/ProvidersContext";
 import { useConfirm } from "../context/ConfirmContext";
 import { useLanguage } from "../context/LanguageContext";
+import { humanizeError } from "../i18n/errorMessages";
 import { localeForLang } from "../i18n/locale";
 import { copyToClipboard } from "../utils/copyToClipboard";
 import { usePageTitle } from "../hooks/usePageTitle";
@@ -224,7 +225,7 @@ export default function Forecast() {
     try {
       const res = await api.generateForecast(provider, coin, horizon);
       setResult(res);
-      if (res.is_mock) push(res.error_message || t("forecast.mockNotice"), "warn");
+      if (res.is_mock) push(res.error_message ? humanizeError(res.error_message, lang) : t("forecast.mockNotice"), "warn");
     } catch (err) {
       push(err, "error");
     } finally {

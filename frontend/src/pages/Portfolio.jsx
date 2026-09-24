@@ -12,6 +12,7 @@ import { useCurrency } from "../context/CurrencyContext";
 import { useProviders } from "../context/ProvidersContext";
 import { useToast } from "../context/ToastContext";
 import { useLanguage } from "../context/LanguageContext";
+import { humanizeError } from "../i18n/errorMessages";
 import { localeForLang } from "../i18n/locale";
 import { usePageTitle } from "../hooks/usePageTitle";
 
@@ -165,7 +166,7 @@ export default function Portfolio() {
     try {
       const res = await api.analyzePortfolio(provider, holdings.map(({ minca, mnozstvo, coin_id }) => ({ minca, mnozstvo, coin_id })));
       setResult(res);
-      if (res.is_mock) push(res.error_message || t("forecast.mockNotice"), "warn");
+      if (res.is_mock) push(res.error_message ? humanizeError(res.error_message, lang) : t("forecast.mockNotice"), "warn");
     } catch (err) {
       push(err, "error");
     } finally {

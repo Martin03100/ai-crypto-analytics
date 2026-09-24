@@ -9,6 +9,7 @@ import ProviderSelect from "../components/ProviderSelect";
 import { useToast } from "../context/ToastContext";
 import { useProviders } from "../context/ProvidersContext";
 import { useLanguage } from "../context/LanguageContext";
+import { humanizeError } from "../i18n/errorMessages";
 import { localeForLang } from "../i18n/locale";
 import { usePageTitle } from "../hooks/usePageTitle";
 
@@ -65,7 +66,7 @@ export default function Market() {
       const titles = headlines.map((h) => h.title);
       const res = await api.newsSentiment(provider, titles);
       setNewsResult(res);
-      if (res.is_mock) push(res.error_message || t("market.mockNotice"), "warn");
+      if (res.is_mock) push(res.error_message ? humanizeError(res.error_message, lang) : t("market.mockNotice"), "warn");
     } catch (err) {
       push(err, "error");
     } finally {
