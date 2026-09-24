@@ -84,32 +84,31 @@ def _email_shell(inner_html: str, preheader: str = "") -> str:
 </html>"""
 
 
-def render_reset_password_email(username: str, reset_link: str, expires_minutes: int) -> tuple[str, str]:
-    """Vrati (text_body, html_body) pre email s odkazom na reset hesla."""
+def render_reset_password_email(username: str, code: str, expires_minutes: int) -> tuple[str, str]:
+    """Vrati (text_body, html_body) pre email s kodom na reset hesla."""
     text_body = (
         f"Ahoj {username},\n\nO obnovenie hesla si poziadal(a) ty? Ak ano, "
-        f"klikni na odkaz nizsie (platny {expires_minutes} minut):\n\n{reset_link}\n\n"
+        f"zadaj tento kod v appke (platny {expires_minutes} minut):\n\n{code}\n\n"
         f"Ak si o reset nepoziadal(a), tento email jednoducho ignoruj — tvoj ucet je v poriadku."
     )
     html_body = _email_shell(
-        preheader=f"Odkaz na obnovenie hesla, platny {expires_minutes} minut.",
+        preheader=f"Tvoj kod na obnovenie hesla, platny {expires_minutes} minut.",
         inner_html=f"""
         <h1 style="margin:0 0 14px; font-size:19px; color:#0f172a;">Obnovenie hesla</h1>
-        <p style="margin:0 0 20px; font-size:14px; line-height:1.6; color:#334155;">
+        <p style="margin:0 0 22px; font-size:14px; line-height:1.6; color:#334155;">
           Ahoj <strong>{username}</strong>, dostali sme žiadosť o obnovenie hesla k tvojmu účtu.
-          Klikni na tlačidlo nižšie a nastav si nové heslo:
+          Zadaj tento kód v aplikácii:
         </p>
-        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 22px;">
-          <tr><td style="border-radius:10px; background:#0f172a;">
-            <a href="{reset_link}" style="display:inline-block; padding:13px 26px; font-size:14px; font-weight:700; color:#ffffff; text-decoration:none; border-radius:10px;">
-              Nastaviť nové heslo
-            </a>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 22px; width:100%;">
+          <tr><td align="center" style="background:#f1f5f9; border-radius:12px; padding:20px;">
+            <span style="font-family:'SF Mono',Consolas,monospace; font-size:34px; font-weight:800; letter-spacing:8px; color:#0f172a;">
+              {code}
+            </span>
           </td></tr>
         </table>
-        <p style="margin:0 0 8px; font-size:12.5px; color:#94a3b8;">
-          Tento odkaz je platný {expires_minutes} minút. Ak tlačidlo nefunguje, skopíruj tento odkaz do prehliadača:
+        <p style="margin:0 0 20px; font-size:12.5px; color:#94a3b8;">
+          Tento kód je platný {expires_minutes} minút a dá sa použiť len raz.
         </p>
-        <p style="margin:0 0 20px; font-size:12px; color:#22d3ee; word-break:break-all;">{reset_link}</p>
         <p style="margin:0; font-size:12.5px; color:#94a3b8;">
           Ak si o reset hesla nepožiadal(a) ty, tento email jednoducho ignoruj — tvoj účet zostáva v bezpečí.
         </p>

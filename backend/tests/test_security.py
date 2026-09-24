@@ -5,7 +5,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.security import (  # noqa: E402
-    encrypt_secret, decrypt_secret, generate_reset_token, hash_password,
+    encrypt_secret, decrypt_secret, generate_reset_code, hash_password,
     hash_reset_token, mask_key, sanitize_text, verify_password,
 )
 
@@ -30,10 +30,14 @@ def test_mask_key_hides_most_of_the_key():
     assert masked.endswith("cdef") or "..." in masked
 
 
-def test_generate_reset_token_hash_matches():
-    raw, digest = generate_reset_token()
-    assert hash_reset_token(raw) == digest
-    assert hash_reset_token("something-else") != digest
+def test_generate_reset_code_hash_matches():
+    code, digest = generate_reset_code()
+    assert len(code) == 6
+    assert code.isdigit()
+    assert hash_reset_token(code) == digest
+    other_code, _ = generate_reset_code()
+    if other_code != code:
+        assert hash_reset_token(other_code) != digest
 
 
 def test_sanitize_text_strips_control_chars_and_trims():

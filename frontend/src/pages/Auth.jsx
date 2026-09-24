@@ -1,6 +1,6 @@
 import { Brain, CheckCircle2, LineChart, Loader2, ShieldCheck, Sparkles } from "lucide-react";
 import { useState } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { api } from "../api";
 import CandlestickArt from "../components/CandlestickArt";
 import { useAuth } from "../context/AuthContext";
@@ -38,19 +38,18 @@ function AuthLanguageSwitch() {
 }
 
 export default function Auth() {
-  const [searchParams] = useSearchParams();
-  const resetTokenFromUrl = searchParams.get("resetToken");
-
-  const [tab, setTab] = useState(resetTokenFromUrl ? "reset" : "login");
+  const [tab, setTab] = useState("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [email, setEmail] = useState("");
   const [forgotEmail, setForgotEmail] = useState("");
+  const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const { login, register } = useAuth();
   const { t, lang } = useLanguage();
   usePageTitle("auth.pageTitle");
@@ -91,6 +90,11 @@ export default function Auth() {
     }
   }
 
+  async function requestCode(targetEmail) {
+    const res = await api.forgotPassword(targetEmail);
+    setInfo(res.message + (res.dev_reset_code ? t("auth.devResetCodeNote", { code: res.dev_reset_code }) : ""));
+  }
+
   async function handleForgotPassword(e) {
     e.preventDefault();
     setError("");
@@ -101,8 +105,40 @@ export default function Auth() {
     }
     setLoading(true);
     try {
-      const res = await api.forgotPassword(forgotEmail);
-      setInfo(res.message + (res.dev_reset_link ? t("auth.devResetLinkNote", { link: res.dev_reset_link }) : ""));
+      await requestCode(forgotEmail);
+      setCode("");
+      setTab("verifyCode");
+    } catch (err) {
+      setError(humanizeError(err, lang));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleResendCode() {
+    setError("");
+    setResending(true);
+    try {
+      await requestCode(forgotEmail);
+    } catch (err) {
+      setError(humanizeError(err, lang));
+    } finally {
+      setResending(false);
+    }
+  }
+
+  async function handleVerifyCode(e) {
+    e.preventDefault();
+    setError("");
+    if (code.trim().length !== 6) {
+      setError(t("auth.validationCodeLength"));
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.verifyResetCode(forgotEmail, code.trim());
+      setInfo("");
+      setTab("reset");
     } catch (err) {
       setError(humanizeError(err, lang));
     } finally {
@@ -120,7 +156,7 @@ export default function Auth() {
     }
     setLoading(true);
     try {
-      const res = await api.resetPassword(resetTokenFromUrl, newPassword);
+      const res = await api.resetPassword(forgotEmail, code.trim(), newPassword);
       setInfo(res.message);
       setTab("login");
     } catch (err) {
@@ -157,7 +193,7 @@ export default function Auth() {
           </div>
 
           <div className="card auth-form-card">
-            {tab !== "reset" && (
+            {tab !== "reset" && tab !== "verifyCode" && (
             <div className="tabs" style={{ width: "100%" }}>
               <button className={`tab ${tab === "login" ? "active" : ""}`} style={{ flex: 1 }} onClick={() => { setTab("login"); setError(""); setInfo(""); }}>
                 {t("auth.login")}
@@ -215,7 +251,38 @@ export default function Auth() {
                 <input className="input" type="email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} placeholder={t("auth.emailPlaceholder")} />
               </div>
               <button className="btn btn-primary btn-block" type="submit" disabled={loading}>
-                {loading && <Loader2 size={15} className="spin" />} {t("auth.sendResetLink")}
+                {loading && <Loader2 size={15} className="spin" />} {t("auth.sendCode")}
+              </button>
+              <button type="button" className="link-btn" onClick={() => { setTab("login"); setError(""); setInfo(""); }}>
+                {t("auth.backToLogin")}
+              </button>
+            </form>
+          )}
+
+          {tab === "verifyCode" && (
+            <form onSubmit={handleVerifyCode}>
+              <p className="text-sub" style={{ marginTop: 0 }}>
+                {t("auth.verifyCodeInstructions", { email: forgotEmail })}
+              </p>
+              <div className="field">
+                <label>{t("auth.codeLabel")}</label>
+                <input
+                  className="input"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="000000"
+                  style={{ textAlign: "center", fontSize: 22, letterSpacing: 8, fontFamily: "var(--font-mono)" }}
+                />
+              </div>
+              <button className="btn btn-primary btn-block" type="submit" disabled={loading}>
+                {loading && <Loader2 size={15} className="spin" />} {t("auth.verifyCode")}
+              </button>
+              <button type="button" className="link-btn" onClick={handleResendCode} disabled={resending}>
+                {resending && <Loader2 size={13} className="spin" style={{ marginRight: 4 }} />} {t("auth.resendCode")}
               </button>
               <button type="button" className="link-btn" onClick={() => { setTab("login"); setError(""); setInfo(""); }}>
                 {t("auth.backToLogin")}

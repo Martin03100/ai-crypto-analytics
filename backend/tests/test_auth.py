@@ -105,16 +105,85 @@ def test_forgot_password_looks_up_by_email_not_username(registered):
                        headers=anon_csrf_headers(client))
     assert res.status_code == 200
     assert res.json()["success"] is True
-    if "dev_reset_link" in res.json():
-        assert "resetToken=" in res.json()["dev_reset_link"]
+    assert "dev_reset_code" in res.json()
+    assert len(res.json()["dev_reset_code"]) == 6
+    assert res.json()["dev_reset_code"].isdigit()
 
 
-def test_forgot_password_never_leaks_reset_link_in_production(client, monkeypatch):
-    """Bezpecnostna regresia: dev_reset_link sa v produkcii NIKDY nesmie
+def test_full_reset_flow_request_verify_reset(registered):
+    """End-to-end: poziadaj o kod -> over kod -> nastav nove heslo -> priihlas
+    sa uz NOVYM heslom (stare uz nema fungovat)."""
+    client, username, old_password = registered
+    client.post("/api/auth/logout", headers=csrf_headers(client))
+
+    res = client.post("/api/auth/forgot-password", json={"email": "testuser1@example.com"},
+                       headers=anon_csrf_headers(client))
+    code = res.json()["dev_reset_code"]
+
+    res = client.post("/api/auth/verify-reset-code", json={"email": "testuser1@example.com", "code": code},
+                       headers=anon_csrf_headers(client))
+    assert res.status_code == 200
+    assert res.json()["valid"] is True
+
+    res = client.post("/api/auth/reset-password",
+                       json={"email": "testuser1@example.com", "code": code, "new_password": "BrandNewPass123"},
+                       headers=anon_csrf_headers(client))
+    assert res.status_code == 200
+    assert res.json()["success"] is True
+
+    res = client.post("/api/auth/login", json={"username": username, "password": old_password})
+    assert res.status_code == 401  # stare heslo uz nefunguje
+
+    res = client.post("/api/auth/login", json={"username": username, "password": "BrandNewPass123"})
+    assert res.status_code == 200
+
+
+def test_verify_reset_code_rejects_wrong_code(registered):
+    client, _username, _password = registered
+    client.post("/api/auth/logout", headers=csrf_headers(client))
+    client.post("/api/auth/forgot-password", json={"email": "testuser1@example.com"},
+                headers=anon_csrf_headers(client))
+
+    res = client.post("/api/auth/verify-reset-code", json={"email": "testuser1@example.com", "code": "000000"},
+                       headers=anon_csrf_headers(client))
+    assert res.status_code == 400
+
+
+def test_reset_password_rejects_wrong_code(registered):
+    client, _username, _password = registered
+    client.post("/api/auth/logout", headers=csrf_headers(client))
+    client.post("/api/auth/forgot-password", json={"email": "testuser1@example.com"},
+                headers=anon_csrf_headers(client))
+
+    res = client.post("/api/auth/reset-password",
+                       json={"email": "testuser1@example.com", "code": "000000", "new_password": "WhateverPass123"},
+                       headers=anon_csrf_headers(client))
+    assert res.status_code == 400
+
+
+def test_requesting_new_code_invalidates_the_previous_one(registered):
+    """Ak si pouzivatel vypyta kod dvakrat po sebe, ten PRVY uz nesmie
+    fungovat - platny je vzdy len ten najnovsi."""
+    client, _username, _password = registered
+    client.post("/api/auth/logout", headers=csrf_headers(client))
+
+    res1 = client.post("/api/auth/forgot-password", json={"email": "testuser1@example.com"},
+                        headers=anon_csrf_headers(client))
+    first_code = res1.json()["dev_reset_code"]
+
+    client.post("/api/auth/forgot-password", json={"email": "testuser1@example.com"},
+                headers=anon_csrf_headers(client))
+
+    res = client.post("/api/auth/verify-reset-code", json={"email": "testuser1@example.com", "code": first_code},
+                       headers=anon_csrf_headers(client))
+    assert res.status_code == 400
+
+
+def test_forgot_password_never_leaks_reset_code_in_production(client, monkeypatch):
+    """Bezpecnostna regresia: dev_reset_code sa v produkcii NIKDY nesmie
     vratit v API odpovedi, aj ked SMTP nie je nakonfigurovane - inak by
-    ktokolvek, kto pozna existujuce pouzivatelske meno so zadanym emailom,
-    mohol cez tento endpoint ziskat funkcny reset odkaz bez pristupu k
-    tomu emailu."""
+    ktokolvek, kto pozna existujuci email, mohol cez tento endpoint ziskat
+    funkcny reset kod bez pristupu k tomu emailu."""
     monkeypatch.setattr("app.routers.auth.APP_ENV", "production")
     client.post("/api/auth/register", json={"username": "prodtest", "password": "GoodPass123", "email": "prodtest@example.com"})
     client.post("/api/auth/logout", headers=csrf_headers(client))
@@ -122,7 +191,7 @@ def test_forgot_password_never_leaks_reset_link_in_production(client, monkeypatc
     res = client.post("/api/auth/forgot-password", json={"email": "prodtest@example.com"},
                        headers=anon_csrf_headers(client))
     assert res.status_code == 200
-    assert "dev_reset_link" not in res.json()
+    assert "dev_reset_code" not in res.json()
 
 
 def test_mutating_request_without_csrf_token_rejected(registered):

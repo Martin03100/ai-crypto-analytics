@@ -98,11 +98,13 @@ def mask_key(plain_text: str) -> str:
 import secrets  # noqa: E402
 
 
-def generate_reset_token() -> tuple[str, str]:
-    """Vrati (surovy_token_pre_link, sha256_hash_pre_db)."""
-    raw = secrets.token_urlsafe(32)
-    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
-    return raw, digest
+def generate_reset_code() -> tuple[str, str]:
+    """Vrati (surovy 6-cifernny kod pre email, sha256 hash pre DB).
+    Kratky ciselny kod (nie dlhy nahodny token v odkaze) - pouzivatel ho
+    prepise priamo v appke, nemusi opustit tab kvoli klikaniu na odkaz."""
+    code = "".join(secrets.choice("0123456789") for _ in range(6))
+    digest = hashlib.sha256(code.encode("utf-8")).hexdigest()
+    return code, digest
 
 
 def hash_reset_token(raw_token: str) -> str:

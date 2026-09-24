@@ -164,13 +164,14 @@ RATE_LIMIT_ACCOUNT_SENSITIVE: Final[tuple] = (5, 60)   # zmena hesla/emailu/odhl
 RATE_LIMIT_API_KEY_TEST: Final[tuple] = (10, 60)        # tlacidlo "Testovat" pri API klucoch
 RATE_LIMIT_VOTE: Final[tuple] = (10, 60)               # community sentiment hlasovanie
 RATE_LIMIT_MARKET_PUBLIC: Final[tuple] = (30, 60)      # verejne (neautentifikovane) market endpointy
+RATE_LIMIT_RESET_CODE: Final[tuple] = (8, 300)         # over/znovu-posli kod na reset hesla (brute-force ochrana)
 
 # ---------------------------------------------------------------------------
 # Password reset (funguje aj bez SMTP: v development rezime sa reset link
 # vrati priamo v API odpovedi + vypise do konzoly; v produkcii treba
 # nastavit SMTP_* premenne, inak sa link iba loguje na serveri).
 # ---------------------------------------------------------------------------
-PASSWORD_RESET_TOKEN_MINUTES: Final[int] = 30
+PASSWORD_RESET_TOKEN_MINUTES: Final[int] = 15
 SMTP_HOST: Final[str] = os.environ.get("SMTP_HOST", "")
 SMTP_PORT: Final[int] = int(os.environ.get("SMTP_PORT", "587"))
 SMTP_USER: Final[str] = os.environ.get("SMTP_USER", "")
