@@ -4,7 +4,7 @@ from tests.conftest import anon_csrf_headers, csrf_headers
 
 
 def test_register_success(client):
-    res = client.post("/api/auth/register", json={"username": "alice", "password": "GoodPass123"})
+    res = client.post("/api/auth/register", json={"username": "alice", "password": "GoodPass123", "email": "alice@example.com"})
     assert res.status_code == 201
     body = res.json()
     assert body["username"] == "alice"
@@ -13,15 +13,37 @@ def test_register_success(client):
 
 def test_register_duplicate_username_rejected(registered):
     client, username, password = registered
-    res = client.post("/api/auth/register", json={"username": username, "password": "AnotherPass123"})
+    res = client.post("/api/auth/register", json={"username": username, "password": "AnotherPass123", "email": "someone-else@example.com"})
     assert res.status_code == 400
 
 
 def test_register_password_too_short_is_validation_error(client):
-    res = client.post("/api/auth/register", json={"username": "bob", "password": "short"})
+    res = client.post("/api/auth/register", json={"username": "bob", "password": "short", "email": "bob@example.com"})
     assert res.status_code == 422
     # Pydantic validacne chyby vracaju POLE objektov (viz frontend api.js extractDetailMessage)
     assert isinstance(res.json()["detail"], list)
+
+
+def test_register_without_email_is_validation_error(client):
+    res = client.post("/api/auth/register", json={"username": "noemail", "password": "GoodPass123"})
+    assert res.status_code == 422
+
+
+def test_register_invalid_email_rejected(client):
+    res = client.post("/api/auth/register", json={"username": "bademail", "password": "GoodPass123", "email": "not-an-email"})
+    assert res.status_code == 400
+
+
+def test_register_duplicate_email_rejected(registered):
+    client, _username, _password = registered
+    res = client.post("/api/auth/register", json={"username": "differentuser", "password": "GoodPass123", "email": "testuser1@example.com"})
+    assert res.status_code == 400
+
+
+def test_register_stores_email_and_returns_it(client):
+    res = client.post("/api/auth/register", json={"username": "withemail", "password": "GoodPass123", "email": "withemail@example.com"})
+    assert res.status_code == 201
+    assert res.json()["email"] == "withemail@example.com"
 
 
 def test_login_success(registered):
@@ -81,7 +103,7 @@ def test_forgot_password_never_leaks_reset_link_in_production(client, monkeypatc
     mohol cez tento endpoint ziskat funkcny reset odkaz bez pristupu k
     tomu emailu."""
     monkeypatch.setattr("app.routers.auth.APP_ENV", "production")
-    client.post("/api/auth/register", json={"username": "prodtest", "password": "GoodPass123"})
+    client.post("/api/auth/register", json={"username": "prodtest", "password": "GoodPass123", "email": "prodtest-original@example.com"})
     client.put("/api/account/email", json={"email": "prodtest@example.com"}, headers=csrf_headers(client))
     client.post("/api/auth/logout", headers=csrf_headers(client))
 

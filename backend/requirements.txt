@@ -7,3 +7,4 @@ passlib==1.7.4
 cryptography==50.0.1
 requests==2.34.2
 python-multipart==0.0.32
+google-genai==2.25.0

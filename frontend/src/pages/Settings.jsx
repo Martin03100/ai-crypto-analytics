@@ -121,6 +121,7 @@ export default function Settings() {
             <div className="field">
               <label><AtSign size={12} style={{ verticalAlign: -1, marginRight: 4 }} />{t("settings.emailLabel")}</label>
               <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("settings.emailPlaceholder")} />
+              <span className="text-sub" style={{ display: "block", marginTop: 4 }}>{t("settings.emailDesc")}</span>
             </div>
             <button className="btn btn-ghost btn-sm" type="submit" disabled={savingEmail}>
               {savingEmail ? t("common.saving") : t("settings.saveEmail")}

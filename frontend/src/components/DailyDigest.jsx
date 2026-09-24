@@ -24,12 +24,23 @@ function loadCached() {
 export default function DailyDigest() {
   const { t } = useLanguage();
   const { defaultProvider, loading: providersLoading } = useProviders();
-  const [digest, setDigest] = useState(() => loadCached());
+  const [digest, setDigest] = useState(null);
   const [dismissed, setDismissed] = useState(() => sessionStorage.getItem("aca_digest_dismissed") === "1");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (digest || dismissed || providersLoading) return;
+    if (dismissed || providersLoading) return;
+    const cached = loadCached();
+    // Cachovany MOCK vysledok berieme ako platny iba ak pouzivatel STALE
+    // nema pripojeny ziaden AI provider. Inak by prehlad ostal "zaseknuty"
+    // v mock rezime cely den aj po tom, co si niekto medzitym pripoji
+    // skutocny API kluc (presne toto predtym robilo dojem, ze appka
+    // "ignoruje" novo pripojeny kluc).
+    const cacheIsStale = Boolean(cached?.isMock && defaultProvider);
+    if (cached && !cacheIsStale) {
+      setDigest(cached);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     const provider = defaultProvider || "gemini";
@@ -44,7 +55,7 @@ export default function DailyDigest() {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [providersLoading, defaultProvider]);
+  }, [providersLoading, defaultProvider, dismissed]);
 
   function dismiss() {
     setDismissed(true);

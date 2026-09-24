@@ -45,6 +45,7 @@ export default function Auth() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
@@ -59,6 +60,8 @@ export default function Auth() {
     if (username.trim().length < 3) return t("auth.validationUsernameLength");
     if (password.length < 8) return t("auth.validationPasswordLength");
     if (tab === "register" && password !== confirm) return t("auth.validationPasswordMismatch");
+    if (tab === "register" && (!email || !email.includes("@") || !email.split("@").pop().includes(".")))
+      return t("auth.validationEmailRequired");
     return null;
   }
 
@@ -77,7 +80,7 @@ export default function Auth() {
       if (tab === "login") {
         await login(username, password);
       } else {
-        await register(username, password);
+        await register(username, password, email);
       }
       navigate("/forecast");
     } catch (err) {
@@ -173,6 +176,12 @@ export default function Auth() {
                 <label>{t("auth.username")}</label>
                 <input className="input" value={username} onChange={(e) => setUsername(e.target.value)} placeholder={t("auth.usernamePlaceholder")} />
               </div>
+              {tab === "register" && (
+                <div className="field">
+                  <label>{t("auth.email")}</label>
+                  <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("auth.emailPlaceholder")} />
+                </div>
+              )}
               <div className="field">
                 <label>{t("auth.password")}</label>
                 <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.passwordPlaceholder")} />

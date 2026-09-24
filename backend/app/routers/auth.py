@@ -25,7 +25,7 @@ from app.security import (
     create_access_token, generate_reset_token, hash_password, hash_reset_token,
     sanitize_text, verify_password,
 )
-from app.services.email_service import is_smtp_configured, send_email
+from app.services.email_service import is_smtp_configured, render_reset_password_email, send_email
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -46,7 +46,14 @@ def register(payload: RegisterRequest, response: Response, db: Session = Depends
     if existing is not None:
         raise HTTPException(status_code=400, detail="Toto pouzivatelske meno je uz obsadene.")
 
-    user = User(username=username, password_hash=hash_password(payload.password))
+    email = sanitize_text(payload.email, max_length=255)
+    if "@" not in email or "." not in email.split("@")[-1]:
+        raise HTTPException(status_code=400, detail="Zadaj platnú emailovú adresu.")
+    existing_email = db.query(User).filter(User.email == email).first()
+    if existing_email is not None:
+        raise HTTPException(status_code=400, detail="Tento email už používa iný účet.")
+
+    user = User(username=username, password_hash=hash_password(payload.password), email=email)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -125,12 +132,8 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
     db.commit()
 
     reset_link = f"{FRONTEND_URL}/auth?resetToken={raw_token}"
-    body = (
-        f"Ahoj {user.username},\n\nO obnovenie hesla si poziadal(a) ty? Ak ano, "
-        f"klikni na odkaz nizsie (platny {PASSWORD_RESET_TOKEN_MINUTES} minut):\n\n{reset_link}\n\n"
-        f"Ak si o reset nepoziadal(a), tento email jednoducho ignoruj."
-    )
-    sent = send_email(user.email, "Obnovenie hesla — AI Crypto Analytics", body)
+    text_body, html_body = render_reset_password_email(user.username, reset_link, PASSWORD_RESET_TOKEN_MINUTES)
+    sent = send_email(user.email, "Obnovenie hesla — AI Crypto Analytics", text_body, html_body)
 
     result = dict(generic_response)
     # V dev rezime (bez SMTP) vratime link priamo v odpovedi, aby sa dal

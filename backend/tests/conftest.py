@@ -66,7 +66,8 @@ def registered(client):
     testu (rovnako ako prehliadac). Vracia (client, username, password)."""
     username = "testuser1"
     password = "TestPass123"
-    res = client.post("/api/auth/register", json={"username": username, "password": password})
+    email = "testuser1@example.com"
+    res = client.post("/api/auth/register", json={"username": username, "password": password, "email": email})
     assert res.status_code == 201, res.text
     return client, username, password
 
