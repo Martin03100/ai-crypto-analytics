@@ -172,11 +172,19 @@ RATE_LIMIT_RESET_CODE: Final[tuple] = (8, 300)         # over/znovu-posli kod na
 # nastavit SMTP_* premenne, inak sa link iba loguje na serveri).
 # ---------------------------------------------------------------------------
 PASSWORD_RESET_TOKEN_MINUTES: Final[int] = 15
+# Render (a viacero inych bezplatnych PaaS platforiem) od konca roka 2025
+# blokuje na bezplatnom pláne VSETKY odchadzajuce spojenia na SMTP porty
+# (25/465/587) kvoli ochrane pred spamom - priame SMTP tym padom z takehoto
+# hostingu proste nikdy neprejde, bez ohladu na spravnost udajov. BREVO_API_KEY
+# umoznuje poslat email cez ich HTTPS API (port 443) namiesto SMTP - to
+# blokovane nie je. Ak je nastaveny, ma prednost pred SMTP_* nizsie.
+BREVO_API_KEY: Final[str] = os.environ.get("BREVO_API_KEY", "")
+EMAIL_FROM: Final[str] = os.environ.get("EMAIL_FROM", "no-reply@ai-crypto-analytics.local")
 SMTP_HOST: Final[str] = os.environ.get("SMTP_HOST", "")
 SMTP_PORT: Final[int] = int(os.environ.get("SMTP_PORT", "587"))
 SMTP_USER: Final[str] = os.environ.get("SMTP_USER", "")
 SMTP_PASSWORD: Final[str] = os.environ.get("SMTP_PASSWORD", "")
-SMTP_FROM: Final[str] = os.environ.get("SMTP_FROM", "no-reply@ai-crypto-analytics.local")
+SMTP_FROM: Final[str] = os.environ.get("SMTP_FROM", EMAIL_FROM)
 FRONTEND_URL: Final[str] = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
 # ---------------------------------------------------------------------------

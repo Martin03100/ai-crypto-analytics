@@ -28,7 +28,7 @@ from app.security import (
     create_access_token, generate_reset_code, hash_password, hash_reset_token,
     sanitize_text, verify_password,
 )
-from app.services.email_service import is_smtp_configured, render_reset_password_email, send_email
+from app.services.email_service import is_email_configured, render_reset_password_email, send_email
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -150,7 +150,7 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
     # nevracia v odpovedi, aj keby administrator zabudol nastavit SMTP —
     # inak by ktokolvek, kto pozna existujuci email, mohol cez tento
     # endpoint ziskat funkcny reset kod priamo z API odpovede.
-    if not sent and not is_smtp_configured() and APP_ENV != "production":
+    if not sent and not is_email_configured() and APP_ENV != "production":
         result["dev_reset_code"] = code
     return result
 

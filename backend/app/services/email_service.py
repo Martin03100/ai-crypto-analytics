@@ -1,11 +1,20 @@
 """app/services/email_service.py — odosielanie emailov (napr. reset hesla).
 
-Ak su nastavene SMTP_* premenne (viz app/config.py), posiela realny email
-(HTML aj plain-text verziu naraz — multipart/alternative, standardna prax,
-aby ho spravne zobrazili aj emailovi klienti, ktori HTML nerendruju). Ak nie
-(typicky lokalny vyvoj), sprava sa iba zaloguje na server - appka tym padom
-funguje aj bez emailovej infrastruktury (viz routers/auth.py — v development
-rezime sa odkaz vrati aj priamo v API odpovedi)."""
+Dva mozne sposoby odoslania, v tomto poradi priority:
+
+1. Brevo HTTPS API (BREVO_API_KEY) — bezi cez port 443, ktory ziadny hosting
+   neblokuje. POUZIVAT TOTO na Render/Railway/Fly a inych bezplatnych PaaS
+   platformach: tie od konca roka 2025 na bezplatnom pláne blokuju VSETKY
+   odchadzajuce spojenia na klasicke SMTP porty (25/465/587) kvoli ochrane
+   pred spamom, takze priame SMTP z takehoto hostingu proste nikdy neprejde
+   (spojenie padne na timeout), bez ohladu na to, aky spravny je login/heslo.
+2. Klasicke SMTP (SMTP_* premenne) — funguje lokalne alebo na hostingu bez
+   tohto obmedzenia (platene instancie, VPS...).
+
+Ak nie je nastavene ani jedno (typicky lokalny vyvoj), sprava sa iba zaloguje
+na server - appka tym padom funguje aj bez emailovej infrastruktury (viz
+routers/auth.py — v development rezime sa kod vrati aj priamo v API odpovedi).
+"""
 
 from __future__ import annotations
 
@@ -14,22 +23,46 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from app.config import SMTP_FROM, SMTP_HOST, SMTP_PASSWORD, SMTP_PORT, SMTP_USER
+import requests
+
+from app.config import BREVO_API_KEY, EMAIL_FROM, SMTP_FROM, SMTP_HOST, SMTP_PASSWORD, SMTP_PORT, SMTP_USER
 
 logger = logging.getLogger("aca.email")
+
+BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
 
 
 def is_smtp_configured() -> bool:
     return bool(SMTP_HOST and SMTP_USER and SMTP_PASSWORD)
 
 
-def send_email(to_address: str, subject: str, text_body: str, html_body: str | None = None) -> bool:
-    """Posle email. Ak je zadany `html_body`, posle multipart/alternative
-    (HTML + plain-text fallback pre klientov, ktori HTML nerendruju alebo
-    ho pouzivatel ma vypnuty) - standardny format pre transakcne emaily."""
-    if not is_smtp_configured():
-        logger.info("SMTP nie je nakonfigurovany — email pre %s sa iba loguje:\n%s", to_address, text_body)
+def is_email_configured() -> bool:
+    """True ak je nastaveny ASPON jeden zo sposobov odoslania (Brevo alebo SMTP)."""
+    return bool(BREVO_API_KEY) or is_smtp_configured()
+
+
+def _send_via_brevo(to_address: str, subject: str, text_body: str, html_body: str | None) -> bool:
+    try:
+        resp = requests.post(
+            BREVO_API_URL,
+            headers={"api-key": BREVO_API_KEY, "Content-Type": "application/json", "Accept": "application/json"},
+            json={
+                "sender": {"email": EMAIL_FROM},
+                "to": [{"email": to_address}],
+                "subject": subject,
+                "textContent": text_body,
+                "htmlContent": html_body or text_body,
+            },
+            timeout=10,
+        )
+        resp.raise_for_status()
+        return True
+    except Exception as exc:  # noqa: BLE001 - odoslanie emailu nikdy nesmie zhodit request
+        logger.error("Odoslanie emailu cez Brevo API na %s zlyhalo: %s", to_address, exc)
         return False
+
+
+def _send_via_smtp(to_address: str, subject: str, text_body: str, html_body: str | None) -> bool:
     try:
         if html_body:
             msg = MIMEMultipart("alternative")
@@ -46,8 +79,19 @@ def send_email(to_address: str, subject: str, text_body: str, html_body: str | N
             server.sendmail(SMTP_FROM, [to_address], msg.as_string())
         return True
     except Exception as exc:  # noqa: BLE001 - odoslanie emailu nikdy nesmie zhodit request
-        logger.error("Odoslanie emailu na %s zlyhalo: %s", to_address, exc)
+        logger.error("Odoslanie emailu cez SMTP na %s zlyhalo: %s", to_address, exc)
         return False
+
+
+def send_email(to_address: str, subject: str, text_body: str, html_body: str | None = None) -> bool:
+    """Posle email cez Brevo API (ak je nastaveny BREVO_API_KEY), inak cez
+    klasicke SMTP (ak je nastavene), inak sa sprava iba zaloguje."""
+    if BREVO_API_KEY:
+        return _send_via_brevo(to_address, subject, text_body, html_body)
+    if is_smtp_configured():
+        return _send_via_smtp(to_address, subject, text_body, html_body)
+    logger.info("Email nie je nakonfigurovany (BREVO_API_KEY ani SMTP_*) — email pre %s sa iba loguje:\n%s", to_address, text_body)
+    return False
 
 
 def _email_shell(inner_html: str, preheader: str = "") -> str:
