@@ -18,43 +18,55 @@ export default function Sidebar({ open, onClose }) {
   ];
 
   return (
-    <aside className={`sidebar ${open ? "open" : ""}`}>
-      <div className="brand">
-        <div className="brand-mark"><LineChart size={18} /></div>
-        <div>
-          <div className="brand-name">AI Crypto Analytics</div>
-          <div className="brand-sub">2026 Edition</div>
+    <>
+      {/* Stmavene pozadie za vysuvacim menu na mobile - klikom naň sa menu
+         zatvori (bezny UX vzor "tap outside to dismiss"). Na desktope sa
+         nikdy nezobrazi (sidebar tam je bezny stlpec, nie prekryvna vrstva). */}
+      <button
+        type="button"
+        className={`sidebar-backdrop ${open ? "open" : ""}`}
+        onClick={onClose}
+        aria-label={t("common.closeMenu")}
+        tabIndex={open ? 0 : -1}
+      />
+      <aside className={`sidebar ${open ? "open" : ""}`}>
+        <div className="brand">
+          <div className="brand-mark"><LineChart size={18} /></div>
+          <div>
+            <div className="brand-name">AI Crypto Analytics</div>
+            <div className="brand-sub">2026 Edition</div>
+          </div>
+          {open && (
+            <button className="mobile-menu-btn" style={{ marginLeft: "auto" }} onClick={onClose} aria-label={t("common.closeMenu")}>
+              <X size={18} />
+            </button>
+          )}
         </div>
-        {open && (
-          <button className="mobile-menu-btn" style={{ marginLeft: "auto" }} onClick={onClose} aria-label={t("common.closeMenu")}>
-            <X size={18} />
+
+        <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {LINKS.map(({ to, label, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
+              onClick={onClose}
+            >
+              <Icon size={17} />
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="sidebar-footer">
+          <div className="user-chip">
+            <div className="user-avatar">{initial}</div>
+            <div className="user-name">{user?.username}</div>
+          </div>
+          <button className="logout-btn" onClick={logout}>
+            <LogOut size={14} /> {t("nav.logout")}
           </button>
-        )}
-      </div>
-
-      <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        {LINKS.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
-            onClick={onClose}
-          >
-            <Icon size={17} />
-            {label}
-          </NavLink>
-        ))}
-      </nav>
-
-      <div className="sidebar-footer">
-        <div className="user-chip">
-          <div className="user-avatar">{initial}</div>
-          <div className="user-name">{user?.username}</div>
         </div>
-        <button className="logout-btn" onClick={logout}>
-          <LogOut size={14} /> {t("nav.logout")}
-        </button>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }

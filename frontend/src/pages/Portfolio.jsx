@@ -383,12 +383,19 @@ export default function Portfolio() {
 
           <Card title={t("portfolio.checklistTitle")}>
             {result.data.rebalancing_checklist?.map((step, i) => (
-              <div key={i} className="checklist-item" onClick={() => setChecked((c) => ({ ...c, [i]: !c[i] }))} style={{ cursor: "pointer" }}>
-                <span className={`checkbox ${checked[i] ? "checked" : ""}`}>{checked[i] && "✓"}</span>
+              <button
+                key={i}
+                type="button"
+                className="checklist-item"
+                onClick={() => setChecked((c) => ({ ...c, [i]: !c[i] }))}
+                role="checkbox"
+                aria-checked={Boolean(checked[i])}
+              >
+                <span className={`checkbox ${checked[i] ? "checked" : ""}`} aria-hidden="true">{checked[i] && "✓"}</span>
                 <span style={{ textDecoration: checked[i] ? "line-through" : "none", color: checked[i] ? "var(--text-tertiary)" : "inherit" }}>
                   {step}
                 </span>
-              </div>
+              </button>
             ))}
           </Card>
 

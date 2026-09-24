@@ -44,8 +44,9 @@ export default function CoinSearchPicker({ onPick }) {
       {open && results.length > 0 && (
         <div className="coin-search-results">
           {results.map((c) => (
-            <div
+            <button
               key={c.id}
+              type="button"
               className="coin-search-item"
               onClick={() => {
                 onPick(c);
@@ -56,7 +57,7 @@ export default function CoinSearchPicker({ onPick }) {
             >
               <span>{c.name}</span>
               <span className="text-sub mono">{c.symbol}</span>
-            </div>
+            </button>
           ))}
         </div>
       )}

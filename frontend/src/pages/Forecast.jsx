@@ -119,8 +119,8 @@ function HistoryItem({ entry, onDelete }) {
           <span className="text-sub">{new Date(entry.created_at).toLocaleString(locale)}</span>
         </span>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <span className="btn btn-ghost btn-sm" onClick={handleCopy} title={t("common.copy")} aria-label={t("common.copy")} role="button" tabIndex={0}><Copy size={12} /></span>
-          <span className="btn btn-danger-ghost btn-sm" onClick={handleDelete} title={t("common.delete")} aria-label={t("common.delete")} role="button" tabIndex={0}><Trash2 size={12} /></span>
+          <span className="btn btn-ghost btn-sm" onClick={handleCopy} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleCopy(e); } }} title={t("common.copy")} aria-label={t("common.copy")} role="button" tabIndex={0}><Copy size={12} /></span>
+          <span className="btn btn-danger-ghost btn-sm" onClick={handleDelete} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleDelete(e); } }} title={t("common.delete")} aria-label={t("common.delete")} role="button" tabIndex={0}><Trash2 size={12} /></span>
           <ChevronDown size={16} style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
         </span>
       </button>

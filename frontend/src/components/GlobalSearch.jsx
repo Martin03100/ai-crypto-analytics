@@ -67,10 +67,10 @@ export default function GlobalSearch() {
         <div className="coin-search-results global-search-results">
           {searching && <div className="coin-search-item text-sub">{t("common.searching")}</div>}
           {!searching && results.map((c) => (
-            <div key={c.id} className="coin-search-item" onClick={() => goToCoin(c)}>
+            <button key={c.id} type="button" className="coin-search-item" onClick={() => goToCoin(c)}>
               <span>{c.name}</span>
               <span className="text-sub mono">{c.symbol}</span>
-            </div>
+            </button>
           ))}
         </div>
       )}

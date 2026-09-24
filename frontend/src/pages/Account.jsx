@@ -89,7 +89,7 @@ export default function Account() {
             {keys.map((k) => (
               <div key={k.provider} className={`provider-row ${k.connected ? "connected" : ""}`}>
                 <span className={`provider-status-dot ${k.connected ? "on" : "off"}`} />
-                <div style={{ flex: "0 0 150px" }}>
+                <div className="provider-label">
                   <div style={{ fontSize: 13.5, fontWeight: 600 }}>{k.label}</div>
                   {k.connected && (
                     <div className="mono text-sub" style={{ marginTop: 2 }}>{k.masked_preview}</div>
@@ -101,12 +101,11 @@ export default function Account() {
                   )}
                 </div>
                 <input
-                  className="input"
+                  className="input provider-key-input"
                   type="password"
                   placeholder={k.connected ? t("account.keyPlaceholderConnected") : t("account.keyPlaceholderNew")}
                   value={inputs[k.provider] ?? ""}
                   onChange={(e) => setInputs((prev) => ({ ...prev, [k.provider]: e.target.value }))}
-                  style={{ flex: 1 }}
                 />
                 <div className="provider-row-actions">
                   <button
