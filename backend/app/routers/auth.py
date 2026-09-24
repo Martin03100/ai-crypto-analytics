@@ -14,15 +14,18 @@ from sqlalchemy.orm import Session
 
 from app.config import (
     ACCOUNT_LOCKOUT_MINUTES, APP_ENV, AUTH_COOKIE_MAX_AGE_SECONDS, AUTH_COOKIE_NAME, AUTH_COOKIE_SAMESITE,
-    AUTH_COOKIE_SECURE, FRONTEND_URL, MAX_FAILED_LOGIN_ATTEMPTS, PASSWORD_RESET_TOKEN_MINUTES,
-    RATE_LIMIT_LOGIN,
+    AUTH_COOKIE_SECURE, MAX_FAILED_LOGIN_ATTEMPTS, PASSWORD_RESET_TOKEN_MINUTES,
+    RATE_LIMIT_LOGIN, RATE_LIMIT_RESET_CODE,
 )
 from app.deps import get_current_user, get_db
 from app.models import PasswordResetToken, User
 from app.rate_limit import rate_limit_by_ip
-from app.schemas import ForgotPasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest, TokenResponse
+from app.schemas import (
+    ForgotPasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest, TokenResponse,
+    VerifyResetCodeRequest,
+)
 from app.security import (
-    create_access_token, generate_reset_token, hash_password, hash_reset_token,
+    create_access_token, generate_reset_code, hash_password, hash_reset_token,
     sanitize_text, verify_password,
 )
 from app.services.email_service import is_smtp_configured, render_reset_password_email, send_email
@@ -119,46 +122,81 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
     neexistuje), aby sa nedalo cez tento endpoint zistovat, kto ma ucet."""
     generic_response = {
         "success": True,
-        "message": "Ak účet s emailom existuje, poslali sme naň odkaz na reset hesla.",
+        "message": "Ak účet s emailom existuje, poslali sme naň kód na reset hesla.",
     }
     email = sanitize_text(payload.email, max_length=255).lower()
     user = db.query(User).filter(User.email == email).first()
     if user is None or not user.email:
         return generic_response
 
-    raw_token, token_hash = generate_reset_token()
+    # Predchadzajuce nepouzite kody pre tohto pouzivatela znehodnot - platny
+    # je vzdy len ten najnovsi, aby aj starsi unikly/nezmazany kod prestal
+    # fungovat hned, ako si pouzivatel vyziada novy.
+    db.query(PasswordResetToken).filter(
+        PasswordResetToken.user_id == user.id, PasswordResetToken.used.is_(False)
+    ).update({"used": True})
+
+    code, code_hash = generate_reset_code()
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=PASSWORD_RESET_TOKEN_MINUTES)
-    db.add(PasswordResetToken(user_id=user.id, token_hash=token_hash, expires_at=expires_at))
+    db.add(PasswordResetToken(user_id=user.id, token_hash=code_hash, expires_at=expires_at))
     db.commit()
 
-    reset_link = f"{FRONTEND_URL}/auth?resetToken={raw_token}"
-    text_body, html_body = render_reset_password_email(user.username, reset_link, PASSWORD_RESET_TOKEN_MINUTES)
-    sent = send_email(user.email, "Obnovenie hesla — AI Crypto Analytics", text_body, html_body)
+    text_body, html_body = render_reset_password_email(user.username, code, PASSWORD_RESET_TOKEN_MINUTES)
+    sent = send_email(user.email, "Kód na obnovenie hesla — AI Crypto Analytics", text_body, html_body)
 
     result = dict(generic_response)
-    # V dev rezime (bez SMTP) vratime link priamo v odpovedi, aby sa dal
-    # tok reálne otestovat bez emailoveho servera. V PRODUKCII sa link
-    # NIKDY nevracia v odpovedi, aj keby administrator zabudol nastavit
-    # SMTP — inak by ktokolvek, kto pozna existujuce pouzivatelske meno,
-    # mohol cez tento endpoint ziskat funkcny reset odkaz priamo z API
-    # odpovede, bez potreby pristupu k danemu emailu.
+    # V dev rezime (bez SMTP) vratime kod priamo v odpovedi, aby sa dal tok
+    # realne otestovat bez emailoveho servera. V PRODUKCII sa kod NIKDY
+    # nevracia v odpovedi, aj keby administrator zabudol nastavit SMTP —
+    # inak by ktokolvek, kto pozna existujuci email, mohol cez tento
+    # endpoint ziskat funkcny reset kod priamo z API odpovede.
     if not sent and not is_smtp_configured() and APP_ENV != "production":
-        result["dev_reset_link"] = reset_link
+        result["dev_reset_code"] = code
     return result
+
+
+def _find_valid_reset_token(db: Session, user_id: int, code: str) -> PasswordResetToken | None:
+    """Najde najnovsi nepouzity kod pre pouzivatela a overi, ci sedi so
+    zadanym kodom a ci este neexpiroval. Hlada podla user_id (nie len podla
+    hashu kodu) - 6-ciferny kod ma oveľa mensi priestor nez povodny dlhy
+    nahodny token, takze bez filtra na konkretneho pouzivatela by teoreticky
+    mohla (velmi zriedkavo) nastat zhoda hashu naprieč dvoma rôznymi uctami."""
+    row = (
+        db.query(PasswordResetToken)
+        .filter(PasswordResetToken.user_id == user_id, PasswordResetToken.used.is_(False))
+        .order_by(PasswordResetToken.created_at.desc())
+        .first()
+    )
+    if row is None:
+        return None
+    now = datetime.now(timezone.utc)
+    if row.expires_at.replace(tzinfo=timezone.utc) < now:
+        return None
+    if row.token_hash != hash_reset_token(code):
+        return None
+    return row
+
+
+@router.post("/verify-reset-code", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_RESET_CODE))])
+def verify_reset_code(payload: VerifyResetCodeRequest, db: Session = Depends(get_db)) -> dict:
+    """Overi kod BEZ toho, aby ho spotreboval (nemeni 'used') - appka tym
+    padom vie hned ukazat 'kod je spravny' a prejst na formular noveho
+    hesla, este predtym, nez si pouzivatel heslo skutocne zvoli."""
+    email = sanitize_text(payload.email, max_length=255).lower()
+    user = db.query(User).filter(User.email == email).first()
+    if user is None or _find_valid_reset_token(db, user.id, payload.code) is None:
+        raise HTTPException(status_code=400, detail="Kód je nesprávny alebo expirovaný.")
+    return {"valid": True}
 
 
 @router.post("/reset-password")
 def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)) -> dict:
-    token_hash = hash_reset_token(payload.token)
-    now = datetime.now(timezone.utc)
-    row = db.query(PasswordResetToken).filter(PasswordResetToken.token_hash == token_hash).first()
+    email = sanitize_text(payload.email, max_length=255).lower()
+    user = db.query(User).filter(User.email == email).first()
+    row = _find_valid_reset_token(db, user.id, payload.code) if user else None
 
-    if row is None or row.used or row.expires_at.replace(tzinfo=timezone.utc) < now:
-        raise HTTPException(status_code=400, detail="Odkaz na reset hesla je neplatný alebo expirovaný.")
-
-    user = db.get(User, row.user_id)
-    if user is None:
-        raise HTTPException(status_code=400, detail="Odkaz na reset hesla je neplatný alebo expirovaný.")
+    if user is None or row is None:
+        raise HTTPException(status_code=400, detail="Kód je nesprávny alebo expirovaný.")
 
     user.password_hash = hash_password(payload.new_password)
     user.token_version += 1  # invaliduje vsetky doteraz vydane JWT
