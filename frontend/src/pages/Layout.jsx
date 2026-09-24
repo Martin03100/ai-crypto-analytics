@@ -1,11 +1,23 @@
 import { Menu } from "lucide-react";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { Outlet } from "react-router-dom";
 import ChatWidget from "../components/ChatWidget";
 import DailyDigest from "../components/DailyDigest";
 import GlobalSearch from "../components/GlobalSearch";
 import Sidebar from "../components/Sidebar";
 import { useLanguage } from "../context/LanguageContext";
+
+/** Ľahký loading stav LEN pre obsahovú časť (nie cez celú obrazovku) - kým sa
+ * stiahne JS balíček pre danú stránku (lazy-loaded route, viď App.jsx).
+ * Sidebar aj hlavička ostávajú na mieste, nezmiznú počas prepínania stránok. */
+function ContentLoader() {
+  const { t } = useLanguage();
+  return (
+    <div style={{ padding: "60px 0", textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>
+      {t("app.loading")}
+    </div>
+  );
+}
 
 export default function Layout() {
   const { t } = useLanguage();
@@ -24,7 +36,9 @@ export default function Layout() {
 
         <DailyDigest />
 
-        <Outlet />
+        <Suspense fallback={<ContentLoader />}>
+          <Outlet />
+        </Suspense>
       </main>
 
       <ChatWidget />

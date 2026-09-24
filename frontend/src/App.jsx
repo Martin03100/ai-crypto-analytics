@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { useLanguage } from "./context/LanguageContext";
@@ -45,30 +45,28 @@ export default function App() {
       <div className="grid-layer" aria-hidden="true" />
       <div className="aurora-layer" aria-hidden="true"><div className="aurora-blob-3" /></div>
       <div className="grain-layer" aria-hidden="true" />
-      <Suspense fallback={<FullScreenLoader />}>
-        <Routes>
-          <Route path="/auth" element={user ? <Navigate to="/dashboard" replace /> : <Auth />} />
-          <Route path="/privacy" element={<PrivacyPolicy />} />
-          <Route path="/terms" element={<TermsOfService />} />
-          <Route
-            path="/"
-            element={
-              <RequireAuth>
-                <Layout />
-              </RequireAuth>
-            }
-          >
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="forecast" element={<Forecast />} />
-            <Route path="portfolio" element={<Portfolio />} />
-            <Route path="market" element={<Market />} />
-            <Route path="account" element={<Account />} />
-            <Route path="settings" element={<Settings />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Suspense>
+      <Routes>
+        <Route path="/auth" element={user ? <Navigate to="/dashboard" replace /> : <Auth />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
+        <Route
+          path="/"
+          element={
+            <RequireAuth>
+              <Layout />
+            </RequireAuth>
+          }
+        >
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="forecast" element={<Forecast />} />
+          <Route path="portfolio" element={<Portfolio />} />
+          <Route path="market" element={<Market />} />
+          <Route path="account" element={<Account />} />
+          <Route path="settings" element={<Settings />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </>
   );
 }
