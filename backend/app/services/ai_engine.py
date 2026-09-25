@@ -14,17 +14,19 @@ from __future__ import annotations
 import json
 import random
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import requests
 
 from app.config import (
     ANTHROPIC_API_URL, ANTHROPIC_API_VERSION, ANTHROPIC_MODEL,
-    DEEPSEEK_API_URL, DEEPSEEK_MODEL, GROK_API_URL, GROK_MODEL,
+    DEEPSEEK_API_URL, DEEPSEEK_MODEL, DEFAULT_COIN_IDS, GROK_API_URL, GROK_MODEL,
     MOCK_BASE_PRICES, OPENAI_API_URL, OPENAI_MODEL,
     PROVIDER_TOKEN_PRICE_USD_PER_1K,
     REQUEST_TIMEOUT_SECONDS, SECTOR_CATEGORIES, TIME_HORIZONS,
 )
+from app.services import market_data
 from app.services.validators import (
     build_daily_digest_prompt, build_forecast_prompt, build_news_prompt, build_portfolio_prompt,
     validate_digest_payload, validate_forecast_payload, validate_news_payload, validate_portfolio_payload,
@@ -55,9 +57,17 @@ class AIEngineResult:
 # Retry & Exponential Backoff pre docasne vypadky provider API (napr. Gemini
 # 503 "model overloaded", 429 rate limit, siet. timeouty). Neopakuje sa pri
 # trvalych chybach (401 nespravny kluc a pod.) - tie sa vratia hned.
+#
+# DOLEZITE: Netlify (a podobne proxy pred FastAPI backendom) ma vlastny
+# tvrdy limit cca 30-40s na to, kym backend zacne posielat odpoved - ak to
+# nestihne, PROXY SAMA vrati 502 skor, nez FastAPI vobec stihne odpovedat
+# (bez ohladu na to, ci by AI provider nakoniec uspel). _MAX_RETRIES=1 a
+# REQUEST_TIMEOUT_SECONDS=12 su zamerne male, aby CELY najhorsi mozny
+# pripad (2 pokusy + 1 pauza) ostal bezpecne pod touto hranicou:
+# 12 + 1.5 + 12 = 25.5s, s rezervou cca 14s na sietovu/frontovu rezii.
 # ---------------------------------------------------------------------------
 _RETRYABLE_STATUS_CODES = {429, 502, 503, 504}
-_MAX_RETRIES = 2
+_MAX_RETRIES = 1
 _BACKOFF_BASE_SECONDS = 1.5
 
 
@@ -87,14 +97,35 @@ def _post_with_retry(url: str, headers: Dict[str, str], payload: Dict[str, Any],
 
 # ---------------------------------------------------------------------------
 # Nizkourovnove volania providerov
+#
+# DOLEZITE (naklady/token spotreba): kazdy provider ma explicitne obmedzeny
+# vystup na _MAX_OUTPUT_TOKENS a nizku temperature (0.4). Odpovede su vzdy
+# kompaktny strukturovany JSON (zopar cenovych bodov + kratke zdovodnenie),
+# takze vyssi limit by len umoznil modelu zbytocne "vypisovat sa" - a teda
+# platit za tokeny, ktore appka aj tak zahodi pri parsovani. Rovnaky limit
+# naprieč vsetkymi providermi = predvidatelne naklady bez ohladu na to, ktory
+# si pouzivatel zvoli.
 # ---------------------------------------------------------------------------
+_MAX_OUTPUT_TOKENS = 1024
+_TEMPERATURE = 0.4
+
+
 def _call_gemini(prompt: str, api_key: str) -> tuple[bool, str, Optional[str]]:
     last_error = ""
     for attempt in range(_MAX_RETRIES + 1):
         try:
             from google import genai
-            client = genai.Client(api_key=api_key)
-            response = client.models.generate_content(model="gemini-3.6-flash", contents=prompt)
+            from google.genai import types
+            # DOLEZITE: bez explicitneho http_options timeoutu google-genai SDK
+            # pouziva svoj vlastny (nezdokumentovany, potencialne dlhy) default -
+            # v kombinacii s retry loopom nizsie to mohlo trvat tak dlho, ze
+            # Netlify proxy pred backendom sama vratila 502 skor, nez tento
+            # kod vobec stihol odpovedat (viz komentar pri _MAX_RETRIES vyssie).
+            client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=REQUEST_TIMEOUT_SECONDS * 1000))
+            response = client.models.generate_content(
+                model="gemini-3.6-flash", contents=prompt,
+                config=types.GenerateContentConfig(max_output_tokens=_MAX_OUTPUT_TOKENS, temperature=_TEMPERATURE),
+            )
             return True, response.text or "", None
         except Exception as exc:  # noqa: BLE001 - musime zachytit vsetko, nikdy nepadnut
             last_error = str(exc)
@@ -112,7 +143,10 @@ def _call_openai_compatible(url: str, model: str, prompt: str, api_key: str,
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     if extra_headers:
         headers.update(extra_headers)
-    payload = {"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.4}
+    payload = {
+        "model": model, "messages": [{"role": "user", "content": prompt}],
+        "temperature": _TEMPERATURE, "max_tokens": _MAX_OUTPUT_TOKENS,
+    }
     try:
         response = _post_with_retry(url, headers, payload, REQUEST_TIMEOUT_SECONDS)
         body = response.json()
@@ -126,7 +160,8 @@ def _call_openai_compatible(url: str, model: str, prompt: str, api_key: str,
 
 def _call_anthropic(prompt: str, api_key: str) -> tuple[bool, str, Optional[str]]:
     headers = {"x-api-key": api_key, "anthropic-version": ANTHROPIC_API_VERSION, "Content-Type": "application/json"}
-    payload = {"model": ANTHROPIC_MODEL, "max_tokens": 1024, "messages": [{"role": "user", "content": prompt}]}
+    payload = {"model": ANTHROPIC_MODEL, "max_tokens": _MAX_OUTPUT_TOKENS, "temperature": _TEMPERATURE,
+               "messages": [{"role": "user", "content": prompt}]}
     try:
         response = _post_with_retry(ANTHROPIC_API_URL, headers, payload, REQUEST_TIMEOUT_SECONDS)
         body = response.json()
@@ -223,13 +258,103 @@ def _generate_mock_news_summary(headlines: List[str], lang: str = "en") -> Dict[
 # ---------------------------------------------------------------------------
 # Verejne funkcie volane z routerov
 # ---------------------------------------------------------------------------
+def _fetch_market_context(coin: str) -> Optional[str]:
+    """Skutocne aktualne trhove data pre danu mincu (aktualna cena, 24h a 7d
+    zmena) - format ako kratky textovy blok na vlozenie do AI promptu.
+
+    DOLEZITE: bez tohto AI model nemal ZIADNU realnu kotvu (nevedel, aka je
+    aktualna cena) a predikcie tak boli len vymyslene cisla naviazane na
+    vseobecny "crypto stale rastie" narativ z trenovacich dat namiesto na
+    realny aktualny trend - presne preto posobili systematicky prilis
+    optimisticky. Vrati None (nie vynimku), ak sa data nepodari zohnat -
+    volajuci potom prompt zostavi bez tejto casti, nikdy to nepadne."""
+    coin_id = DEFAULT_COIN_IDS.get(coin.upper())
+    if not coin_id:
+        return None
+    try:
+        price_ok, prices, _ = market_data.get_live_prices([coin_id], "usd")
+        chart_ok, chart, _ = market_data.get_market_chart(coin_id, "usd", "7")
+        if not price_ok or not prices or coin_id not in prices:
+            return None
+        current = prices[coin_id]["usd"]
+        change_24h = prices[coin_id].get("usd_24h_change", 0.0)
+        parts = [f"Aktualna cena: ${current:,.2f} USD", f"Zmena za 24h: {change_24h:+.2f}%"]
+        if chart_ok and len(chart) >= 2:
+            price_7d_ago = chart[0][1]
+            if price_7d_ago:
+                change_7d = (current - price_7d_ago) / price_7d_ago * 100
+                low = min(p[1] for p in chart)
+                high = max(p[1] for p in chart)
+                parts.append(f"Zmena za poslednych 7 dni: {change_7d:+.2f}%")
+                parts.append(f"Rozpatie za 7 dni: ${low:,.2f} - ${high:,.2f} USD")
+        return " | ".join(parts)
+    except Exception:  # noqa: BLE001 - realne data su bonus, nikdy nesmu zhodit predikciu
+        return None
+
+
+def compute_forecast_accuracy(coin: str, timeframe: str, predicted_prices: List[float],
+                               time_labels: List[str], created_at: datetime) -> Dict[str, Any]:
+    """Spatne porovna ulozenu predikciu so SKUTOCNYM vyvojom ceny odvtedy, aby
+    mal pouzivatel dokaz (nie len sluby), ci AI predikcie maju realnu
+    vypovednu hodnotu. Tri mozne stavy:
+    - "pending": horizont predikcie este neubehol (napr. 1-tyzdnova predikcia
+      stara len 2 dni) - realne data na porovnanie proste este neexistuju.
+    - "unavailable": minca nie je v DEFAULT_COIN_IDS (custom vyhladana minca)
+      alebo CoinGecko data nezohnal - graceful fallback, nikdy vynimka.
+    - "completed": realne porovnanie s vypocitanym % presnosti."""
+    horizon_days_map = {"24h": 1, "1T": 7, "1M": 30, "1R": 365}
+    horizon_days = horizon_days_map.get(timeframe, 7)
+    created_at_utc = created_at if created_at.tzinfo else created_at.replace(tzinfo=timezone.utc)
+    target_end = created_at_utc + timedelta(days=horizon_days)
+    now = datetime.now(timezone.utc)
+
+    base = {"predicted_prices": predicted_prices, "time_labels": time_labels, "matures_at": target_end.isoformat()}
+
+    if now < target_end:
+        return {**base, "status": "pending", "accuracy_pct": None, "actual_prices": []}
+
+    coin_id = DEFAULT_COIN_IDS.get(coin.upper())
+    if not coin_id:
+        return {**base, "status": "unavailable", "accuracy_pct": None, "actual_prices": []}
+
+    try:
+        ok, chart, _ = market_data.get_market_chart_range(
+            coin_id, "usd", int(created_at_utc.timestamp()), int(target_end.timestamp())
+        )
+    except Exception:  # noqa: BLE001 - toto je bonusova funkcia, nikdy nesmie zhodit endpoint
+        ok, chart = False, []
+
+    if not ok or len(chart) < 2:
+        return {**base, "status": "unavailable", "accuracy_pct": None, "actual_prices": []}
+
+    n = len(predicted_prices)
+    chart_start_ts, chart_end_ts = chart[0][0], chart[-1][0]
+    actual_prices: List[float] = []
+    for i in range(n):
+        frac = i / max(1, n - 1)
+        target_ts = chart_start_ts + (chart_end_ts - chart_start_ts) * frac
+        closest = min(chart, key=lambda p: abs(p[0] - target_ts))
+        actual_prices.append(closest[1])
+
+    errors = [abs(predicted_prices[i] - actual_prices[i]) / actual_prices[i]
+              for i in range(n) if actual_prices[i]]
+    if not errors:
+        return {**base, "status": "unavailable", "accuracy_pct": None, "actual_prices": actual_prices}
+
+    mape_pct = (sum(errors) / len(errors)) * 100
+    accuracy_pct = round(max(0.0, 100.0 - mape_pct), 1)
+
+    return {**base, "status": "completed", "accuracy_pct": accuracy_pct, "actual_prices": actual_prices}
+
+
 def get_coin_forecast(provider: str, coin: str, horizon: str, api_key: Optional[str], lang: str = "en") -> AIEngineResult:
     if not api_key:
         return AIEngineResult(True, _generate_mock_forecast(coin, horizon, lang), True,
                                missing_api_key_message(lang))
 
     points = int(TIME_HORIZONS.get(horizon, {"points": 7})["points"])
-    prompt = build_forecast_prompt(coin, horizon, points)
+    market_context = _fetch_market_context(coin)
+    prompt = build_forecast_prompt(coin, horizon, points, market_context)
     success, raw_text, call_error = call_ai_provider(provider, prompt, api_key)
     if not success:
         return AIEngineResult(True, _generate_mock_forecast(coin, horizon, lang), True, call_error)
@@ -330,6 +455,48 @@ def _estimate_tokens(text: str) -> int:
     return max(1, round(len(text) / 4))
 
 
+def _estimate_cost_usd(provider: str, total_tokens: int) -> float:
+    price_per_1k = PROVIDER_TOKEN_PRICE_USD_PER_1K.get(provider, 0.0008)
+    return round((total_tokens / 1000) * price_per_1k, 6)
+
+
+def estimate_forecast_cost(provider: str, coin: str, horizon: str) -> Dict[str, Any]:
+    """Odhad ceny PRED skutocnym volanim AI (pre potvrdzovacie okno na
+    frontende) - vypocitany na TOM ISTOM prompte, aky by sa realne poslal, aby
+    bol odhad vstupnych tokenov presny. market_context sa zamerne vynechava
+    (na rozdiel od skutocneho volania v get_coin_forecast) - je to len o pár
+    desiatok tokenov naviac a odhad tak nemusi cakat na sietovy dotaz na
+    CoinGecko, aby ostal pre pouzivatela okamzity."""
+    points = int(TIME_HORIZONS.get(horizon, {"points": 7})["points"])
+    prompt = build_forecast_prompt(coin, horizon, points, market_context=None)
+    input_tokens = _estimate_tokens(prompt)
+    # Typicky vystup: kratke zdovodnenie + strukturalny JSON overhead, plus
+    # trocha naviac za kazdy dalsi datovy bod (cislo + casovy popisok).
+    expected_output_tokens = 150 + points * 12
+    total_tokens = input_tokens + expected_output_tokens
+    return {
+        "estimated_input_tokens": input_tokens,
+        "estimated_output_tokens": expected_output_tokens,
+        "estimated_total_tokens": total_tokens,
+        "estimated_cost_usd": _estimate_cost_usd(provider, total_tokens),
+    }
+
+
+def estimate_portfolio_cost(provider: str, holdings: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Rovnaky princip ako estimate_forecast_cost(), pre Portfolio Advisor."""
+    prompt = build_portfolio_prompt(holdings)
+    input_tokens = _estimate_tokens(prompt)
+    # Vystup rastie s poctom pozicii (kazda ma vlastne "akcia" + "dovod").
+    expected_output_tokens = 150 + max(1, len(holdings)) * 45
+    total_tokens = input_tokens + expected_output_tokens
+    return {
+        "estimated_input_tokens": input_tokens,
+        "estimated_output_tokens": expected_output_tokens,
+        "estimated_total_tokens": total_tokens,
+        "estimated_cost_usd": _estimate_cost_usd(provider, total_tokens),
+    }
+
+
 def chat_with_ai(provider: str, messages: List[Dict[str, str]], api_key: Optional[str],
                   lang: str = "en") -> AIEngineResult:
     if not messages:
@@ -355,8 +522,7 @@ def chat_with_ai(provider: str, messages: List[Dict[str, str]], api_key: Optiona
         return AIEngineResult(False, None, False, error)
 
     tokens = _estimate_tokens(prompt) + _estimate_tokens(text)
-    price_per_1k = PROVIDER_TOKEN_PRICE_USD_PER_1K.get(provider, 0.0008)
-    cost = round((tokens / 1000) * price_per_1k, 6)
+    cost = _estimate_cost_usd(provider, tokens)
     return AIEngineResult(True, {
         "reply": text.strip(), "tokens_used": tokens, "estimated_cost_usd": cost,
     }, False)

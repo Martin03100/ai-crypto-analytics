@@ -23,23 +23,36 @@ PORTFOLIO_REQUIRED_KEYS: Tuple[str, ...] = (
 NEWS_REQUIRED_KEYS: Tuple[str, ...] = ("spravy", "trendy")
 DIGEST_REQUIRED_KEYS: Tuple[str, ...] = ("zhrnutie", "kluceve_body")
 
-# Spolocna instrukcia pre AI, aby nezohladnovala len historicke ceny, ale aj
-# siri kontext, ktory realne hyba trhom: makroekonomika, geopolitika, klima,
-# a sentiment/naladu z X (Twitter), Reddit komunit a vyhlaseni vplyvnych ludi.
-# LLM tu cerpa z vlastnych trenovacich dat (ziadny live web-search nie je
-# k dispozicii pri volani provider API), takze ide o "odhad na zaklade
-# vseobecnej znalosti kontextu", nie o realtime scraping.
+# Spolocna instrukcia pre AI, aby nezohladnovala len historicke ceny, ale
+# SIRSIU sadu realnych cenotvornych faktorov naprieč kryptotrhom - makro,
+# regulacia, on-chain/derivatove trhove data, mainstreamove aj socialne
+# medialne pokrytie, vyjadrenia vplyvnych osobnosti, a pri altcoinoch aj
+# projektove fundamenty. LLM tu cerpa z vlastnych trenovacich dat (ziadny
+# live web-search nie je k dispozicii pri volani provider API), takze ide
+# o "odhad na zaklade vseobecnej znalosti kontextu", nie o realtime
+# scraping - preto instrukcia explicitne ziada priznat, kde ide o predpoklad.
 GLOBAL_CONTEXT_INSTRUCTION = (
-    "Pri analyze NEBER do uvahy iba historicke cenove data. Zohladni aj siri "
-    "kontext, ktory realne ovplyvnuje kryptotrh: (1) makroekonomiku - urokove "
-    "sadzby centralnych bank, inflaciu, silu USD; (2) geopolitiku - regulacne "
-    "rozhodnutia, sankcie, napatie medzi statmi; (3) klimaticke a energeticke "
-    "vplyvy relevantne pre mining/stakeaking; (4) aktualnu naladu a diskusie "
-    "na socialnych sieťach (X/Twitter, Reddit) a v krypto komunitach/fórach; "
-    "(5) verejne vyjadrenia vplyvnych osobnosti (zakladatelia projektov, "
-    "institucionalni investori, regulatori). Ak k niektorym z tychto faktorov "
-    "nemas aktualne data, jasne to uved v zdovodneni ako predpoklad/odhad "
-    "namiesto potvrdeneho faktu."
+    "Pri analyze NEBER do uvahy iba historicke cenove data. Zohladni siri "
+    "kontext, ktory realne hyba kryptotrhom: "
+    "(1) makroekonomiku a koreláciu s tradičnými trhmi - úrokové sadzby "
+    "centrálnych bánk, infláciu, silu USD/DXY, pohyb akciových indexov "
+    "(S&P 500, Nasdaq) a zlata; "
+    "(2) reguláciu a geopolitiku - rozhodnutia regulátorov, súdne spory, "
+    "sankcie, napätie medzi štátmi; "
+    "(3) krypto-špecifické trhové dáta - tok prostriedkov na/z búrz, pohyby "
+    "veľkých peňaženiek (whale), prítoky/odtoky ETF fondov, funding rates a "
+    "open interest na derivátoch; "
+    "(4) médiá a sentiment - mainstreamové finančné spravodajstvo AJ nálada "
+    "na sociálnych sieťach (X/Twitter, Reddit, Telegram) a v krypto "
+    "komunitách/fórach, vrátane rozlíšenia, či ide o širší medializovaný "
+    "názor alebo len o lokálnu bublinu nadšenia/paniky; "
+    "(5) verejné vyjadrenia vplyvných osobností - zakladatelia projektov, "
+    "inštitucionálni investori, regulátori; "
+    "(6) pri konkrétnych projektoch (nie BTC/ETH) aj ich vlastné fundamenty "
+    "- token unlocks, partnerstvá, technologické míľniky; "
+    "(7) klimatické a energetické vplyvy relevantné pre mining/staking. "
+    "Ak k niektorým z týchto faktorov nemáš aktuálne dáta, jasne to uveď v "
+    "zdôvodnení ako predpoklad/odhad namiesto potvrdeného faktu."
 )
 
 _JSON_BLOCK_PATTERN = re.compile(r"\{.*\}", re.DOTALL)
@@ -169,17 +182,26 @@ def build_daily_digest_prompt(fear_greed_value: int, fear_greed_classification: 
     )
 
 
-def build_forecast_prompt(coin: str, horizon: str, points: int) -> str:
+def build_forecast_prompt(coin: str, horizon: str, points: int, market_context: str | None = None) -> str:
+    context_block = (
+        f"SKUTOCNE aktualne trhove data pre {coin} (pouzi ako hlavny zaklad predikcie): {market_context}. "
+        if market_context else
+        f"Aktualne trhove data pre {coin} nie su k dispozicii - vychadzaj zo vseobecnych znalosti o tomto aktive, "
+        f"ale jasne to zohladni v nizsej istote (confidence_score) a v odovodneni to spomen. "
+    )
     return (
-        f"Si expert na kryptomenovu analyzu. Vytvor cenovu predikciu pre "
-        f"kryptomenu {coin} na casovy horizont {horizon} s presne {points} "
+        f"Si expert na kryptomenovu analyzu. {context_block}"
+        f"Predikcia MUSI vychadzat z poskytnuteho trendu (24h/7d zmena), NIE zo vseobecneho predpokladu, "
+        f"ze kryptomeny dlhodobo rastu - ak trend klesa alebo je neisty, predikuj pokles/stagnaciu rovnako "
+        f"ochotne ako rast. Falosny optimizmus je horsi ako priznana neistota. "
+        f"Vytvor cenovu predikciu pre kryptomenu {coin} na casovy horizont {horizon} s presne {points} "
         f"datovymi bodmi. {GLOBAL_CONTEXT_INSTRUCTION} "
         f"Odpovedz VYHRADNE ako platny JSON bez markdown obalu, "
         f"bez sprievodneho textu, presne v tomto tvare:\n"
         f'{{"ceny": [/* {points} cisel (float) */], '
         f'"casove_body": [/* {points} textovych popiskov casu */], '
         f'"odovodnenie": "/* strucne slovne zdovodnenie predikcie, vratane '
-        f'spomenutia relevantneho makro/geopoliticke/sentiment kontextu */", '
+        f'spomenutia relevantneho makro/geopoliticke/sentiment kontextu a aktualneho trendu */", '
         f'"confidence_score": /* cislo 0-100, ako vela si isty predikciou */, '
         f'"risk_level": "/* presne jedno z: Low, Medium, High */"}}'
     )
@@ -188,9 +210,12 @@ def build_forecast_prompt(coin: str, horizon: str, points: int) -> str:
 def build_portfolio_prompt(holdings: List[Dict[str, Any]]) -> str:
     holdings_text = ", ".join(f"{item.get('minca', '?')}: {item.get('mnozstvo', 0)}" for item in holdings)
     return (
-        f"Si profesionalny krypto investicny poradca. Analyzuj portfolio: "
+        f"Si profesionalny krypto investicny poradca, ktory hodnoti kazdu poziciu striktne na zaklade jej "
+        f"vlastnych rizik a fundamentov - nie automaticky ako BUY. Analyzuj portfolio: "
         f"{holdings_text}. Zameraj sa na rizika, diverzifikaciu a sektorove "
         f"zlozenie (DeFi, L1/L2, AI, Memes, Other). {GLOBAL_CONTEXT_INSTRUCTION} "
+        f"DOLEZITE: pouzivaj SELL a HOLD rovnako casto ako BUY, ked si to riziko/koncentracia/volatilita danej "
+        f"pozicie realisticky vyzaduje - odporucanie BUY pre kazdu poziciu by bolo nezodpovedne a nerealisticke. "
         f"Odpovedz VYHRADNE ako "
         f"platny JSON bez markdown obalu, bez sprievodneho textu, presne v tomto tvare:\n"
         f'{{"odporucania": [{{"minca": str, "akcia": "BUY|SELL|HOLD", "dovod": str}}, ...], '

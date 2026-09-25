@@ -17,9 +17,9 @@ from app.models import PortfolioHistory, User
 from app.rate_limit import rate_limit_by_user
 from app.config import RATE_LIMIT_AI_ENDPOINT
 from app.schemas import (
-    AIResultOut, PaginatedPortfolioHistory, PortfolioHistoryOut, PortfolioRequest, SavePortfolioRequest,
+    AIResultOut, CostEstimateOut, PaginatedPortfolioHistory, PortfolioHistoryOut, PortfolioRequest, SavePortfolioRequest,
 )
-from app.services.ai_engine import get_portfolio_analysis
+from app.services.ai_engine import estimate_portfolio_cost, get_portfolio_analysis
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
 
@@ -31,6 +31,19 @@ def analyze_portfolio(payload: PortfolioRequest, user: User = Depends(get_curren
     holdings = [h.model_dump() for h in payload.holdings]
     result = get_portfolio_analysis(payload.provider, holdings, api_key, payload.lang)
     return AIResultOut(**result.as_dict())
+
+
+@router.post("/estimate-cost", response_model=CostEstimateOut,
+             dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
+def estimate_portfolio_cost_endpoint(payload: PortfolioRequest, user: User = Depends(get_current_user),
+                                      db: Session = Depends(get_db)) -> CostEstimateOut:
+    """Odhad ceny PRED skutocnou analyzou - viz rovnaky endpoint vo forecast.py."""
+    api_key = get_decrypted_api_key(db, user.id, payload.provider)
+    if not api_key:
+        return CostEstimateOut(is_mock=True)
+    holdings = [h.model_dump() for h in payload.holdings]
+    result = estimate_portfolio_cost(payload.provider, holdings)
+    return CostEstimateOut(is_mock=False, **result)
 
 
 @router.post("/save", response_model=PortfolioHistoryOut, status_code=201)

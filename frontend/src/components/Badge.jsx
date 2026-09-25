@@ -51,6 +51,17 @@ export function ConfidenceBadge({ score }) {
   );
 }
 
+export function AccuracyBadge({ score }) {
+  const { t } = useLanguage();
+  const value = Math.round(score ?? 0);
+  const cls = value >= 70 ? "badge-buy" : value >= 40 ? "badge-hold" : "badge-sell";
+  return (
+    <span className={`badge ${cls}`}>
+      <span className="badge-dot" /> {t("badge.accuracy", { value })}
+    </span>
+  );
+}
+
 export function MockBadge() {
   const { t } = useLanguage();
   return <span className="badge badge-mock">{t("badge.mock")}</span>;

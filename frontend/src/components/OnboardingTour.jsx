@@ -138,14 +138,25 @@ export default function OnboardingTour({ onNeedSidebar }) {
   const isLast = stepIndex === STEP_TARGETS.length - 1;
   const pad = 8;
   const tw = 272;
+  const th = 170; // odhadovana max. vyska tooltipu - pouzita len na klampovanie do viewportu
+
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const clampLeft = (v) => Math.max(12, Math.min(v, vw - tw - 12));
+  const clampTop = (v) => Math.max(12, Math.min(v, vh - th - 12));
 
   let tipStyle = {};
   if (step.pos === "right") {
-    tipStyle = { left: rect.right + 18, top: Math.max(12, rect.top - 6) };
+    tipStyle = { left: clampLeft(rect.right + 18), top: clampTop(rect.top - 6) };
   } else if (step.pos === "left") {
-    tipStyle = { left: Math.max(12, rect.left - tw - 18), top: Math.max(12, rect.top - 100) };
+    tipStyle = { left: clampLeft(rect.left - tw - 18), top: clampTop(rect.top - 100) };
   } else {
-    tipStyle = { left: Math.max(12, Math.min(rect.left, window.innerWidth - tw - 12)), top: rect.bottom + 16 };
+    // "bottom": ak by tooltip pod cielom presiahol spodok viewportu (napr.
+    // cielovy prvok je nizko na obrazovke po scrollnuti), zobraz ho radsej
+    // NAD cielom namiesto toho, aby sa odrezal mimo viditelnej plochy.
+    const fitsBelow = rect.bottom + th + 16 <= vh;
+    const top = fitsBelow ? rect.bottom + 16 : rect.top - th - 16;
+    tipStyle = { left: clampLeft(rect.left), top: clampTop(top) };
   }
 
   return (

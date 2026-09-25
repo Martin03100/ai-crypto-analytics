@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api } from "../api";
 import CandlestickArt from "../components/CandlestickArt";
+import PasswordInput from "../components/PasswordInput";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { usePageTitle } from "../hooks/usePageTitle";
@@ -224,12 +225,12 @@ export default function Auth() {
               )}
               <div className="field">
                 <label>{t("auth.password")}</label>
-                <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.passwordPlaceholder")} />
+                <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.passwordPlaceholder")} />
               </div>
               {tab === "register" && (
                 <div className="field">
                   <label>{t("auth.confirmPassword")}</label>
-                  <input className="input" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+                  <PasswordInput value={confirm} onChange={(e) => setConfirm(e.target.value)} />
                 </div>
               )}
               <button className="btn btn-primary btn-block" type="submit" disabled={loading}>
@@ -298,7 +299,7 @@ export default function Auth() {
               <p className="text-sub" style={{ marginTop: 0 }}>{t("auth.resetInstructions")}</p>
               <div className="field">
                 <label>{t("auth.newPasswordLabel")}</label>
-                <input className="input" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t("auth.passwordPlaceholder")} />
+                <PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t("auth.passwordPlaceholder")} />
               </div>
               <button className="btn btn-primary btn-block" type="submit" disabled={loading}>
                 {loading && <Loader2 size={15} className="spin" />} {t("auth.setNewPassword")}

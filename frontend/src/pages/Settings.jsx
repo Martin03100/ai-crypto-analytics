@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Card } from "../components/Card";
 import { resetOnboarding } from "../components/OnboardingTour";
+import PasswordInput from "../components/PasswordInput";
 import { useAuth } from "../context/AuthContext";
 import { CURRENCIES, useCurrency } from "../context/CurrencyContext";
 import { LANGUAGES } from "../i18n/translations";
@@ -136,11 +137,11 @@ export default function Settings() {
             <div className="grid grid-2">
               <div className="field">
                 <label>{t("settings.currentPassword")}</label>
-                <input className="input" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+                <PasswordInput value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
               </div>
               <div className="field">
                 <label>{t("settings.newPassword")}</label>
-                <input className="input" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t("settings.newPasswordPlaceholder")} />
+                <PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t("settings.newPasswordPlaceholder")} />
               </div>
             </div>
             <button className="btn btn-primary btn-sm" type="submit" disabled={savingPassword}>
@@ -159,7 +160,7 @@ export default function Settings() {
           <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13 }}>
             <div><strong>{t("settings.version")}:</strong> 2.2.0 — 2026 Edition</div>
             <div><strong>{t("settings.techStack")}:</strong> React (Vite), FastAPI, SQLAlchemy, Recharts, CoinGecko API</div>
-            <div><strong>{t("settings.support")}:</strong> <a href="mailto:support@example.com" className="key-link">support@example.com</a></div>
+            <div><strong>{t("settings.support")}:</strong> <a href="mailto:aicryptoanalytics7@gmail.com" className="key-link">aicryptoanalytics7@gmail.com</a></div>
             <div style={{ display: "flex", gap: 14, marginTop: 6 }}>
               <Link to="/privacy" className="key-link">{t("privacy.title")}</Link>
               <Link to="/terms" className="key-link">{t("terms.title")}</Link>

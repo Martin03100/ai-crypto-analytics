@@ -16,7 +16,7 @@ from typing import Dict, Final, List
 # Vseobecne
 # ---------------------------------------------------------------------------
 APP_TITLE: Final[str] = "AI Crypto Analytics"
-REQUEST_TIMEOUT_SECONDS: Final[int] = 15
+REQUEST_TIMEOUT_SECONDS: Final[int] = 12
 
 BASE_DIR: Final[Path] = Path(__file__).resolve().parent.parent
 DATA_DIR: Final[Path] = BASE_DIR / "data"

@@ -90,3 +90,65 @@ def test_forecast_history_pagination(registered):
     body = res.json()
     assert body["total"] == 5
     assert len(body["items"]) == 1  # posledna, neuplna stranka
+
+
+def test_forecast_accuracy_requires_auth(client):
+    res = client.get("/api/forecast/history/1/accuracy")
+    assert res.status_code == 401
+
+
+def test_forecast_accuracy_404_for_nonexistent_entry(registered):
+    client, _username, _password = registered
+    res = client.get("/api/forecast/history/999999/accuracy")
+    assert res.status_code == 404
+
+
+def test_forecast_accuracy_pending_for_recent_forecast(registered):
+    """Predikcia ulozena prave teraz s horizontom "1T" (1 tyzden) - realne
+    data na porovnanie este neexistuju, status musi byt "pending"."""
+    client, _username, _password = registered
+    payload = {
+        "provider": "gemini", "coin": "BTC", "horizon": "1T", "is_mock": True,
+        "forecast_data": {"ceny": [100, 105], "casove_body": ["d1", "d2"], "odovodnenie": "test"},
+    }
+    res = client.post("/api/forecast/save", json=payload, headers=csrf_headers(client))
+    entry_id = res.json()["id"]
+
+    res = client.get(f"/api/forecast/history/{entry_id}/accuracy")
+    assert res.status_code == 200
+    body = res.json()
+    assert body["status"] == "pending"
+    assert body["accuracy_pct"] is None
+    assert body["predicted_prices"] == [100, 105]
+
+
+def test_forecast_accuracy_cannot_be_read_by_another_user(registered, client):
+    """Presnost cudzej ulozenej predikcie sa nikdy nesmie dat nahliadnut cez
+    len uhadnute ID zaznamu - rovnaky princip ako pri mazani cudzej analyzy."""
+    owner_client, _username, _password = registered
+    payload = {
+        "provider": "gemini", "coin": "BTC", "horizon": "1T", "is_mock": True,
+        "forecast_data": {"ceny": [100], "casove_body": ["d1"], "odovodnenie": "test"},
+    }
+    res = owner_client.post("/api/forecast/save", json=payload, headers=csrf_headers(owner_client))
+    entry_id = res.json()["id"]
+
+    other_reg = client.post("/api/auth/register", json={
+        "username": "inyuzivatel", "password": "heslo12345", "email": "iny@example.com",
+    }, headers=anon_csrf_headers(client))
+    assert other_reg.status_code == 201
+
+    res = client.get(f"/api/forecast/history/{entry_id}/accuracy")
+    assert res.status_code == 404
+
+
+def test_estimate_forecast_cost_without_api_key_returns_mock(registered):
+    """Bez pripojeneho klucu by realne volanie bolo zadarmo (mock rezim) -
+    odhad sa preto vobec nepocita, len sa vrati is_mock=true."""
+    client, _username, _password = registered
+    res = client.post("/api/forecast/estimate-cost", json={"provider": "gemini", "coin": "BTC", "horizon": "1T"},
+                       headers=csrf_headers(client))
+    assert res.status_code == 200
+    body = res.json()
+    assert body["is_mock"] is True
+    assert body["estimated_cost_usd"] == 0.0

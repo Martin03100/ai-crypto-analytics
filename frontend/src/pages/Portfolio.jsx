@@ -5,6 +5,7 @@ import { api } from "../api";
 import { ActionBadge, MockBadge } from "../components/Badge";
 import { Card } from "../components/Card";
 import CoinSearchPicker from "../components/CoinSearchPicker";
+import CostConfirmModal from "../components/CostConfirmModal";
 import PortfolioHistoryItem from "../components/PortfolioHistoryItem";
 import { SkeletonLines } from "../components/Skeleton";
 import ProviderSelect from "../components/ProviderSelect";
@@ -18,6 +19,9 @@ import { usePageTitle } from "../hooks/usePageTitle";
 
 const COINS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "DOT", "LINK"];
 const PIE_COLORS = ["#22d3ee", "#34d399", "#a78bfa", "#fbbf24", "#fb5a6a"];
+// Zhoduje sa s Field(max_length=30) na PortfolioRequest.holdings na backende
+// (app/schemas.py) - drzi to AI odpoved predvidatelne v ramci token limitu.
+const MAX_HOLDINGS = 30;
 
 // Mapovanie zakladnych symbolov na CoinGecko id (zhoduje sa s backend DEFAULT_COIN_IDS).
 const DEFAULT_COIN_IDS = {
@@ -60,6 +64,8 @@ export default function Portfolio() {
   const [result, setResult] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [costEstimate, setCostEstimate] = useState(null);
+  const [estimating, setEstimating] = useState(false);
   const [checked, setChecked] = useState({});
   const [prices, setPrices] = useState({});
   const [pfHistory, setPfHistory] = useState([]);
@@ -127,12 +133,20 @@ export default function Portfolio() {
   }
 
   function addRow() {
+    if (holdings.length >= MAX_HOLDINGS) {
+      push(t("portfolio.maxHoldingsReached", { max: MAX_HOLDINGS }), "warn");
+      return;
+    }
     const idx = holdings.length;
     setHoldings((prev) => [...prev, { minca: "BTC", mnozstvo: 1, coin_id: "bitcoin" }]);
     setAmountInputs((prev) => ({ ...prev, [idx]: "1" }));
   }
 
   function addCustomCoin(coin) {
+    if (holdings.length >= MAX_HOLDINGS) {
+      push(t("portfolio.maxHoldingsReached", { max: MAX_HOLDINGS }), "warn");
+      return;
+    }
     const idx = holdings.length;
     setHoldings((prev) => [...prev, { minca: coin.symbol, mnozstvo: 1, coin_id: coin.id }]);
     setAmountInputs((prev) => ({ ...prev, [idx]: "1" }));
@@ -160,6 +174,28 @@ export default function Portfolio() {
 
   async function analyze() {
     if (!provider || holdings.length === 0 || hasAmountErrors) return;
+    const providerInfo = providers.find((p) => p.provider === provider);
+    if (!providerInfo?.connected) {
+      // Demo/mock rezim - nic sa neplati, netreba potvrdzovacie okno.
+      doAnalyze();
+      return;
+    }
+    setEstimating(true);
+    try {
+      const cleanHoldings = holdings.map(({ minca, mnozstvo, coin_id }) => ({ minca, mnozstvo, coin_id }));
+      const est = await api.estimatePortfolioCost(provider, cleanHoldings);
+      setCostEstimate(est);
+    } catch (err) {
+      // Odhad je len pomocny UI prvok - ak zlyha, radsej pokracuj rovno
+      // k skutocnej analyze, nez aby pouzivatel uviazol bez moznosti pokracovat.
+      doAnalyze();
+    } finally {
+      setEstimating(false);
+    }
+  }
+
+  async function doAnalyze() {
+    setCostEstimate(null);
     setLoading(true);
     setResult(null);
     setSaved(false);
@@ -315,9 +351,9 @@ export default function Portfolio() {
 
         <hr className="divider" />
         {providers.some((p) => p.connected) && (
-          <button className="btn btn-primary" onClick={analyze} disabled={loading || hasAmountErrors}>
-            {loading ? <Loader2 size={15} className="spin" /> : <Search size={15} />}
-            {loading ? t("portfolio.analyzingButton") : t("portfolio.analyzeButton")}
+          <button className="btn btn-primary" onClick={analyze} disabled={loading || estimating || hasAmountErrors}>
+            {(loading || estimating) ? <Loader2 size={15} className="spin" /> : <Search size={15} />}
+            {loading ? t("portfolio.analyzingButton") : estimating ? t("costConfirm.estimating") : t("portfolio.analyzeButton")}
           </button>
         )}
       </Card>
@@ -430,6 +466,15 @@ export default function Portfolio() {
             </div>
           )}
         </div>
+      )}
+      {costEstimate && (
+        <CostConfirmModal
+          estimate={costEstimate}
+          providerLabel={providers.find((p) => p.provider === provider)?.label || provider}
+          confirming={loading}
+          onConfirm={doAnalyze}
+          onCancel={() => setCostEstimate(null)}
+        />
       )}
     </div>
   );

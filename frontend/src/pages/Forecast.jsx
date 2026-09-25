@@ -1,11 +1,12 @@
 import { Brain, ChevronDown, Copy, Loader2, RefreshCw, Rocket, Save, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
-  Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Area, AreaChart, CartesianGrid, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { api } from "../api";
-import { ConfidenceBadge, MockBadge, RiskBadge } from "../components/Badge";
+import { AccuracyBadge, ConfidenceBadge, MockBadge, RiskBadge } from "../components/Badge";
 import { Card } from "../components/Card";
+import CostConfirmModal from "../components/CostConfirmModal";
 import { SkeletonChart, SkeletonLines } from "../components/Skeleton";
 import ProviderSelect from "../components/ProviderSelect";
 import { useToast } from "../context/ToastContext";
@@ -27,14 +28,18 @@ function formatPrice(v) {
   return `$${v.toFixed(4)}`;
 }
 
-function ForecastChart({ data, coin, t }) {
+function ForecastChart({ data, t, actualPrices }) {
+  const hasActual = Array.isArray(actualPrices) && actualPrices.length === data.casove_body.length;
   const chartData = data.casove_body.map((time, i) => {
     const price = data.ceny[i];
-    return { t: time, price, upper: +(price * 1.05).toFixed(4), lower: +(price * 0.95).toFixed(4) };
+    const point = { t: time, price, upper: +(price * 1.05).toFixed(4), lower: +(price * 0.95).toFixed(4) };
+    if (hasActual) point.actual = actualPrices[i];
+    return point;
   });
 
   // Dynamický Y-axis rozsah (min/max ±5%), aby graf nezačínal od $0.
-  const prices = data.ceny;
+  // Ked mame aj skutocnu cenu (spatne porovnanie), musi sa zmestit do rozsahu tiez.
+  const prices = hasActual ? [...data.ceny, ...actualPrices] : data.ceny;
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);
   const padding = (maxPrice - minPrice) * 0.05 || maxPrice * 0.05 || 1;
@@ -58,11 +63,15 @@ function ForecastChart({ data, coin, t }) {
         <Tooltip
           contentStyle={{ background: "#121824", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, fontSize: 12 }}
           labelStyle={{ color: "var(--text-secondary)" }}
-          formatter={(v, name) => [formatPrice(v), name === "price" ? coin : name]}
+          formatter={(v, name) => [formatPrice(v), name === "price" ? t("forecast.legendPredicted") : name === "actual" ? t("forecast.legendActual") : name]}
           labelFormatter={(label) => t("forecast.timeTooltip", { label })}
         />
-        <Area type="monotone" dataKey="upper" stroke="none" fill="url(#priceFill)" fillOpacity={0.4} isAnimationActive={false} />
+        {hasActual && <Legend formatter={(value) => (value === "price" ? t("forecast.legendPredicted") : t("forecast.legendActual"))} wrapperStyle={{ fontSize: 12 }} />}
+        <Area type="monotone" dataKey="upper" stroke="none" fill="url(#priceFill)" fillOpacity={0.4} isAnimationActive={false} legendType="none" />
         <Area type="monotone" dataKey="price" stroke="var(--cyan)" strokeWidth={2.5} fill="url(#priceFill)" dot={{ r: 3, fill: "var(--cyan)" }} />
+        {hasActual && (
+          <Line type="monotone" dataKey="actual" stroke="var(--emerald)" strokeWidth={2.5} dot={{ r: 3, fill: "var(--emerald)" }} />
+        )}
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -73,8 +82,20 @@ function HistoryItem({ entry, onDelete }) {
   const confirm = useConfirm();
   const { t, lang } = useLanguage();
   const [open, setOpen] = useState(false);
+  const [accuracy, setAccuracy] = useState(null);
+  const [accuracyLoading, setAccuracyLoading] = useState(false);
   const locale = localeForLang(lang);
   const hasChart = entry.forecast_data?.ceny && entry.forecast_data?.casove_body;
+
+  useEffect(() => {
+    if (!open || accuracy || accuracyLoading) return;
+    setAccuracyLoading(true);
+    api.forecastAccuracy(entry.id)
+      .then(setAccuracy)
+      .catch(() => setAccuracy(null))
+      .finally(() => setAccuracyLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   async function handleCopy(e) {
     e.stopPropagation();
@@ -127,12 +148,19 @@ function HistoryItem({ entry, onDelete }) {
         <div style={{ padding: "0 18px 18px" }}>
           {hasChart ? (
             <>
-              <ForecastChart data={entry.forecast_data} coin={entry.crypto_symbol} t={t} />
-              {(entry.forecast_data.confidence_score !== undefined || entry.forecast_data.risk_level) && (
+              <ForecastChart data={entry.forecast_data} t={t} actualPrices={accuracy?.status === "completed" ? accuracy.actual_prices : undefined} />
+              {(entry.forecast_data.confidence_score !== undefined || entry.forecast_data.risk_level || accuracy?.status === "completed") && (
                 <div style={{ display: "flex", gap: 8, margin: "10px 0", flexWrap: "wrap" }}>
                   {entry.forecast_data.confidence_score !== undefined && <ConfidenceBadge score={entry.forecast_data.confidence_score} />}
                   {entry.forecast_data.risk_level && <RiskBadge level={entry.forecast_data.risk_level} />}
+                  {accuracy?.status === "completed" && <AccuracyBadge score={accuracy.accuracy_pct} />}
                 </div>
+              )}
+              {accuracyLoading && <p className="text-sub" style={{ marginTop: 4 }}>{t("forecast.accuracyLoading")}</p>}
+              {accuracy?.status === "pending" && (
+                <p className="text-sub" style={{ marginTop: 4 }}>
+                  {t("forecast.accuracyPending", { date: new Date(accuracy.matures_at).toLocaleDateString(locale) })}
+                </p>
               )}
               <p className="text-sub" style={{ marginTop: 8 }}>{entry.forecast_data.odovodnenie}</p>
             </>
@@ -165,6 +193,8 @@ export default function Forecast() {
   const HISTORY_PAGE_SIZE = 20;
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [costEstimate, setCostEstimate] = useState(null);
+  const [estimating, setEstimating] = useState(false);
 
   useEffect(() => {
     if (providersCtx.defaultProvider) setProvider(providersCtx.defaultProvider);
@@ -206,6 +236,27 @@ export default function Forecast() {
 
   async function generate() {
     if (!provider) return;
+    const providerInfo = providers.find((p) => p.provider === provider);
+    if (!providerInfo?.connected) {
+      // Demo/mock rezim - nic sa neplati, netreba potvrdzovacie okno.
+      doGenerate();
+      return;
+    }
+    setEstimating(true);
+    try {
+      const est = await api.estimateForecastCost(provider, coin, horizon);
+      setCostEstimate(est);
+    } catch (err) {
+      // Odhad je len pomocny UI prvok - ak zlyha, radsej pokracuj rovno
+      // k skutocnej analyze, nez aby pouzivatel uviazol bez moznosti pokracovat.
+      doGenerate();
+    } finally {
+      setEstimating(false);
+    }
+  }
+
+  async function doGenerate() {
+    setCostEstimate(null);
     setLoading(true);
     setResult(null);
     setSaved(false);
@@ -272,9 +323,9 @@ export default function Forecast() {
               )}
             </div>
             {providers.some((p) => p.connected) && (
-              <button className="btn btn-primary" onClick={generate} disabled={loading} style={{ marginTop: 4 }}>
-                {loading ? <Loader2 size={15} className="spin" /> : <Rocket size={15} />}
-                {loading ? t("forecast.generatingButton") : t("forecast.generateButton")}
+              <button className="btn btn-primary" onClick={generate} disabled={loading || estimating} style={{ marginTop: 4 }}>
+                {(loading || estimating) ? <Loader2 size={15} className="spin" /> : <Rocket size={15} />}
+                {loading ? t("forecast.generatingButton") : estimating ? t("costConfirm.estimating") : t("forecast.generateButton")}
               </button>
             )}
           </Card>
@@ -291,7 +342,7 @@ export default function Forecast() {
             <div style={{ marginTop: 20 }}>
               <Card title={`${t("forecast.chartTitlePrefix")}: ${coin}`} icon={Sparkles} glow="cyan">
                 {result.is_mock && <div style={{ marginBottom: 12 }}><MockBadge /></div>}
-                <ForecastChart data={result.data} coin={coin} t={t} />
+                <ForecastChart data={result.data} t={t} />
               </Card>
               <div style={{ height: 16 }} />
               <Card title={t("forecast.reasoningTitle")} icon={Brain}>
@@ -338,6 +389,15 @@ export default function Forecast() {
             </div>
           )}
         </div>
+      )}
+      {costEstimate && (
+        <CostConfirmModal
+          estimate={costEstimate}
+          providerLabel={providers.find((p) => p.provider === provider)?.label || provider}
+          confirming={loading}
+          onConfirm={doGenerate}
+          onCancel={() => setCostEstimate(null)}
+        />
       )}
     </div>
   );

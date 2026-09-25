@@ -41,9 +41,28 @@ def test_forecast_prompt_includes_global_context():
     assert "risk_level" in prompt
 
 
+def test_forecast_prompt_includes_real_market_data_when_provided():
+    """Bez realnej ceny/trendu model nemal ziadnu kotvu a predikcie posobili
+    systematicky prilis optimisticky - musi byt jasne vlozena do promptu."""
+    ctx = "Aktualna cena: $64,280.00 USD | Zmena za 24h: -2.15% | Zmena za poslednych 7 dni: -5.30%"
+    prompt = build_forecast_prompt("BTC", "1T", 7, market_context=ctx)
+    assert ctx in prompt
+
+
+def test_forecast_prompt_instructs_against_default_optimism():
+    prompt = build_forecast_prompt("BTC", "1T", 7)
+    assert "pokles" in prompt.lower()
+    assert "optimizmus" in prompt.lower()
+
+
 def test_portfolio_prompt_includes_global_context():
     prompt = build_portfolio_prompt([{"minca": "BTC", "mnozstvo": 1}])
     assert GLOBAL_CONTEXT_INSTRUCTION in prompt
+
+
+def test_portfolio_prompt_instructs_against_always_buy():
+    prompt = build_portfolio_prompt([{"minca": "BTC", "mnozstvo": 1}])
+    assert "SELL" in prompt and "HOLD" in prompt
 
 
 def test_news_prompt_includes_global_context():

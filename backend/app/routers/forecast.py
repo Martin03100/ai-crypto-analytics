@@ -18,9 +18,9 @@ from app.deps import get_current_user, get_db, get_decrypted_api_key
 from app.models import ForecastHistory, User
 from app.rate_limit import rate_limit_by_user
 from app.schemas import (
-    AIResultOut, ForecastHistoryOut, ForecastRequest, PaginatedForecastHistory, SaveForecastRequest,
+    AIResultOut, CostEstimateOut, ForecastAccuracyOut, ForecastHistoryOut, ForecastRequest, PaginatedForecastHistory, SaveForecastRequest,
 )
-from app.services.ai_engine import get_coin_forecast
+from app.services.ai_engine import compute_forecast_accuracy, estimate_forecast_cost, get_coin_forecast
 
 router = APIRouter(prefix="/api/forecast", tags=["forecast"])
 
@@ -31,6 +31,20 @@ def generate_forecast(payload: ForecastRequest, user: User = Depends(get_current
     api_key = get_decrypted_api_key(db, user.id, payload.provider)
     result = get_coin_forecast(payload.provider, payload.coin, payload.horizon, api_key, payload.lang)
     return AIResultOut(**result.as_dict())
+
+
+@router.post("/estimate-cost", response_model=CostEstimateOut,
+             dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
+def estimate_forecast_cost_endpoint(payload: ForecastRequest, user: User = Depends(get_current_user),
+                                     db: Session = Depends(get_db)) -> CostEstimateOut:
+    """Odhad ceny PRED kliknutim na skutocne "Analyzovat" - frontend toto
+    zavola najprv a ukaze potvrdzovacie okno, aby pouzivatel vedel priblizny
+    naklad este predtym, nez sa realne minu tokeny."""
+    api_key = get_decrypted_api_key(db, user.id, payload.provider)
+    if not api_key:
+        return CostEstimateOut(is_mock=True)
+    result = estimate_forecast_cost(payload.provider, payload.coin, payload.horizon)
+    return CostEstimateOut(is_mock=False, **result)
 
 
 @router.post("/save", response_model=ForecastHistoryOut, status_code=201)
@@ -58,6 +72,26 @@ def delete_forecast(entry_id: int, user: User = Depends(get_current_user), db: S
     db.delete(row)
     db.commit()
     return {"success": True}
+
+
+@router.get("/history/{entry_id}/accuracy", response_model=ForecastAccuracyOut,
+            dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
+def get_forecast_accuracy(entry_id: int, user: User = Depends(get_current_user),
+                           db: Session = Depends(get_db)) -> ForecastAccuracyOut:
+    """Spatne porovna ulozenu predikciu so skutocnym vyvojom ceny odvtedy
+    (viz ai_engine.py::compute_forecast_accuracy) - da pouzivatelovi realny
+    dokaz namiesto len sluby, ci AI predikcie maju vypovednu hodnotu."""
+    row = db.query(ForecastHistory).filter(ForecastHistory.id == entry_id, ForecastHistory.user_id == user.id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Uložená analýza nebola nájdená.")
+    try:
+        forecast_data = json.loads(row.forecast_json)
+    except json.JSONDecodeError:
+        forecast_data = {}
+    predicted_prices = forecast_data.get("ceny", [])
+    time_labels = forecast_data.get("casove_body", [])
+    result = compute_forecast_accuracy(row.crypto_symbol, row.timeframe, predicted_prices, time_labels, row.created_at)
+    return ForecastAccuracyOut(**result)
 
 
 @router.get("/history", response_model=PaginatedForecastHistory)

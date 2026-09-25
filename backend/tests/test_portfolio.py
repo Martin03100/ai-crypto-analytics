@@ -61,3 +61,32 @@ def test_delete_nonexistent_portfolio_analysis_returns_404(registered):
     client, _username, _password = registered
     res = client.delete("/api/portfolio/history/999999", headers=csrf_headers(client))
     assert res.status_code == 404
+
+
+def test_portfolio_analyze_rejects_more_than_30_holdings(registered):
+    """Chrani pred degenerovanym vstupom a drzi najhorsi mozny AI vystup
+    predvidatelne pod token limitom (viz PortfolioRequest v app/schemas.py)."""
+    client, _username, _password = registered
+    holdings = [{"minca": f"COIN{i}", "mnozstvo": 1} for i in range(31)]
+    res = client.post("/api/portfolio/analyze", json={"provider": "gemini", "holdings": holdings},
+                       headers=csrf_headers(client))
+    assert res.status_code == 422
+
+
+def test_portfolio_analyze_accepts_exactly_30_holdings(registered):
+    client, _username, _password = registered
+    holdings = [{"minca": f"COIN{i}", "mnozstvo": 1} for i in range(30)]
+    res = client.post("/api/portfolio/analyze", json={"provider": "gemini", "holdings": holdings},
+                       headers=csrf_headers(client))
+    assert res.status_code == 200
+
+
+def test_estimate_portfolio_cost_without_api_key_returns_mock(registered):
+    client, _username, _password = registered
+    res = client.post("/api/portfolio/estimate-cost",
+                       json={"provider": "gemini", "holdings": [{"minca": "BTC", "mnozstvo": 1}]},
+                       headers=csrf_headers(client))
+    assert res.status_code == 200
+    body = res.json()
+    assert body["is_mock"] is True
+    assert body["estimated_cost_usd"] == 0.0

@@ -728,6 +728,21 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 .confirm-message { margin: 0 0 18px; font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
 .confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
+.confirm-icon-neutral { background: var(--cyan-dim); color: var(--cyan); }
+.cost-breakdown {
+  background: var(--bg-inset); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 12px;
+}
+.cost-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 13px; color: var(--text-secondary); padding: 4px 0;
+}
+.cost-row-highlight {
+  border-top: 1px solid var(--border-subtle); margin-top: 4px; padding-top: 8px;
+  font-weight: 700; color: var(--text-primary); font-family: var(--font-mono);
+}
+.cost-disclaimer { margin: 0 0 18px; font-size: 11.5px; color: var(--text-tertiary); line-height: 1.5; }
+
 /* ---------- Inline link-style button (forgot password a pod.) ---------- */
 .link-btn {
   display: block; width: 100%; text-align: center; margin-top: 12px;
@@ -775,6 +790,7 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
   box-shadow: 0 20px 50px rgba(0,0,0,0.5);
   transition: all 0.4s var(--ease);
   pointer-events: auto;
+  max-height: calc(100vh - 24px); overflow-y: auto;
 }
 .onboarding-step-no {
   font-size: 11px; font-weight: 700; color: var(--cyan);
@@ -804,3 +820,16 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 @media (max-width: 520px) {
   .onboarding-tip { width: calc(100vw - 32px); left: 16px !important; }
 }
+
+/* PasswordInput — show/hide toggle */
+.password-input-wrap { position: relative; display: flex; }
+.password-input-wrap .input { padding-right: 40px; width: 100%; }
+.password-toggle-btn {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; color: var(--text-tertiary);
+  padding: 6px; border-radius: var(--radius-sm); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: color 0.15s var(--ease);
+}
+.password-toggle-btn:hover { color: var(--text-secondary); }
+.password-toggle-btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 1px; }

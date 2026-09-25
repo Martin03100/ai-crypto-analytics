@@ -105,14 +105,19 @@ export const api = {
 
   generateForecast: (provider, coin, horizon) =>
     request("/forecast", { method: "POST", body: { provider, coin, horizon, lang: currentLang() } }),
+  estimateForecastCost: (provider, coin, horizon) =>
+    request("/forecast/estimate-cost", { method: "POST", body: { provider, coin, horizon, lang: currentLang() } }),
   saveForecast: (provider, coin, horizon, forecast_data, is_mock) =>
     request("/forecast/save", { method: "POST", body: { provider, coin, horizon, forecast_data, is_mock } }),
   deleteForecast: (id) => request(`/forecast/history/${id}`, { method: "DELETE" }),
   forecastHistory: (symbol, daysBack = 30, page = 1, pageSize = 20) =>
     request(`/forecast/history?days_back=${daysBack}&page=${page}&page_size=${pageSize}${symbol ? `&symbol=${symbol}` : ""}`),
+  forecastAccuracy: (id) => request(`/forecast/history/${id}/accuracy`),
 
   analyzePortfolio: (provider, holdings) =>
     request("/portfolio/analyze", { method: "POST", body: { provider, holdings, lang: currentLang() } }),
+  estimatePortfolioCost: (provider, holdings) =>
+    request("/portfolio/estimate-cost", { method: "POST", body: { provider, holdings, lang: currentLang() } }),
   savePortfolio: (provider, holdings, analysis_data, is_mock) =>
     request("/portfolio/save", { method: "POST", body: { provider, holdings, analysis_data, is_mock } }),
   deletePortfolioAnalysis: (id) => request(`/portfolio/history/${id}`, { method: "DELETE" }),

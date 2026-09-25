@@ -237,6 +237,39 @@ def get_market_chart(coin_id: str, vs_currency: str = "usd", days: str = "7") ->
         return False, [], f"Chyba pri spracovani historickych cien: {exc}"
 
 
+def get_market_chart_range(coin_id: str, vs_currency: str, from_ts: int, to_ts: int) -> Tuple[bool, List[List[float]], Optional[str]]:
+    """Historicke cenove data za PRESNY casovy rozsah (unix timestampy, sekundy)
+    - na rozdiel od get_market_chart() (vzdy "poslednych N dni od TERAZ"), toto
+    vie zohnat cenu za lubovolne OBDOBIE V MINULOSTI. Pouzite na spatne
+    porovnanie ulozenej predikcie so skutocnym vyvojom ceny (viz
+    ai_engine.py::compute_forecast_accuracy) - predikcia mohla byt vytvorena
+    pred tyzdnami, takze "poslednych 7 dni od teraz" by mierilo na uplne iny
+    casovy usek, nez ktory predikcia v skutocnosti pokryvala."""
+    vs_currency = (vs_currency or "usd").lower()
+    cache_key = f"{coin_id}|{vs_currency}|{from_ts}|{to_ts}"
+    cached = _market_chart_cache.get(cache_key)
+    if cached is not None:
+        return True, cached, None
+    try:
+        response = requests.get(
+            f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart/range",
+            params={"vs_currency": vs_currency, "from": from_ts, "to": to_ts},
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        body = response.json()
+        prices = body.get("prices", [])
+        _market_chart_cache.set(cache_key, prices)
+        return True, prices, None
+    except requests.exceptions.RequestException as exc:
+        stale = _market_chart_cache.get(cache_key, allow_stale=True)
+        if stale is not None:
+            return True, stale, f"Pouzivam starsie cachovane data (chyba: {exc})"
+        return False, [], f"Chyba siete pri nacitani historickych cien: {exc}"
+    except (ValueError, KeyError, TypeError) as exc:
+        return False, [], f"Chyba pri spracovani historickych cien: {exc}"
+
+
 def search_coins(query: str, limit: int = 8) -> Tuple[bool, List[Dict[str, str]], Optional[str]]:
     """Vyhladavanie ktorejkolvek mincy podporovanej na CoinGecko (pre custom
     vyber mincí v Portfolio Advisor aj globalne vyhladavanie v hlavicke),

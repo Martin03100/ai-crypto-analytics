@@ -90,7 +90,11 @@ class HoldingIn(BaseModel):
 
 class PortfolioRequest(BaseModel):
     provider: str
-    holdings: List[HoldingIn]
+    # Horna hranica 30 mincí: chráni pred degenerovaným vstupom (AI analýza
+    # stovky pozícií by aj tak nebola prakticky čitateľná) A zároveň drží
+    # najhorší možný výstup AI odpovede predvídateľne pod _MAX_OUTPUT_TOKENS
+    # limitom v ai_engine.py, takže sa nikdy neoreže uprostred JSON-u.
+    holdings: List[HoldingIn] = Field(max_length=30)
     lang: str = "en"
 
 
@@ -119,6 +123,28 @@ class ForecastHistoryOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ForecastAccuracyOut(BaseModel):
+    """status: "pending" (horizont este neubehol) | "unavailable" (data sa
+    nepodarilo zohnat) | "completed" (realne porovnanie hotove)."""
+    status: str
+    accuracy_pct: Optional[float] = None
+    predicted_prices: List[float]
+    actual_prices: List[float]
+    time_labels: List[str]
+    matures_at: str
+
+
+class CostEstimateOut(BaseModel):
+    """Odhad ceny PRED skutocnym volanim AI (potvrdzovacie okno na
+    frontende). is_mock=true znamena, ze pouzivatel nema pripojeny API kluc -
+    skutocne volanie by teda bolo zadarmo (mock rezim), odhad sa neratal."""
+    is_mock: bool
+    estimated_input_tokens: int = 0
+    estimated_output_tokens: int = 0
+    estimated_total_tokens: int = 0
+    estimated_cost_usd: float = 0.0
+
+
 class SaveForecastRequest(BaseModel):
     provider: str
     coin: str
@@ -129,7 +155,7 @@ class SaveForecastRequest(BaseModel):
 
 class SavePortfolioRequest(BaseModel):
     provider: str
-    holdings: List[HoldingIn]
+    holdings: List[HoldingIn] = Field(max_length=30)
     analysis_data: Dict[str, Any]
     is_mock: bool = False
 
