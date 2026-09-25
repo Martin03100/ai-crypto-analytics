@@ -90,7 +90,18 @@ SECTOR_CATEGORIES: Final[List[str]] = ["DeFi", "L1/L2", "AI", "Memes", "Other"]
 # Externe API
 # ---------------------------------------------------------------------------
 FEAR_GREED_API_URL: Final[str] = "https://api.alternative.me/fng/"
-CRYPTO_NEWS_RSS_URL: Final[str] = "https://www.coindesk.com/arc/outboundfeeds/rss/"
+# Viacero zdrojov namiesto jedneho RSS feedu - diverzifikuje spravy naprieč
+# nezavislymi redakciami (nie len jeden pohlad). Instagram/Facebook nemaju
+# realny verejny sposob, ako z nich cerpat krypto obsah bez business API
+# schvalenia, a X/Twitter API je od zmeny vlastnika platene - ani jedno teda
+# nie je v tomto zozname. Reddit (r/CryptoCurrency) je pridany samostatne
+# nizsie (REDDIT_CRYPTO_URL), kedze pouziva iny format (JSON, nie RSS).
+CRYPTO_NEWS_RSS_URLS: Final[List[str]] = [
+    "https://www.coindesk.com/arc/outboundfeeds/rss/",
+    "https://cointelegraph.com/rss",
+    "https://decrypt.co/feed",
+]
+REDDIT_CRYPTO_URL: Final[str] = "https://www.reddit.com/r/CryptoCurrency/hot.json"
 
 GEMINI_API_URL_TEMPLATE: Final[str] = (
     "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key={api_key}"

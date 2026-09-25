@@ -15,6 +15,14 @@ def test_fear_greed_is_public_and_never_fails(client):
     assert "data" in res.json()
 
 
+def test_fear_greed_accepts_refresh_query_param(client):
+    """Manualne "Aktualizovat" tlacidlo na Dashboarde posiela ?refresh=true -
+    endpoint to musi prijat bez chyby (obchadza cache na strane servera)."""
+    res = client.get("/api/market/fear-greed?refresh=true")
+    assert res.status_code == 200
+    assert "data" in res.json()
+
+
 def test_events_is_public(client):
     res = client.get("/api/market/events?lang=en")
     assert res.status_code == 200

@@ -123,7 +123,7 @@ export const api = {
   deletePortfolioAnalysis: (id) => request(`/portfolio/history/${id}`, { method: "DELETE" }),
   portfolioHistory: (page = 1, pageSize = 20) => request(`/portfolio/history?page=${page}&page_size=${pageSize}`),
 
-  fearGreed: () => request("/market/fear-greed"),
+  fearGreed: (refresh = false) => request(`/market/fear-greed${refresh ? "?refresh=true" : ""}`),
   headlines: () => request("/market/headlines"),
   newsSentiment: (provider, titles) => request("/market/news-sentiment", { method: "POST", body: { provider, titles, lang: currentLang() } }),
   events: () => request(`/market/events?lang=${currentLang()}`),

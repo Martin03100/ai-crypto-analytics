@@ -10,11 +10,11 @@ const SEEN_KEY = "aca_onboarding_seen_v1";
  * mieria na uz existujuce, stabilne triedy/atributy (nie na text), takze
  * preklad ani zmena poradia menu polozky sprievodcu nerozbije. */
 const STEP_TARGETS = [
-  { selector: ".fab-chat", titleKey: "onboarding.step1Title", textKey: "onboarding.step1Text", pos: "left" },
-  { selector: 'a[href="/forecast"]', titleKey: "onboarding.step2Title", textKey: "onboarding.step2Text", pos: "right", needsSidebar: true },
-  { selector: 'a[href="/portfolio"]', titleKey: "onboarding.step3Title", textKey: "onboarding.step3Text", pos: "right", needsSidebar: true },
-  { selector: "#tour-feargreed-card", titleKey: "onboarding.step4Title", textKey: "onboarding.step4Text", pos: "bottom" },
-  { selector: 'a[href="/settings"]', titleKey: "onboarding.step5Title", textKey: "onboarding.step5Text", pos: "right", needsSidebar: true },
+  { selector: ".fab-chat", titleKey: "onboarding.step1Title", textKey: "onboarding.step1Text" },
+  { selector: 'a[href="/forecast"]', titleKey: "onboarding.step2Title", textKey: "onboarding.step2Text", needsSidebar: true },
+  { selector: 'a[href="/portfolio"]', titleKey: "onboarding.step3Title", textKey: "onboarding.step3Text", needsSidebar: true },
+  { selector: "#tour-feargreed-card", titleKey: "onboarding.step4Title", textKey: "onboarding.step4Text" },
+  { selector: 'a[href="/settings"]', titleKey: "onboarding.step5Title", textKey: "onboarding.step5Text", needsSidebar: true },
 ];
 
 export function hasSeenOnboarding() {
@@ -48,6 +48,17 @@ export function resetOnboarding() {
  * takze ma pristup ku vsetkym cielovym prvkom (sidebar, chat FAB) aj naprieč
  * strankami cez position:fixed prekryvnu vrstvu (nie je vazany na jeden
  * konkretny rodicovsky kontajner).
+ *
+ * DOLEZITE (poucenie z realneho bugu): tooltip textu/tlacidlam je VZDY
+ * pripnuty na pevne miesto dole na obrazovke (nie dynamicky vedla ciela) -
+ * pri dynamickom pozicovani vedla ciela sa mohlo stat, ze ak bol cielovy
+ * prvok nizko na dlhej stranke, tooltip (aj s tlacidlami Dalej/Preskocit) sa
+ * odrezal mimo viditelnej plochy a strankou sa neda scrollovat (fixed prvky
+ * sa scrollom nehybu) - pouzivatel sa tak realne zasekol v ture bez moznosti
+ * pokracovat. Pevne dolne miesto tomuto zaruku vylucuje: text/tlacidla su VZDY
+ * v ramci viewportu, bez ohladu na to, kde presne je cielovy prvok. Cielovy
+ * prvok sa navyse pri kazdom kroku scrollne do viditelnej casti, aby
+ * pouzivatel videl aj samotne zvyraznenie (spotlight), nie len text o nom.
  */
 export default function OnboardingTour({ onNeedSidebar }) {
   const location = useLocation();
@@ -89,6 +100,9 @@ export default function OnboardingTour({ onNeedSidebar }) {
       setStepIndex((i) => (i + 1 < STEP_TARGETS.length ? i + 1 : -1));
       return;
     }
+    // Nech je zvyrazneny prvok skutocne vidiet (nie len tooltip o nom) -
+    // "nearest" nehybe strankou, ak uz je prvok viditelny.
+    el.scrollIntoView({ behavior: "smooth", block: "nearest" });
     setRect(el.getBoundingClientRect());
   }, [stepIndex]);
 
@@ -132,40 +146,25 @@ export default function OnboardingTour({ onNeedSidebar }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [active, finish]);
 
-  if (!active || !rect) return null;
+  if (!active) return null;
 
   const step = STEP_TARGETS[stepIndex];
+  if (!step) return null;
   const isLast = stepIndex === STEP_TARGETS.length - 1;
   const pad = 8;
-  const tw = 272;
-  const th = 170; // odhadovana max. vyska tooltipu - pouzita len na klampovanie do viewportu
-
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  const clampLeft = (v) => Math.max(12, Math.min(v, vw - tw - 12));
-  const clampTop = (v) => Math.max(12, Math.min(v, vh - th - 12));
-
-  let tipStyle = {};
-  if (step.pos === "right") {
-    tipStyle = { left: clampLeft(rect.right + 18), top: clampTop(rect.top - 6) };
-  } else if (step.pos === "left") {
-    tipStyle = { left: clampLeft(rect.left - tw - 18), top: clampTop(rect.top - 100) };
-  } else {
-    // "bottom": ak by tooltip pod cielom presiahol spodok viewportu (napr.
-    // cielovy prvok je nizko na obrazovke po scrollnuti), zobraz ho radsej
-    // NAD cielom namiesto toho, aby sa odrezal mimo viditelnej plochy.
-    const fitsBelow = rect.bottom + th + 16 <= vh;
-    const top = fitsBelow ? rect.bottom + 16 : rect.top - th - 16;
-    tipStyle = { left: clampLeft(rect.left), top: clampTop(top) };
-  }
 
   return (
     <div className="onboarding-layer" role="dialog" aria-modal="true" aria-label={t("onboarding.dialogLabel")}>
-      <div
-        className="onboarding-hole"
-        style={{ left: rect.left - pad, top: rect.top - pad, width: rect.width + pad * 2, height: rect.height + pad * 2 }}
-      />
-      <div className="onboarding-tip" style={tipStyle}>
+      {rect && (
+        <div
+          className="onboarding-hole"
+          style={{ left: rect.left - pad, top: rect.top - pad, width: rect.width + pad * 2, height: rect.height + pad * 2 }}
+        />
+      )}
+      {/* Pevne pripnute dole na obrazovke (nikdy nie dynamicky vedla ciela) -
+         tlacidla Dalej/Preskocit su tak VZDY v ramci viewportu, bez ohladu na
+         to, kde je cielovy prvok na stranke. */}
+      <div className="onboarding-tip onboarding-tip-docked">
         <div className="onboarding-step-no">{t("onboarding.stepCounter", { current: stepIndex + 1, total: STEP_TARGETS.length })}</div>
         <h4>{t(step.titleKey)}</h4>
         <p aria-live="polite">{t(step.textKey)}</p>

@@ -784,13 +784,22 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
   pointer-events: none;
 }
 .onboarding-tip {
-  position: fixed; width: 272px;
   background: rgba(15, 20, 32, 0.98); border: 1px solid var(--border-strong);
   border-radius: var(--radius-md); padding: 16px 17px;
   box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-  transition: all 0.4s var(--ease);
   pointer-events: auto;
   max-height: calc(100vh - 24px); overflow-y: auto;
+}
+/* Pevne pripnute dole na strede obrazovky - NIKDY dynamicky vedla ciela.
+   Zamerny navrhovy princip (viz komentar v OnboardingTour.jsx): tlacidla
+   Dalej/Preskocit musia byt VZDY v ramci viewportu bez ohladu na to, kde na
+   dlhej stranke je zvyrazneny prvok - inak sa da pri dynamickom pozicovani
+   pri urcitych scroll pozicich zaseknut mimo viditelnu plochu. */
+.onboarding-tip-docked {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+  width: 320px; max-width: calc(100vw - 32px);
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  transition: opacity 0.25s var(--ease);
 }
 .onboarding-step-no {
   font-size: 11px; font-weight: 700; color: var(--cyan);
@@ -816,9 +825,6 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 .btn-next-tour:active { transform: scale(0.97); }
 .btn-next-tour:focus-visible, .btn-skip-tour:focus-visible {
   outline: 2px solid var(--cyan); outline-offset: 2px;
-}
-@media (max-width: 520px) {
-  .onboarding-tip { width: calc(100vw - 32px); left: 16px !important; }
 }
 
 /* PasswordInput — show/hide toggle */

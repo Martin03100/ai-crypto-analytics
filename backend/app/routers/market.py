@@ -26,9 +26,9 @@ router = APIRouter(prefix="/api/market", tags=["market"])
 VALID_VOTES = ("Bullish", "Neutral", "Bearish")
 
 
-@router.get("/fear-greed")
-def fear_greed() -> dict:
-    success, data, error = get_fear_greed_index()
+@router.get("/fear-greed", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_MARKET_PUBLIC))])
+def fear_greed(refresh: bool = False) -> dict:
+    success, data, error = get_fear_greed_index(force_refresh=refresh)
     if not success or data is None:
         return {"data": get_dummy_fear_greed_index(), "is_mock": True, "error_message": error}
     return {"data": data, "is_mock": False, "error_message": None}

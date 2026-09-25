@@ -16,17 +16,11 @@ import { useLanguage } from "../context/LanguageContext";
 import { humanizeError } from "../i18n/errorMessages";
 import { localeForLang } from "../i18n/locale";
 import { copyToClipboard } from "../utils/copyToClipboard";
+import { formatPrice } from "../utils/formatPrice";
 import { usePageTitle } from "../hooks/usePageTitle";
 
 const COINS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "DOT", "LINK"];
 const HORIZONS = ["24h", "1T", "1M", "1R"];
-
-function formatPrice(v) {
-  if (v == null) return "";
-  if (v >= 1000) return `$${(v / 1000).toFixed(1)}k`;
-  if (v >= 1) return `$${v.toFixed(2)}`;
-  return `$${v.toFixed(4)}`;
-}
 
 function ForecastChart({ data, t, actualPrices }) {
   const hasActual = Array.isArray(actualPrices) && actualPrices.length === data.casove_body.length;

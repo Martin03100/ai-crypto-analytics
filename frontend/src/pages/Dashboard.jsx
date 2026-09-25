@@ -1,4 +1,4 @@
-import { ArrowRight, Gauge, Sparkles, TrendingUp, Wallet } from "lucide-react";
+import { ArrowRight, Gauge, RefreshCw, Sparkles, TrendingUp, Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
@@ -7,7 +7,9 @@ import { Card } from "../components/Card";
 import { SkeletonLines } from "../components/Skeleton";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
+import { useToast } from "../context/ToastContext";
 import { localeForLang } from "../i18n/locale";
+import { formatPrice } from "../utils/formatPrice";
 import { usePageTitle } from "../hooks/usePageTitle";
 
 function QuickLink({ to, icon: Icon, label, sub }) {
@@ -26,8 +28,10 @@ function QuickLink({ to, icon: Icon, label, sub }) {
 export default function Dashboard() {
   const { user } = useAuth();
   const { t, lang } = useLanguage();
+  const { push } = useToast();
   usePageTitle("dashboard.pageTitle");
   const [fg, setFg] = useState(null);
+  const [refreshingFg, setRefreshingFg] = useState(false);
   const [lastForecast, setLastForecast] = useState(null);
   const [lastPortfolio, setLastPortfolio] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -44,6 +48,19 @@ export default function Dashboard() {
       if (portfolioRes.status === "fulfilled" && portfolioRes.value.items.length > 0) setLastPortfolio(portfolioRes.value.items[0]);
     }).finally(() => setLoading(false));
   }, []);
+
+  async function handleRefreshFg() {
+    setRefreshingFg(true);
+    try {
+      const res = await api.fearGreed(true);
+      setFg(res.data);
+      push(t("dashboard.fearGreedRefreshed"), "success");
+    } catch (err) {
+      push(err, "error");
+    } finally {
+      setRefreshingFg(false);
+    }
+  }
 
   const hour = new Date().getHours();
   const greetingKey = hour < 5 ? "dashboard.greetingNight" : hour < 12 ? "dashboard.greetingMorning" : hour < 18 ? "dashboard.greetingDay" : "dashboard.greetingEvening";
@@ -79,6 +96,12 @@ export default function Dashboard() {
                   {lastForecast.forecast_data?.confidence_score !== undefined && <ConfidenceBadge score={lastForecast.forecast_data.confidence_score} />}
                   {lastForecast.forecast_data?.risk_level && <RiskBadge level={lastForecast.forecast_data.risk_level} />}
                 </div>
+                {Array.isArray(lastForecast.forecast_data?.ceny) && lastForecast.forecast_data.ceny.length > 0 && (
+                  <div className="metric-value mono" style={{ fontSize: 20, marginBottom: 10 }}>
+                    {formatPrice(lastForecast.forecast_data.ceny[lastForecast.forecast_data.ceny.length - 1])}
+                    <span className="text-sub" style={{ fontSize: 12, fontWeight: 400, marginLeft: 6 }}>{t("dashboard.predictedPriceLabel")}</span>
+                  </div>
+                )}
                 <p className="text-sub" style={{ marginBottom: 12 }}>{lastForecast.forecast_data?.odovodnenie?.slice(0, 160)}…</p>
                 <Link to="/forecast" className="btn btn-ghost btn-sm">{t("dashboard.viewHistory")} <ArrowRight size={13} /></Link>
               </>
@@ -105,7 +128,19 @@ export default function Dashboard() {
       )}
 
       {fg && (
-        <Card id="tour-feargreed-card" title={t("dashboard.fearGreedTitle")} icon={Gauge} glow={fg.value >= 55 ? "emerald" : fg.value <= 45 ? "crimson" : undefined}>
+        <Card id="tour-feargreed-card" glow={fg.value >= 55 ? "emerald" : fg.value <= 45 ? "crimson" : undefined}>
+          <div className="card-title" style={{ justifyContent: "space-between" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Gauge size={15} /> {t("dashboard.fearGreedTitle")}</span>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={handleRefreshFg}
+              disabled={refreshingFg}
+              aria-label={t("dashboard.fearGreedRefresh")}
+              title={t("dashboard.fearGreedRefresh")}
+            >
+              <RefreshCw size={13} className={refreshingFg ? "spin" : ""} />
+            </button>
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div className="metric-value mono" style={{ fontSize: 32 }}>{fg.value}</div>
             <div>

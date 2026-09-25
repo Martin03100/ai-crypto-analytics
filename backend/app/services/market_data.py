@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
-from app.config import CRYPTO_NEWS_RSS_URL, FEAR_GREED_API_URL, REQUEST_TIMEOUT_SECONDS
+from app.config import CRYPTO_NEWS_RSS_URLS, FEAR_GREED_API_URL, REDDIT_CRYPTO_URL, REQUEST_TIMEOUT_SECONDS
 from app.i18n_content import market_events_for_lang
 from app.utils.ttl_cache import TTLCache
 
@@ -30,10 +30,15 @@ _FEAR_GREED_KEY = "fear_greed"
 _DEFAULT_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; AICryptoAnalytics/2.0)"}
 
 
-def get_fear_greed_index() -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
-    cached = _fear_greed_cache.get(_FEAR_GREED_KEY)
-    if cached is not None:
-        return True, cached, None
+def get_fear_greed_index(force_refresh: bool = False) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
+    """force_refresh=True obchadza cache (manualne "Aktualizovat" tlacidlo na
+    Dashboarde) - hodnota sa aj tak na zdroji (alternative.me) meni len raz
+    denne o polnoci UTC, takze aj po obnoveni bude casto rovnaka, ale
+    pouzivatel tym ziska istotu, ze vidi naozaj cerstvo overenu hodnotu."""
+    if not force_refresh:
+        cached = _fear_greed_cache.get(_FEAR_GREED_KEY)
+        if cached is not None:
+            return True, cached, None
 
     try:
         # Bez User-Agent hlavicky vie Cloudflare pred alternative.me
@@ -94,36 +99,95 @@ def _parse_rss_date(raw: str) -> Optional[datetime]:
         return None
 
 
-def get_crypto_headlines(limit: int = 8) -> Tuple[bool, List[Dict[str, str]], Optional[str]]:
+def _fetch_one_rss_source(url: str, per_source_limit: int) -> List[Dict[str, str]]:
+    """Nacita a sparsuje JEDEN RSS feed. Volajuce get_crypto_headlines() to
+    obali try/except per-zdroj, takze vypadok jedneho feedu (napr. docasne
+    nedostupny CoinTelegraph) nezhodi zvysne zdroje."""
+    response = requests.get(url, timeout=REQUEST_TIMEOUT_SECONDS, headers=_DEFAULT_HEADERS)
+    response.raise_for_status()
+    root = ET.fromstring(response.content)
+    items = root.findall(".//item")
+    channel_title_el = root.find(".//channel/title")
+    source_name = _clean_html(channel_title_el.text) if channel_title_el is not None and channel_title_el.text else "Krypto Spravy"
+    headlines: List[Dict[str, str]] = []
+    for item in items[:per_source_limit]:
+        title_el = item.find("title")
+        link_el = item.find("link")
+        pubdate_el = item.find("pubDate")
+        title = _clean_html(title_el.text) if title_el is not None and title_el.text else ""
+        link = link_el.text.strip() if link_el is not None and link_el.text else ""
+        published_at = _parse_rss_date(pubdate_el.text) if pubdate_el is not None and pubdate_el.text else None
+        if title:
+            headlines.append({
+                "title": title, "link": link, "source": source_name,
+                "published_at": published_at.isoformat() if published_at else "",
+            })
+    return headlines
+
+
+def get_reddit_crypto_posts(limit: int = 5) -> List[Dict[str, str]]:
+    """Hot prispevky z r/CryptoCurrency cez verejne, bez-prihlasovacie JSON
+    API Redditu - dava appke aj skutocny "hlas komunity", nie len redakcne
+    spravy. Nikdy nevyhodi vynimku von (prazdny zoznam pri akomkolvek
+    zlyhani) - je to bonusovy zdroj, ziadny ineho zdroj naň nespolieha.
+    POZNAMKA: na rozdiel od RSS feedov Reddit obcas blokuje pozadavky z
+    datacentrovych IP adries (typicky aj hosting ako Render) bez ohladu na
+    spravny User-Agent - ak sa to deje, funkcia jednoducho vrati prazdny
+    zoznam a appka pokracuje len s RSS zdrojmi."""
     try:
-        response = requests.get(CRYPTO_NEWS_RSS_URL, timeout=REQUEST_TIMEOUT_SECONDS)
+        response = requests.get(
+            REDDIT_CRYPTO_URL, timeout=REQUEST_TIMEOUT_SECONDS,
+            headers={"User-Agent": "web:ai-crypto-analytics:2.2.0 (crypto sentiment aggregator)"},
+        )
         response.raise_for_status()
-        root = ET.fromstring(response.content)
-        items = root.findall(".//item")
-        if not items:
-            return False, [], "RSS feed neobsahuje ziadne spravy."
-        channel_title_el = root.find(".//channel/title")
-        source_name = _clean_html(channel_title_el.text) if channel_title_el is not None and channel_title_el.text else "Krypto Spravy"
+        body = response.json()
+        posts = body.get("data", {}).get("children", [])
         headlines: List[Dict[str, str]] = []
-        for item in items[:limit]:
-            title_el = item.find("title")
-            link_el = item.find("link")
-            pubdate_el = item.find("pubDate")
-            title = _clean_html(title_el.text) if title_el is not None and title_el.text else ""
-            link = link_el.text.strip() if link_el is not None and link_el.text else ""
-            published_at = _parse_rss_date(pubdate_el.text) if pubdate_el is not None and pubdate_el.text else None
-            if title:
-                headlines.append({
-                    "title": title, "link": link, "source": source_name,
-                    "published_at": published_at.isoformat() if published_at else "",
-                })
-        if not headlines:
-            return False, [], "Nepodarilo sa spracovat ziadnu polozku z RSS feedu."
-        return True, headlines, None
-    except requests.exceptions.RequestException as exc:
-        return False, [], f"Chyba siete pri nacitani krypto sprav: {exc}"
-    except ET.ParseError as exc:
-        return False, [], f"Chyba pri spracovani RSS XML: {exc}"
+        for post in posts[:limit]:
+            data = post.get("data", {})
+            title = _clean_html(data.get("title", ""))
+            if not title or data.get("stickied"):  # pripnute posty su zvycajne pravidla subredditu, nie spravy
+                continue
+            permalink = data.get("permalink", "")
+            created_utc = data.get("created_utc")
+            published_at = datetime.fromtimestamp(created_utc, tz=timezone.utc).isoformat() if created_utc else ""
+            headlines.append({
+                "title": title,
+                "link": f"https://reddit.com{permalink}" if permalink else "",
+                "source": "r/CryptoCurrency",
+                "published_at": published_at,
+            })
+        return headlines
+    except Exception:  # noqa: BLE001 - bonusovy zdroj, nikdy nesmie zhodit hlavnu funkciu
+        return []
+
+
+def get_crypto_headlines(limit: int = 8) -> Tuple[bool, List[Dict[str, str]], Optional[str]]:
+    """Agreguje titulky z VIACERYCH nezavislych RSS zdrojov (viz
+    CRYPTO_NEWS_RSS_URLS v config.py) plus Reddit - diverzifikuje spravy
+    naprieč viacerymi redakciami namiesto jedneho pohladu. Kazdy zdroj je
+    izolovany (try/except per-zdroj) - vypadok jedneho feedu neovplyvni
+    zvysne. Vysledky su zoradene podla casu publikovania (najnovsie prve)."""
+    per_source_limit = max(2, limit // len(CRYPTO_NEWS_RSS_URLS) + 1)
+    all_headlines: List[Dict[str, str]] = []
+    errors: List[str] = []
+
+    for url in CRYPTO_NEWS_RSS_URLS:
+        try:
+            all_headlines.extend(_fetch_one_rss_source(url, per_source_limit))
+        except requests.exceptions.RequestException as exc:
+            errors.append(f"{url}: {exc}")
+        except ET.ParseError as exc:
+            errors.append(f"{url}: {exc}")
+
+    all_headlines.extend(get_reddit_crypto_posts(limit=3))
+
+    if not all_headlines:
+        detail = "; ".join(errors) if errors else "Ziadny zdroj sprav nevratil data."
+        return False, [], f"Nepodarilo sa nacitat spravy zo ziadneho zdroja: {detail}"
+
+    all_headlines.sort(key=lambda h: h.get("published_at") or "", reverse=True)
+    return True, all_headlines[:limit], None
 
 
 def get_dummy_crypto_headlines(limit: int = 6) -> List[Dict[str, str]]:
