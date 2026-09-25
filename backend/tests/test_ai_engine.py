@@ -13,11 +13,11 @@ from app.services import ai_engine  # noqa: E402
 def test_fetch_market_context_formats_price_and_trend(monkeypatch):
     monkeypatch.setattr(
         ai_engine.market_data, "get_live_prices",
-        lambda ids, cur: (True, {"bitcoin": {"usd": 64280.0, "usd_24h_change": -2.15}}, None),
+        lambda ids, cur, timeout=None: (True, {"bitcoin": {"usd": 64280.0, "usd_24h_change": -2.15}}, None),
     )
     monkeypatch.setattr(
         ai_engine.market_data, "get_market_chart",
-        lambda coin_id, cur, days: (True, [[0, 68000.0], [1, 64280.0]], None),
+        lambda coin_id, cur, days, timeout=None: (True, [[0, 68000.0], [1, 64280.0]], None),
     )
     result = ai_engine._fetch_market_context("BTC")
     assert result is not None
@@ -35,13 +35,35 @@ def test_fetch_market_context_returns_none_for_unknown_coin():
 def test_fetch_market_context_returns_none_when_price_fetch_fails(monkeypatch):
     monkeypatch.setattr(
         ai_engine.market_data, "get_live_prices",
-        lambda ids, cur: (False, None, "network error"),
+        lambda ids, cur, timeout=None: (False, None, "network error"),
     )
     monkeypatch.setattr(
         ai_engine.market_data, "get_market_chart",
-        lambda coin_id, cur, days: (True, [], None),
+        lambda coin_id, cur, days, timeout=None: (True, [], None),
     )
     assert ai_engine._fetch_market_context("BTC") is None
+
+
+def test_fetch_market_context_uses_short_timeout_not_full_request_timeout(monkeypatch):
+    """Bez kratkeho timeoutu tu mohli tieto 2 volania v najhorsom pripade
+    zjest az 24s (2x plny REQUEST_TIMEOUT_SECONDS) e s t e PREDTYM, nez
+    zacalo samotne volanie AI providera - v sucte s tym cely request mohol
+    prekrocit ~40s limit Netlify proxy a skoncit 502 chybou."""
+    captured_timeouts = []
+
+    def fake_prices(ids, cur, timeout=None):
+        captured_timeouts.append(timeout)
+        return True, {"bitcoin": {"usd": 100.0, "usd_24h_change": 0.0}}, None
+
+    def fake_chart(coin_id, cur, days, timeout=None):
+        captured_timeouts.append(timeout)
+        return True, [[0, 100.0], [1, 100.0]], None
+
+    monkeypatch.setattr(ai_engine.market_data, "get_live_prices", fake_prices)
+    monkeypatch.setattr(ai_engine.market_data, "get_market_chart", fake_chart)
+    ai_engine._fetch_market_context("BTC")
+    assert captured_timeouts == [ai_engine._MARKET_CONTEXT_TIMEOUT, ai_engine._MARKET_CONTEXT_TIMEOUT]
+    assert ai_engine._MARKET_CONTEXT_TIMEOUT < ai_engine.REQUEST_TIMEOUT_SECONDS
 
 
 def test_fetch_market_context_never_raises_on_unexpected_exception(monkeypatch):

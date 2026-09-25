@@ -231,11 +231,14 @@ _market_chart_cache = TTLCache(ttl_seconds=PRICE_CACHE_TTL_SECONDS)
 _search_cache = TTLCache(ttl_seconds=300)  # vyhladavacie vysledky sa menia zriedka
 
 
-def get_live_prices(coin_ids: List[str], vs_currency: str = "usd") -> Tuple[bool, Optional[Dict[str, float]], Optional[str]]:
+def get_live_prices(coin_ids: List[str], vs_currency: str = "usd", timeout: int = REQUEST_TIMEOUT_SECONDS) -> Tuple[bool, Optional[Dict[str, float]], Optional[str]]:
     """Vrati ceny pre zoznam CoinGecko id v zvolenej mene (usd/eur/czk/btc).
     Vysledky su cachovane na PRICE_CACHE_TTL_SECONDS (predvolene 60s), aby
     opakovane requesty z frontendu (napr. prepocet portfolia) nevolali
-    CoinGecko znova a znova."""
+    CoinGecko znova a znova. `timeout` je nastavitelny - pri volani z
+    _fetch_market_context() (ai_engine.py) sa pouziva kratsi limit, aby
+    tieto dve "bonusove" volania nezjedli cely casovy rozpocet requestu este
+    predtym, nez vobec zacne samotne (pomalsie) volanie AI providera."""
     if not coin_ids:
         return True, {}, None
 
@@ -250,7 +253,7 @@ def get_live_prices(coin_ids: List[str], vs_currency: str = "usd") -> Tuple[bool
         response = requests.get(
             COINGECKO_SIMPLE_PRICE_URL,
             params={"ids": cache_key.split("|")[0], "vs_currencies": vs_currency, "include_24hr_change": "true"},
-            timeout=REQUEST_TIMEOUT_SECONDS,
+            timeout=timeout,
         )
         response.raise_for_status()
         body = response.json()
@@ -273,9 +276,10 @@ def get_live_prices(coin_ids: List[str], vs_currency: str = "usd") -> Tuple[bool
         return False, None, f"Chyba pri spracovani odpovede CoinGecko: {exc}"
 
 
-def get_market_chart(coin_id: str, vs_currency: str = "usd", days: str = "7") -> Tuple[bool, List[List[float]], Optional[str]]:
+def get_market_chart(coin_id: str, vs_currency: str = "usd", days: str = "7", timeout: int = REQUEST_TIMEOUT_SECONDS) -> Tuple[bool, List[List[float]], Optional[str]]:
     """Historicke cenove data pre interaktivny graf (Trhovy Sentiment stranka):
-    zoom/prepinanie casovych ramcov. Vracia zoznam [timestamp_ms, cena]."""
+    zoom/prepinanie casovych ramcov. Vracia zoznam [timestamp_ms, cena].
+    `timeout` viz get_live_prices() vyssie - rovnaky dovod."""
     vs_currency = (vs_currency or "usd").lower()
     cache_key = f"{coin_id}|{vs_currency}|{days}"
     cached = _market_chart_cache.get(cache_key)
@@ -285,7 +289,7 @@ def get_market_chart(coin_id: str, vs_currency: str = "usd", days: str = "7") ->
         response = requests.get(
             f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart",
             params={"vs_currency": vs_currency, "days": days},
-            timeout=REQUEST_TIMEOUT_SECONDS,
+            timeout=timeout,
         )
         response.raise_for_status()
         body = response.json()

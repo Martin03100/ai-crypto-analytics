@@ -108,6 +108,10 @@ def _post_with_retry(url: str, headers: Dict[str, str], payload: Dict[str, Any],
 # ---------------------------------------------------------------------------
 _MAX_OUTPUT_TOKENS = 1024
 _TEMPERATURE = 0.4
+# Kratky timeout pre "bonusove" volania na CoinGecko v _fetch_market_context()
+# (nie plny REQUEST_TIMEOUT_SECONDS) - viz podrobne vysvetlenie priamo pri
+# _fetch_market_context() nizsie.
+_MARKET_CONTEXT_TIMEOUT = 5
 
 
 def _call_gemini(prompt: str, api_key: str) -> tuple[bool, str, Optional[str]]:
@@ -267,13 +271,23 @@ def _fetch_market_context(coin: str) -> Optional[str]:
     vseobecny "crypto stale rastie" narativ z trenovacich dat namiesto na
     realny aktualny trend - presne preto posobili systematicky prilis
     optimisticky. Vrati None (nie vynimku), ak sa data nepodari zohnat -
-    volajuci potom prompt zostavi bez tejto casti, nikdy to nepadne."""
+    volajuci potom prompt zostavi bez tejto casti, nikdy to nepadne.
+
+    DOLEZITE (casovy rozpocet): tieto 2 volania su ZAMERNE s kratkym timeoutom
+    (_MARKET_CONTEXT_TIMEOUT), nie plnym REQUEST_TIMEOUT_SECONDS - su to
+    lahke JSON endpointy, co bezne odpovedia do 1-2s, takze kratky timeout
+    normalnu prevadzku nijak neobmedzi. Bez tohto obmedzenia mohli tieto 2
+    "bonusove" volania v najhorsom pripade zjest az 24s (2x plny timeout)
+    E S T E PREDTYM, nez vobec zacalo samotne (pomalsie) volanie AI providera
+    - spolu s tym by cely request mohol prekrocit ~40s limit Netlify proxy
+    pred backendom a skoncit s 502 chybou, presne to, co sme predtym riesili.
+    """
     coin_id = DEFAULT_COIN_IDS.get(coin.upper())
     if not coin_id:
         return None
     try:
-        price_ok, prices, _ = market_data.get_live_prices([coin_id], "usd")
-        chart_ok, chart, _ = market_data.get_market_chart(coin_id, "usd", "7")
+        price_ok, prices, _ = market_data.get_live_prices([coin_id], "usd", timeout=_MARKET_CONTEXT_TIMEOUT)
+        chart_ok, chart, _ = market_data.get_market_chart(coin_id, "usd", "7", timeout=_MARKET_CONTEXT_TIMEOUT)
         if not price_ok or not prices or coin_id not in prices:
             return None
         current = prices[coin_id]["usd"]
