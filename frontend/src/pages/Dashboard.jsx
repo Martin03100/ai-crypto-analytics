@@ -105,7 +105,7 @@ export default function Dashboard() {
       )}
 
       {fg && (
-        <Card title={t("dashboard.fearGreedTitle")} icon={Gauge} glow={fg.value >= 55 ? "emerald" : fg.value <= 45 ? "crimson" : undefined}>
+        <Card id="tour-feargreed-card" title={t("dashboard.fearGreedTitle")} icon={Gauge} glow={fg.value >= 55 ? "emerald" : fg.value <= 45 ? "crimson" : undefined}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div className="metric-value mono" style={{ fontSize: 32 }}>{fg.value}</div>
             <div>

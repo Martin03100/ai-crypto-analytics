@@ -3,6 +3,7 @@ import { Suspense, useState } from "react";
 import { Outlet } from "react-router-dom";
 import ChatWidget from "../components/ChatWidget";
 import DailyDigest from "../components/DailyDigest";
+import OnboardingTour from "../components/OnboardingTour";
 import Sidebar from "../components/Sidebar";
 import { useLanguage } from "../context/LanguageContext";
 
@@ -38,6 +39,7 @@ export default function Layout() {
       </main>
 
       <ChatWidget />
+      <OnboardingTour onNeedSidebar={setMenuOpen} />
     </div>
   );
 }

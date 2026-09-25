@@ -1,7 +1,8 @@
-import { AtSign, Info, Key, Languages, LogOut, Moon, ShieldCheck, Sun, Wallet2 } from "lucide-react";
+import { AtSign, Compass, Info, Key, Languages, LogOut, Moon, ShieldCheck, Sun, Wallet2 } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Card } from "../components/Card";
+import { resetOnboarding } from "../components/OnboardingTour";
 import { useAuth } from "../context/AuthContext";
 import { CURRENCIES, useCurrency } from "../context/CurrencyContext";
 import { LANGUAGES } from "../i18n/translations";
@@ -17,6 +18,7 @@ export default function Settings() {
   const { theme, setTheme } = useTheme();
   const { currency, setCurrency } = useCurrency();
   const { logout, user, updateEmail } = useAuth();
+  const navigate = useNavigate();
   const { push } = useToast();
 
   const [email, setEmail] = useState(user?.email || "");
@@ -162,6 +164,13 @@ export default function Settings() {
               <Link to="/privacy" className="key-link">{t("privacy.title")}</Link>
               <Link to="/terms" className="key-link">{t("terms.title")}</Link>
             </div>
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ marginTop: 10, alignSelf: "flex-start" }}
+              onClick={() => { resetOnboarding(); navigate("/dashboard"); }}
+            >
+              <Compass size={14} /> {t("settings.restartTour")}
+            </button>
           </div>
         </Card>
       </div>

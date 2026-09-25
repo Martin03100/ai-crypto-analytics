@@ -1,4 +1,4 @@
-import { Brain, CheckCircle2, LineChart, Loader2, ShieldCheck, Sparkles } from "lucide-react";
+import { Brain, CheckCircle2, LineChart, Loader2, PlayCircle, ShieldCheck, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api } from "../api";
@@ -179,6 +179,7 @@ export default function Auth() {
           <p className="auth-brand-sub">{t("auth.brandTagline")}</p>
           <CandlestickArt />
           <div className="auth-feature-list">
+            <div className="auth-feature auth-feature-highlight"><PlayCircle size={15} /> {t("auth.featureFreeTrial")}</div>
             <div className="auth-feature"><Brain size={15} /> {t("auth.featureModels")}</div>
             <div className="auth-feature"><Sparkles size={15} /> {t("auth.featurePortfolio")}</div>
             <div className="auth-feature"><ShieldCheck size={15} /> {t("auth.featureSecurity")}</div>
