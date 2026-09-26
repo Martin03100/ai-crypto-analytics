@@ -7,6 +7,11 @@ import { api } from "../api";
 import { AccuracyBadge, ConfidenceBadge, MockBadge, RiskBadge } from "../components/Badge";
 import { Card } from "../components/Card";
 import CostConfirmModal from "../components/CostConfirmModal";
+import DataSources from "../components/DataSources";
+import InfoTip from "../components/InfoTip";
+import Leaderboard from "../components/Leaderboard";
+import TipBox from "../components/TipBox";
+import { useCurrency } from "../context/CurrencyContext";
 import { SkeletonChart, SkeletonLines } from "../components/Skeleton";
 import ProviderSelect from "../components/ProviderSelect";
 import { useToast } from "../context/ToastContext";
@@ -16,30 +21,44 @@ import { useLanguage } from "../context/LanguageContext";
 import { humanizeError } from "../i18n/errorMessages";
 import { localeForLang } from "../i18n/locale";
 import { copyToClipboard } from "../utils/copyToClipboard";
-import { formatPrice } from "../utils/formatPrice";
+import { axisDecimals, buildTimePoints, formatPrice, formatTimeFull, formatTimeShort, formatUsd } from "../utils/formatPrice";
 import { usePageTitle } from "../hooks/usePageTitle";
 
 const COINS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "DOT", "LINK"];
 const HORIZONS = ["24h", "1T", "1M", "1R"];
 
-function ForecastChart({ data, t, actualPrices }) {
-  const hasActual = Array.isArray(actualPrices) && actualPrices.length === data.casove_body.length;
-  const chartData = data.casove_body.map((time, i) => {
-    const price = data.ceny[i];
-    const point = { t: time, price, upper: +(price * 1.05).toFixed(4), lower: +(price * 0.95).toFixed(4) };
-    if (hasActual) point.actual = actualPrices[i];
-    return point;
+function ForecastChart({ data, t, actualPrices, createdAt, horizon, locale }) {
+  const n = data.ceny.length;
+  const hasActual = Array.isArray(actualPrices) && actualPrices.length === n;
+  // Skutocne casy (od casu vytvorenia predikcie), nie popisky vymyslene AI.
+  const points = buildTimePoints(data.vytvorene || createdAt, horizon, n);
+  const startPrice = points && typeof data.aktualna_cena === "number" ? data.aktualna_cena : null;
+  const shortLabel = (i) => (points ? formatTimeShort(points[i], horizon, locale) : data.casove_body[i - 1]);
+  const fullLabel = (i) => (points ? formatTimeFull(points[i], locale) : data.casove_body[i - 1]);
+
+  const chartData = [];
+  if (startPrice !== null) {
+    // Bod 0 = skutocna cena v case vytvorenia - obe krivky zacinaju z rovnakeho miesta.
+    chartData.push({ t: shortLabel(0), full: `${fullLabel(0)} · ${t("forecast.startPoint")}`, price: startPrice, upper: startPrice, actual: hasActual ? startPrice : undefined });
+  }
+  data.ceny.forEach((price, idx) => {
+    chartData.push({ t: shortLabel(idx + 1), full: fullLabel(idx + 1), price, upper: +(price * 1.05).toFixed(8), actual: hasActual ? actualPrices[idx] : undefined });
   });
 
-  // Dynamický Y-axis rozsah (min/max ±5%), aby graf nezačínal od $0.
-  // Ked mame aj skutocnu cenu (spatne porovnanie), musi sa zmestit do rozsahu tiez.
-  const prices = hasActual ? [...data.ceny, ...actualPrices] : data.ceny;
-  const minPrice = Math.min(...prices);
-  const maxPrice = Math.max(...prices);
+  // Dynamicky rozsah osi Y (min/max +-5%), aby graf nezacinal od $0.
+  const values = chartData.flatMap((p) => [p.price, p.actual]).filter((v) => Number.isFinite(v));
+  const minPrice = Math.min(...values);
+  const maxPrice = Math.max(...values);
   const padding = (maxPrice - minPrice) * 0.05 || maxPrice * 0.05 || 1;
   const yDomain = [Math.max(0, minPrice - padding), maxPrice + padding];
+  const decimals = axisDecimals(yDomain[0], yDomain[1]);
+
+  const first = chartData[0];
+  const last = chartData[chartData.length - 1];
+  const summary = t("forecast.chartSummary", { from: formatPrice(first.price), to: formatPrice(last.price), start: first.full, end: last.full });
 
   return (
+    <div role="img" aria-label={summary}>
     <ResponsiveContainer width="100%" height={280}>
       <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
         <defs>
@@ -49,25 +68,26 @@ function ForecastChart({ data, t, actualPrices }) {
           </linearGradient>
         </defs>
         <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-        <XAxis dataKey="t" stroke="var(--text-tertiary)" fontSize={11} tickLine={false} axisLine={false} />
+        <XAxis dataKey="t" stroke="var(--text-tertiary)" fontSize={11} tickLine={false} axisLine={false} minTickGap={16} />
         <YAxis
-          stroke="var(--text-tertiary)" fontSize={11} tickLine={false} axisLine={false} width={70}
-          domain={yDomain} tickFormatter={formatPrice}
+          stroke="var(--text-tertiary)" fontSize={11} tickLine={false} axisLine={false} width={84}
+          domain={yDomain} tickFormatter={(v) => formatUsd(v, decimals)}
         />
         <Tooltip
-          contentStyle={{ background: "#121824", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, fontSize: 12 }}
+          contentStyle={{ background: "var(--bg-tooltip)", border: "1px solid var(--border-strong)", borderRadius: 10, fontSize: 12, color: "var(--text-primary)" }}
           labelStyle={{ color: "var(--text-secondary)" }}
           formatter={(v, name) => [formatPrice(v), name === "price" ? t("forecast.legendPredicted") : name === "actual" ? t("forecast.legendActual") : name]}
-          labelFormatter={(label) => t("forecast.timeTooltip", { label })}
+          labelFormatter={(label, payload) => t("forecast.timeTooltip", { label: payload?.[0]?.payload?.full || label })}
         />
         {hasActual && <Legend formatter={(value) => (value === "price" ? t("forecast.legendPredicted") : t("forecast.legendActual"))} wrapperStyle={{ fontSize: 12 }} />}
         <Area type="monotone" dataKey="upper" stroke="none" fill="url(#priceFill)" fillOpacity={0.4} isAnimationActive={false} legendType="none" />
         <Area type="monotone" dataKey="price" stroke="var(--cyan)" strokeWidth={2.5} fill="url(#priceFill)" dot={{ r: 3, fill: "var(--cyan)" }} />
         {hasActual && (
-          <Line type="monotone" dataKey="actual" stroke="var(--emerald)" strokeWidth={2.5} dot={{ r: 3, fill: "var(--emerald)" }} />
+          <Line type="monotone" dataKey="actual" stroke="var(--amber)" strokeWidth={2.5} strokeDasharray="6 3" dot={{ r: 3.5, fill: "var(--amber)" }} />
         )}
       </AreaChart>
     </ResponsiveContainer>
+    </div>
   );
 }
 
@@ -142,14 +162,23 @@ function HistoryItem({ entry, onDelete }) {
         <div style={{ padding: "0 18px 18px" }}>
           {hasChart ? (
             <>
-              <ForecastChart data={entry.forecast_data} t={t} actualPrices={accuracy?.status === "completed" ? accuracy.actual_prices : undefined} />
+              <ForecastChart data={entry.forecast_data} t={t} createdAt={entry.created_at} horizon={entry.timeframe} locale={locale} actualPrices={accuracy?.status === "completed" ? accuracy.actual_prices : undefined} />
               {(entry.forecast_data.confidence_score !== undefined || entry.forecast_data.risk_level || accuracy?.status === "completed") && (
                 <div style={{ display: "flex", gap: 8, margin: "10px 0", flexWrap: "wrap" }}>
                   {entry.forecast_data.confidence_score !== undefined && <ConfidenceBadge score={entry.forecast_data.confidence_score} />}
                   {entry.forecast_data.risk_level && <RiskBadge level={entry.forecast_data.risk_level} />}
-                  {accuracy?.status === "completed" && <AccuracyBadge score={accuracy.accuracy_pct} />}
+                  {accuracy?.status === "completed" && <><AccuracyBadge score={accuracy.accuracy_pct} /><InfoTip text={t("help.accuracy")} /></>}
+                  {accuracy?.status === "completed" && typeof accuracy.direction_correct === "boolean" && (
+                    <span className={`badge ${accuracy.direction_correct ? "badge-buy" : "badge-sell"}`}>
+                      <span className="badge-dot" /> {t(accuracy.direction_correct ? "forecast.directionCorrect" : "forecast.directionWrong")}
+                    </span>
+                  )}
                 </div>
               )}
+              {accuracy?.status === "completed" && accuracy.baseline_accuracy_pct != null && (
+                <p className="text-sub" style={{ marginTop: 4 }}>{t("forecast.baselineComparison", { baseline: accuracy.baseline_accuracy_pct.toFixed(1) })}</p>
+              )}
+              <TipBox entryId={entry.id} accuracy={accuracy} onTipped={(price) => setAccuracy((a) => ({ ...a, tip_price: price, can_tip: false }))} />
               {accuracyLoading && <p className="text-sub" style={{ marginTop: 4 }}>{t("forecast.accuracyLoading")}</p>}
               {accuracy?.status === "unavailable" && (
                 <p className="text-sub" style={{ marginTop: 4 }}>{t("forecast.accuracyUnavailable")}</p>
@@ -163,6 +192,7 @@ function HistoryItem({ entry, onDelete }) {
                 </p>
               )}
               <p className="text-sub" style={{ marginTop: 8 }}>{entry.forecast_data.odovodnenie}</p>
+              <DataSources sources={entry.forecast_data.zdroje_dat} />
             </>
           ) : (
             <p className="text-sub">{t("forecast.noChartData")}</p>
@@ -177,6 +207,7 @@ export default function Forecast() {
   const { push } = useToast();
   const { t } = useLanguage();
   usePageTitle("forecast.title");
+  const { currency } = useCurrency();
   const [tab, setTab] = useState("new");
   const providersCtx = useProviders();
   const providers = providersCtx.providers;
@@ -193,6 +224,8 @@ export default function Forecast() {
   const HISTORY_PAGE_SIZE = 20;
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const confirmDialog = useConfirm();
   const [costEstimate, setCostEstimate] = useState(null);
   const [estimating, setEstimating] = useState(false);
 
@@ -234,6 +267,20 @@ export default function Forecast() {
     }
   }
 
+  async function bulkDeleteForecasts() {
+    const ok = await confirmDialog(t("common.deleteSelectedConfirm", { n: selectedIds.length }));
+    if (!ok) return;
+    try {
+      const res = await api.bulkDeleteForecasts(selectedIds);
+      setHistory((prev) => prev.filter((h) => !selectedIds.includes(h.id)));
+      setHistoryTotal((n) => n - res.deleted);
+      setSelectedIds([]);
+      push(t("common.deleted"), "success");
+    } catch (err) {
+      push(err, "error");
+    }
+  }
+
   async function generate() {
     if (!provider) return;
     const providerInfo = providers.find((p) => p.provider === provider);
@@ -262,7 +309,7 @@ export default function Forecast() {
     setSaved(false);
     try {
       const res = await api.generateForecast(provider, coin, horizon);
-      setResult(res);
+      setResult({ ...res, generatedAt: new Date().toISOString(), horizon });
       if (res.is_mock) push(res.error_message ? humanizeError(res.error_message, lang) : t("forecast.mockNotice"), "warn");
     } catch (err) {
       push(err, "error");
@@ -297,6 +344,7 @@ export default function Forecast() {
       <div className="tabs">
         <button className={`tab ${tab === "new" ? "active" : ""}`} onClick={() => setTab("new")}>{t("forecast.tabNew")}</button>
         <button className={`tab ${tab === "history" ? "active" : ""}`} onClick={() => setTab("history")}>{t("forecast.tabHistory")}</button>
+        <button className={`tab ${tab === "leaderboard" ? "active" : ""}`} onClick={() => setTab("leaderboard")}>{t("forecast.tabLeaderboard")}</button>
       </div>
 
       {tab === "new" && (
@@ -342,19 +390,21 @@ export default function Forecast() {
             <div style={{ marginTop: 20 }}>
               <Card title={`${t("forecast.chartTitlePrefix")}: ${coin}`} icon={Sparkles} glow="cyan">
                 {result.is_mock && <div style={{ marginBottom: 12 }}><MockBadge /></div>}
-                <ForecastChart data={result.data} t={t} />
+                <ForecastChart data={result.data} t={t} createdAt={result.generatedAt} horizon={result.horizon} locale={localeForLang(lang)} />
+                {currency !== "USD" && <p className="text-sub" style={{ marginTop: 6 }}>{t("forecast.usdNote")}</p>}
               </Card>
               <div style={{ height: 16 }} />
               <Card title={t("forecast.reasoningTitle")} icon={Brain}>
                 {(result.data.confidence_score !== undefined || result.data.risk_level) && (
                   <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-                    {result.data.confidence_score !== undefined && <ConfidenceBadge score={result.data.confidence_score} />}
-                    {result.data.risk_level && <RiskBadge level={result.data.risk_level} />}
+                    {result.data.confidence_score !== undefined && <><ConfidenceBadge score={result.data.confidence_score} /><InfoTip text={t("help.confidence")} /></>}
+                    {result.data.risk_level && <><RiskBadge level={result.data.risk_level} /><InfoTip text={t("help.risk")} /></>}
                   </div>
                 )}
                 <p style={{ margin: 0, lineHeight: 1.6, fontSize: 13.5, color: "var(--text-secondary)" }}>
                   {result.data.odovodnenie}
                 </p>
+                <DataSources sources={result.data.zdroje_dat} />
               </Card>
               <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end" }}>
                 <button className="btn btn-primary btn-sm" onClick={saveCurrentForecast} disabled={saving || saved}>
@@ -365,6 +415,8 @@ export default function Forecast() {
           )}
         </>
       )}
+
+      {tab === "leaderboard" && <Leaderboard />}
 
       {tab === "history" && (
         <div>
@@ -377,8 +429,27 @@ export default function Forecast() {
           {!historyLoading && history.length === 0 && (
             <div className="empty-state">{t("forecast.emptyHistory")}</div>
           )}
+          {!historyLoading && history.length > 0 && (
+            <div className="bulk-toolbar">
+              <label className="bulk-select-all">
+                <input type="checkbox" checked={selectedIds.length === history.length}
+                  onChange={(e) => setSelectedIds(e.target.checked ? history.map((h) => h.id) : [])} /> {t("common.selectAll")}
+              </label>
+              {selectedIds.length > 0 && (
+                <button className="btn btn-ghost btn-sm" style={{ color: "var(--crimson)" }} onClick={bulkDeleteForecasts}>
+                  <Trash2 size={13} /> {t("common.deleteSelected", { n: selectedIds.length })}
+                </button>
+              )}
+            </div>
+          )}
           {!historyLoading && history.map((entry) => (
-            <HistoryItem key={entry.id} entry={entry} onDelete={(id) => { setHistory((prev) => prev.filter((h) => h.id !== id)); setHistoryTotal((n) => n - 1); }} />
+            <div key={entry.id} className="selectable-row">
+              <input type="checkbox" className="row-check" aria-label={t("common.selectItem")} checked={selectedIds.includes(entry.id)}
+                onChange={(e) => setSelectedIds((prev) => (e.target.checked ? [...prev, entry.id] : prev.filter((x) => x !== entry.id)))} />
+              <div className="selectable-row-body">
+                <HistoryItem entry={entry} onDelete={(id) => { setHistory((prev) => prev.filter((h) => h.id !== id)); setHistoryTotal((n) => n - 1); setSelectedIds((prev) => prev.filter((x) => x !== id)); }} />
+              </div>
+            </div>
           ))}
           {!historyLoading && history.length < historyTotal && (
             <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>

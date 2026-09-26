@@ -11,6 +11,7 @@
   --bg-card: rgba(18, 24, 38, 0.55);
   --bg-card-hover: rgba(24, 31, 48, 0.68);
   --bg-inset: rgba(10, 14, 24, 0.6);
+  --bg-tooltip: rgba(15, 20, 32, 0.98);
   --border-subtle: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.16);
 
@@ -60,6 +61,7 @@
   --bg-card: rgba(255, 255, 255, 0.72);
   --bg-card-hover: rgba(255, 255, 255, 0.88);
   --bg-inset: rgba(240, 242, 247, 0.8);
+  --bg-tooltip: rgba(255, 255, 255, 0.98);
   --border-subtle: rgba(15, 23, 42, 0.08);
   --border-strong: rgba(15, 23, 42, 0.14);
 

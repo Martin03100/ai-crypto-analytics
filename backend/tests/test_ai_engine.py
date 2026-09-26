@@ -10,20 +10,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from app.services import ai_engine  # noqa: E402
 
 
-def test_fetch_market_context_formats_price_and_trend(monkeypatch):
-    monkeypatch.setattr(
-        ai_engine.market_data, "get_live_prices",
-        lambda ids, cur, timeout=None: (True, {"bitcoin": {"usd": 64280.0, "usd_24h_change": -2.15}}, None),
-    )
-    monkeypatch.setattr(
-        ai_engine.market_data, "get_market_chart",
-        lambda coin_id, cur, days, timeout=None: (True, [[0, 68000.0], [1, 64280.0]], None),
-    )
-    result = ai_engine._fetch_market_context("BTC")
-    assert result is not None
-    assert "64,280.00" in result
-    assert "-2.15%" in result
-    assert "7 dni" in result
 
 
 def test_fetch_market_context_returns_none_for_unknown_coin():
@@ -32,46 +18,10 @@ def test_fetch_market_context_returns_none_for_unknown_coin():
     assert ai_engine._fetch_market_context("TOTALLY_UNKNOWN_COIN") is None
 
 
-def test_fetch_market_context_returns_none_when_price_fetch_fails(monkeypatch):
-    monkeypatch.setattr(
-        ai_engine.market_data, "get_live_prices",
-        lambda ids, cur, timeout=None: (False, None, "network error"),
-    )
-    monkeypatch.setattr(
-        ai_engine.market_data, "get_market_chart",
-        lambda coin_id, cur, days, timeout=None: (True, [], None),
-    )
-    assert ai_engine._fetch_market_context("BTC") is None
 
 
-def test_fetch_market_context_uses_short_timeout_not_full_request_timeout(monkeypatch):
-    """Bez kratkeho timeoutu tu mohli tieto 2 volania v najhorsom pripade
-    zjest az 24s (2x plny REQUEST_TIMEOUT_SECONDS) e s t e PREDTYM, nez
-    zacalo samotne volanie AI providera - v sucte s tym cely request mohol
-    prekrocit ~40s limit Netlify proxy a skoncit 502 chybou."""
-    captured_timeouts = []
-
-    def fake_prices(ids, cur, timeout=None):
-        captured_timeouts.append(timeout)
-        return True, {"bitcoin": {"usd": 100.0, "usd_24h_change": 0.0}}, None
-
-    def fake_chart(coin_id, cur, days, timeout=None):
-        captured_timeouts.append(timeout)
-        return True, [[0, 100.0], [1, 100.0]], None
-
-    monkeypatch.setattr(ai_engine.market_data, "get_live_prices", fake_prices)
-    monkeypatch.setattr(ai_engine.market_data, "get_market_chart", fake_chart)
-    ai_engine._fetch_market_context("BTC")
-    assert captured_timeouts == [ai_engine._MARKET_CONTEXT_TIMEOUT, ai_engine._MARKET_CONTEXT_TIMEOUT]
-    assert ai_engine._MARKET_CONTEXT_TIMEOUT < ai_engine.REQUEST_TIMEOUT_SECONDS
 
 
-def test_fetch_market_context_never_raises_on_unexpected_exception(monkeypatch):
-    def boom(*a, **k):
-        raise RuntimeError("nieco sa pokazilo")
-    monkeypatch.setattr(ai_engine.market_data, "get_live_prices", boom)
-    # nesmie vyhodit vynimku von - realne data su bonus, nikdy nesmu zhodit predikciu
-    assert ai_engine._fetch_market_context("BTC") is None
 
 
 def test_compute_accuracy_pending_when_horizon_not_yet_matured():
@@ -92,18 +42,23 @@ def test_compute_accuracy_unavailable_for_unknown_coin():
 
 
 def test_compute_accuracy_completed_with_correct_percentage(monkeypatch):
+    """1T predikcia s 2 bodmi: bod 1 = cas vytvorenia + 3.5 dna, bod 2 = +7 dni
+    (rovnako ako casy v grafe). Skutocna cena rastie linearne zo 100 na 110."""
     from datetime import datetime, timedelta, timezone
-    created_at = datetime.now(timezone.utc) - timedelta(days=10)  # "1T" horizont uz ubehol
+    created_at = datetime.now(timezone.utc) - timedelta(days=10)
 
     def fake_range(coin_id, cur, from_ts, to_ts):
-        # simuluje skutocny vyvoj ceny presne na urovni predikcie (nulova chyba)
-        return True, [[from_ts * 1000, 100.0], [to_ts * 1000, 110.0]], None
+        hours = int((to_ts - from_ts) / 3600)
+        return True, [[(from_ts + h * 3600) * 1000, 100.0 + 10.0 * h / hours] for h in range(hours + 1)], None
 
     monkeypatch.setattr(ai_engine.market_data, "get_market_chart_range", fake_range)
-    result = ai_engine.compute_forecast_accuracy("BTC", "1T", [100.0, 110.0], ["d1", "d2"], created_at)
+    result = ai_engine.compute_forecast_accuracy("BTC", "1T", [105.0, 110.0], ["d1", "d2"], created_at)
     assert result["status"] == "completed"
-    assert result["accuracy_pct"] == 100.0  # predikcia sedela presne so "skutocnostou"
-    assert result["actual_prices"] == [100.0, 110.0]
+    assert result["accuracy_pct"] >= 99.9  # predikcia sedela so "skutocnostou"
+    assert abs(result["actual_prices"][0] - 105.0) < 0.1 and abs(result["actual_prices"][1] - 110.0) < 0.1
+    # predikcia trafila smer (rast) a bola lepsia nez naivny odhad "cena sa nezmeni"
+    assert result["direction_correct"] is True
+    assert result["baseline_accuracy_pct"] < result["accuracy_pct"]
 
 
 def test_compute_accuracy_unavailable_when_chart_fetch_fails(monkeypatch):
@@ -238,3 +193,148 @@ def test_call_ai_provider_never_logs_api_key(monkeypatch, caplog):
         ai_engine.call_ai_provider("gemini", "prompt", "TAJNY-KLUC-123")
     assert "TAJNY-KLUC-123" not in caplog.text
     assert "***" in caplog.text
+
+
+
+def _hist(start, end, hours=720):
+    """Linearny vyvoj ceny zo `start` na `end` za 30 dni, hodinove body."""
+    now = 1_800_000_000_000
+    pts = [[now - (hours - i) * 3_600_000, start + (end - start) * i / hours] for i in range(hours + 1)]
+    return {"prices": pts, "volumes": [[p[0], 1_000_000.0] for p in pts]}
+
+
+def _patch_sources(monkeypatch, coin_hist, btc_hist=None, fail=False, timeouts=None):
+    def fake_history(coin_id, days=30, timeout=None):
+        if timeouts is not None:
+            timeouts.append(timeout)
+        if fail:
+            return False, {}, "chyba"
+        return True, (btc_hist if coin_id == "bitcoin" and btc_hist else coin_hist), None
+    monkeypatch.setattr(ai_engine.market_data, "get_market_history", fake_history)
+    monkeypatch.setattr(ai_engine.market_data, "get_fear_greed_index",
+                        lambda *a, **k: (True, {"value": 71, "classification": "Greed"}, None))
+    monkeypatch.setattr(ai_engine.market_data, "get_crypto_headlines",
+                        lambda *a, **k: (True, [{"title": "Bitcoin ETF inflows rise"}], None))
+    for name in ("coin_profile", "coin_news", "derivatives", "onchain", "chain_tvl", "macro_summary",
+                 "world_news", "github_activity", "coin_subreddit"):
+        monkeypatch.setattr(ai_engine.data_sources, name, lambda *a, **k: None)
+
+
+def test_market_context_includes_indicators_btc_mood_and_news(monkeypatch):
+    _patch_sources(monkeypatch, _hist(100.0, 110.0), btc_hist=_hist(80000.0, 84000.0))
+    ctx = ai_engine._fetch_market_context("SOL")
+    assert "SOL: cena $110.00" in ctx
+    assert "30d +10.0%" in ctx
+    assert "RSI(14)" in ctx and "vs SMA7" in ctx and "denna volatilita" in ctx and "objem 24h" in ctx
+    assert "BTC (lider trhu): cena $84,000.00" in ctx
+    assert "Fear & Greed index: 71 (Greed)" in ctx
+    assert "Bitcoin ETF inflows rise" in ctx
+
+
+def test_market_context_for_btc_has_no_duplicate_leader_line(monkeypatch):
+    _patch_sources(monkeypatch, _hist(80000.0, 84000.0))
+    ctx = ai_engine._fetch_market_context("BTC")
+    assert "BTC: cena" in ctx and "lider trhu" not in ctx
+
+
+def test_market_context_none_when_history_unavailable(monkeypatch):
+    _patch_sources(monkeypatch, None, fail=True)
+    assert ai_engine._fetch_market_context("ETH") is None
+
+
+def test_market_context_uses_short_timeout(monkeypatch):
+    timeouts = []
+    _patch_sources(monkeypatch, _hist(1.0, 2.0), timeouts=timeouts)
+    ai_engine._fetch_market_context("ETH")
+    assert timeouts and all(t == ai_engine._MARKET_CONTEXT_TIMEOUT for t in timeouts)
+    assert ai_engine._MARKET_CONTEXT_TIMEOUT < ai_engine.REQUEST_TIMEOUT_SECONDS
+
+
+def test_market_context_never_raises(monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("nieco sa pokazilo")
+    for fn in ("get_market_history", "get_fear_greed_index", "get_crypto_headlines"):
+        monkeypatch.setattr(ai_engine.market_data, fn, boom)
+    for fn in ("coin_profile", "coin_news", "derivatives", "onchain", "chain_tvl", "macro_summary", "world_news"):
+        monkeypatch.setattr(ai_engine.data_sources, fn, boom)
+    assert ai_engine._fetch_market_context("ETH") is None
+
+
+def test_rsi_extremes():
+    assert ai_engine._rsi([float(i) for i in range(20)]) == 100.0
+    assert ai_engine._rsi([float(20 - i) for i in range(20)]) == 0.0
+    assert ai_engine._rsi([1.0, 2.0]) is None
+
+
+def test_real_forecast_prompt_requests_user_language(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(ai_engine, "_build_market_context", lambda coin: (None, []))
+    monkeypatch.setattr(ai_engine, "call_ai_provider",
+                        lambda p, prompt, k: (captured.setdefault("prompt", prompt), (False, "", "x"))[1])
+    ai_engine.get_coin_forecast("gemini", "BTC", "1T", "fake-key", lang="cz")
+    assert "čeština" in captured["prompt"]
+
+
+
+def test_market_context_adds_type_guidance_and_lists_sources(monkeypatch):
+    _patch_sources(monkeypatch, _hist(0.1, 0.12))
+    monkeypatch.setattr(ai_engine.data_sources, "coin_profile",
+                        lambda cid: {"categories": ["Meme", "Dog-Themed"], "rank": 9, "github": "", "subreddit": ""})
+    monkeypatch.setattr(ai_engine.data_sources, "derivatives", lambda s: "Derivaty (Hyperliquid perp): funding +0.0010%/h")
+    text, sources = ai_engine._build_market_context("DOGE")
+    assert "MEME coin" in text and "Derivaty (Hyperliquid perp)" in text
+    assert "hyperliquid" in sources and "coingecko_profile" in sources
+
+
+def test_portfolio_context_computes_values_and_weights(monkeypatch):
+    rows = {
+        "bitcoin": {"current_price": 50000.0, "market_cap_rank": 1, "price_change_percentage_7d_in_currency": 2.0},
+        "ethereum": {"current_price": 2500.0, "market_cap_rank": 2, "price_change_percentage_7d_in_currency": -3.0},
+    }
+    monkeypatch.setattr(ai_engine.market_data, "get_coin_markets", lambda ids, timeout=None: (True, rows, None))
+    _patch_sources(monkeypatch, _hist(1.0, 1.0))
+    text, sources = ai_engine._build_portfolio_context(
+        [{"minca": "BTC", "mnozstvo": 1, "coin_id": "bitcoin"}, {"minca": "ETH", "mnozstvo": 20, "coin_id": "ethereum"}])
+    assert "BTC: hodnota $50,000 (50% portfolia)" in text
+    assert "ETH: hodnota $50,000 (50% portfolia)" in text and "7d -3.0%" in text
+    assert "Celkova hodnota $100,000" in text
+    assert sources[0] == "coingecko_prices"
+
+
+
+def test_custom_provider_call_revalidates_and_blocks_redirects(monkeypatch):
+    import json as _json
+    captured = {}
+    monkeypatch.setattr(ai_engine, "validate_custom_base_url", lambda url: None)
+
+    class Resp:
+        is_redirect = False
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"choices": [{"message": {"content": "OK"}}]}
+
+    def fake_post(url, headers=None, json=None, timeout=None, allow_redirects=True):
+        captured.update(url=url, allow_redirects=allow_redirects)
+        return Resp()
+
+    monkeypatch.setattr(ai_engine.requests, "post", fake_post)
+    secret = _json.dumps({"base_url": "https://api.example.com/v1/", "model": "m1", "key": "k"})
+    assert ai_engine.call_ai_provider("custom", "hi", secret) == (True, "OK", None)
+    assert captured == {"url": "https://api.example.com/v1/chat/completions", "allow_redirects": False}
+
+
+def test_validate_custom_base_url_blocks_private_and_http():
+    for url in ("http://example.com", "https://10.0.0.5/v1", "https://169.254.169.254", "https://[::1]/v1", "ftp://x"):
+        assert ai_engine.validate_custom_base_url(url) is not None, url
+
+
+def test_custom_provider_inner_key_never_logged(monkeypatch, caplog):
+    import json as _json
+    secret = _json.dumps({"base_url": "https://x", "model": "m", "key": "SUPER-TAJNY"})
+    monkeypatch.setattr(ai_engine, "_call_ai_provider_raw", lambda p, pr, k: (False, "", "chyba SUPER-TAJNY"))
+    with caplog.at_level("WARNING", logger="aca.ai"):
+        ai_engine.call_ai_provider("custom", "p", secret)
+    assert "SUPER-TAJNY" not in caplog.text

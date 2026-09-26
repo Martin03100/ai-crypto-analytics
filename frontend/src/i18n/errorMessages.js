@@ -42,6 +42,15 @@ const KNOWN_BACKEND_PATTERNS = [
   { test: /neplatn[aá] hodnota hlasu/i, key: "errors.invalidVote" },
   { test: /api kluc je pr[aá]zdny/i, key: "errors.emptyApiKey" },
   { test: /kluc sa nepodarilo overit/i, key: "errors.keyVerificationFailed" },
+  { test: /najprv si over email/i, key: "errors.emailNotVerified" },
+  { test: /zadaj 6-miestny k[oó]d z overovacej aplik/i, key: "errors.totpRequired" },
+  { test: /nespr[aá]vny k[oó]d z overovacej aplik/i, key: "errors.totpInvalid" },
+  { test: /overenie, [zž]e nie si robot/i, key: "errors.captchaFailed" },
+  { test: /2fa u[zž] m[aá][sš] zapnut|najprv spusti nastavenie 2fa/i, key: "errors.totpSetupState" },
+  { test: /na uk[aá][zž]kov[eé] d[aá]ta sa tipova[tť] ned[aá]/i, key: "errors.tipMock" },
+  { test: /tipova[tť] sa d[aá] len do 2 hod[ií]n/i, key: "errors.tipWindowClosed" },
+  { test: /na t[uú]to predikciu si u[zž] tipoval/i, key: "errors.tipAlreadyExists" },
+  { test: /vlastn[eé]ho providera|vlastn[yý] provider (nie je spr[aá]vne|vr[aá]til presmerovanie)/i, key: "errors.customProviderInvalid" },
   // AI vratila prazdnu/orezanu/neplatnu odpoved (spravy z backend validatorov
   // a prazdnej Gemini odpovede) - predtym koncili ako vseobecne "Nieco sa pokazilo".
   { test: /pr[aá]zdn[uú] odpove[dď]|nepodarilo na[jĵ]?[sš]t [zž]iadny json|naparsovan[yý] json|pol(e|ia) '[^']+'.*mus[ií]/i, key: "errors.aiInvalidResponse" },

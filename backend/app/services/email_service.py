@@ -159,3 +159,38 @@ def render_reset_password_email(username: str, code: str, expires_minutes: int) 
         """,
     )
     return text_body, html_body
+
+
+
+def render_verification_email(username: str, code: str, expires_minutes: int) -> tuple[str, str]:
+    text_body = (f"Ahoj {username},\n\nvitaj v AI Crypto Analytics! Na overenie emailu zadaj v appke tento kod "
+                 f"(platny {expires_minutes} minut):\n\n{code}\n\nAk si sa neregistroval(a), tento email ignoruj.")
+    html_body = _email_shell(preheader=f"Tvoj overovaci kod, platny {expires_minutes} minut.", inner_html=f"""
+        <h1 style="margin:0 0 14px; font-size:19px; color:#0f172a;">Over si email</h1>
+        <p style="margin:0 0 22px; font-size:14px; line-height:1.6; color:#334155;">
+          Ahoj <strong>{username}</strong>, vitaj v AI Crypto Analytics! Na dokončenie registrácie zadaj v aplikácii tento kód:
+        </p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 22px; width:100%;">
+          <tr><td align="center" style="background:#f1f5f9; border-radius:12px; padding:20px;">
+            <span style="font-family:'SF Mono',Consolas,monospace; font-size:34px; font-weight:800; letter-spacing:8px; color:#0f172a;">{code}</span>
+          </td></tr>
+        </table>
+        <p style="margin:0; font-size:12.5px; color:#94a3b8;">Kód platí {expires_minutes} minút. Ak si sa neregistroval(a) ty, tento email ignoruj.</p>
+        """)
+    return text_body, html_body
+
+
+def render_lockout_email(username: str, minutes: int) -> tuple[str, str]:
+    text_body = (f"Ahoj {username},\n\ntvoj ucet bol docasne uzamknuty na {minutes} minut po niekolkych "
+                 f"neuspesnych pokusoch o prihlasenie. Ak si to nebol(a) ty, odporucame zmenit heslo a zapnut 2FA.")
+    html_body = _email_shell(preheader="Viacero neúspešných pokusov o prihlásenie.", inner_html=f"""
+        <h1 style="margin:0 0 14px; font-size:19px; color:#0f172a;">Upozornenie na pokusy o prihlásenie</h1>
+        <p style="margin:0 0 14px; font-size:14px; line-height:1.6; color:#334155;">
+          Ahoj <strong>{username}</strong>, tvoj účet bol dočasne uzamknutý na <strong>{minutes} minút</strong>
+          po niekoľkých neúspešných pokusoch o prihlásenie.
+        </p>
+        <p style="margin:0; font-size:14px; line-height:1.6; color:#334155;">
+          Ak si to nebol(a) ty, odporúčame zmeniť heslo a v Nastaveniach zapnúť dvojfaktorové overenie (2FA).
+        </p>
+        """)
+    return text_body, html_body

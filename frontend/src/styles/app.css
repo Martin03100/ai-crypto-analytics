@@ -784,7 +784,7 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
   pointer-events: none;
 }
 .onboarding-tip {
-  background: rgba(15, 20, 32, 0.98); border: 1px solid var(--border-strong);
+  background: var(--bg-tooltip); border: 1px solid var(--border-strong);
   border-radius: var(--radius-md); padding: 16px 17px;
   box-shadow: 0 20px 50px rgba(0,0,0,0.5);
   pointer-events: auto;
@@ -843,3 +843,103 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 }
 .password-toggle-btn:hover { color: var(--text-secondary); }
 .password-toggle-btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 1px; }
+
+/* Zdroje dat pod AI analyzou */
+.data-sources {
+  display: flex; align-items: flex-start; gap: 6px; flex-wrap: wrap;
+  margin: 10px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--text-tertiary);
+}
+.data-sources svg { margin-top: 2px; flex-shrink: 0; }
+
+/* Rebricek AI + sutaz */
+.table-scroll { overflow-x: auto; }
+.lb-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.lb-table th {
+  text-align: left; font-weight: 600; color: var(--text-tertiary); font-size: 11.5px;
+  text-transform: uppercase; letter-spacing: 0.03em; padding: 8px 10px;
+  border-bottom: 1px solid var(--border-subtle); white-space: nowrap;
+}
+.lb-table td { padding: 10px; border-bottom: 1px solid var(--border-subtle); white-space: nowrap; }
+.tip-box {
+  margin-top: 10px; padding: 12px 14px; border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); background: var(--bg-inset);
+}
+
+/* Overenie emailu po registracii */
+.verify-gate { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.verify-card { width: 100%; max-width: 420px; }
+.verify-card h2 { margin: 10px 0 6px; font-size: 19px; }
+.verify-icon {
+  width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  background: var(--cyan-dim); color: var(--cyan);
+}
+.verify-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+/* Vysvetlivky (i) */
+.infotip { position: relative; display: inline-flex; vertical-align: middle; margin-left: 4px; }
+.infotip-btn {
+  background: none; border: none; padding: 2px; color: var(--text-tertiary); cursor: help;
+  display: inline-flex; border-radius: 50%;
+}
+.infotip-btn:hover, .infotip-btn:focus-visible { color: var(--cyan); }
+.infotip-bubble {
+  position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  width: max-content; max-width: 260px; background: var(--bg-tooltip); border: 1px solid var(--border-strong);
+  color: var(--text-secondary); font-size: 12px; font-weight: 400; line-height: 1.45; padding: 8px 10px;
+  border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); z-index: 60;
+  text-transform: none; letter-spacing: normal; white-space: normal; text-align: left;
+}
+/* Hromadne mazanie historie */
+.bulk-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; min-height: 34px; }
+.bulk-select-all { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer; }
+.selectable-row { display: flex; align-items: flex-start; gap: 10px; }
+.row-check { margin-top: 20px; flex-shrink: 0; width: 16px; height: 16px; cursor: pointer; }
+.selectable-row-body { flex: 1; min-width: 0; }
+/* RSI / MACD panely */
+.indicator-panel { margin-top: 10px; border-top: 1px solid var(--border-subtle); padding-top: 6px; }
+.indicator-title { font-size: 11.5px; font-weight: 600; color: var(--text-tertiary); }
+/* Velryby a on-chain */
+.onchain-item { padding: 12px 14px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-inset); }
+.onchain-item p { margin: 6px 0 0; }
+/* Klavesove skratky */
+.shortcut-list { list-style: none; padding: 0; margin: 0 0 18px; display: grid; gap: 8px; }
+.shortcut-list li { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--text-secondary); }
+.shortcut-list kbd {
+  min-width: 26px; text-align: center; padding: 3px 7px; border-radius: 6px; font-family: var(--font-mono);
+  font-size: 12px; background: var(--bg-inset); border: 1px solid var(--border-strong); color: var(--text-primary);
+}
+/* Dotykove zariadenia - vacsie ciele */
+@media (pointer: coarse) {
+  .tab { min-height: 40px; }
+  .btn-sm { min-height: 36px; }
+  .infotip-btn { padding: 6px; }
+}
+/* Landing stranka */
+.landing { max-width: 1080px; margin: 0 auto; padding: 20px 20px 40px; position: relative; z-index: 1; }
+.landing-nav { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 40px; }
+.landing-brand { display: flex; align-items: center; gap: 10px; }
+.landing-nav-actions { display: flex; gap: 8px; align-items: center; }
+.landing-lang { max-width: 140px; }
+.landing-hero { text-align: center; max-width: 760px; margin: 0 auto 48px; }
+.landing-eyebrow {
+  display: inline-block; font-size: 12px; font-weight: 700; color: var(--cyan); background: var(--cyan-dim);
+  padding: 5px 10px; border-radius: 999px; margin-bottom: 16px;
+}
+.landing-hero h1 { font-size: clamp(28px, 5vw, 46px); line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 14px; }
+.landing-sub { font-size: 16px; color: var(--text-secondary); line-height: 1.6; margin: 0 0 24px; }
+.landing-cta { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.landing-note { font-size: 12.5px; color: var(--text-tertiary); margin-top: 12px; }
+.landing-art { display: flex; justify-content: center; margin-top: 28px; }
+.landing-features { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 40px; }
+.landing-feature h3 { margin: 10px 0 6px; font-size: 15px; }
+.landing-feature-icon {
+  width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  background: var(--cyan-dim); color: var(--cyan);
+}
+.landing-steps { max-width: 760px; margin: 0 auto 32px; }
+.landing-steps h2 { font-size: 20px; text-align: center; margin-bottom: 16px; }
+.landing-steps ol { display: grid; gap: 10px; padding-left: 20px; }
+.landing-honest { display: flex; gap: 14px; align-items: flex-start; max-width: 760px; margin: 0 auto 32px; }
+.landing-honest h3 { margin: 0 0 6px; font-size: 15px; }
+.landing-footer { text-align: center; font-size: 12.5px; color: var(--text-tertiary); }
+.landing-footer a { color: var(--text-secondary); }

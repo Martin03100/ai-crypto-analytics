@@ -17,7 +17,7 @@ from app.models import PortfolioHistory, User
 from app.rate_limit import rate_limit_by_user
 from app.config import RATE_LIMIT_AI_ENDPOINT
 from app.schemas import (
-    AIResultOut, CostEstimateOut, PaginatedPortfolioHistory, PortfolioHistoryOut, PortfolioRequest, SavePortfolioRequest,
+    AIResultOut, BulkDeleteRequest, CostEstimateOut, PaginatedPortfolioHistory, PortfolioHistoryOut, PortfolioRequest, SavePortfolioRequest,
 )
 from app.services.ai_engine import estimate_portfolio_cost, get_portfolio_analysis
 
@@ -98,3 +98,14 @@ def delete_portfolio_analysis(entry_id: int, user: User = Depends(get_current_us
     db.delete(row)
     db.commit()
     return {"success": True}
+
+
+
+@router.post("/history/bulk-delete")
+def bulk_delete_portfolio(payload: BulkDeleteRequest, user: User = Depends(get_current_user),
+                          db: Session = Depends(get_db)) -> dict:
+    """Zmaze viac ulozenych analyz naraz - LEN vlastne (cudzie ID sa ticho ignoruju)."""
+    deleted = db.query(PortfolioHistory).filter(
+        PortfolioHistory.user_id == user.id, PortfolioHistory.id.in_(payload.ids)).delete(synchronize_session=False)
+    db.commit()
+    return {"success": True, "deleted": deleted}

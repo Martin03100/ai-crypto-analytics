@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api } from "../api";
 import { ActionBadge } from "./Badge";
 import { useConfirm } from "../context/ConfirmContext";
+import DataSources from "./DataSources";
 import { useToast } from "../context/ToastContext";
 import { useLanguage } from "../context/LanguageContext";
 import { localeForLang } from "../i18n/locale";
@@ -86,6 +87,7 @@ export default function PortfolioHistoryItem({ entry, onDelete }) {
             ))}
           </div>
           <p className="text-sub">{entry.analysis_data?.odborna_analyza}</p>
+          <DataSources sources={entry.analysis_data?.zdroje_dat} />
         </div>
       )}
     </div>

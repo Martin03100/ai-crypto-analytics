@@ -13,7 +13,7 @@ def test_list_api_keys_returns_all_providers_disconnected(registered):
     res = client.get("/api/account/api-keys")
     assert res.status_code == 200
     providers = res.json()
-    assert len(providers) == 5
+    assert len(providers) == 6
     assert all(p["connected"] is False for p in providers)
 
 
@@ -102,3 +102,36 @@ def test_logout_all_devices_invalidates_old_token(registered):
     # Klient dostal novy cookie hned v tejto odpovedi, takze este je prihlaseny.
     res = client.get("/api/auth/me")
     assert res.status_code == 200
+
+
+
+def test_delete_account_requires_password_and_removes_everything(registered):
+    from tests.conftest import anon_csrf_headers
+    client, username, password = registered
+    res = client.post("/api/account/delete", json={"password": "zle-heslo-123"}, headers=csrf_headers(client))
+    assert res.status_code == 400
+    res = client.post("/api/account/delete", json={"password": password}, headers=csrf_headers(client))
+    assert res.status_code == 200
+    assert client.get("/api/auth/me").status_code == 401
+    res = client.post("/api/auth/login", json={"username": username, "password": password}, headers=anon_csrf_headers(client))
+    assert res.status_code == 401
+
+
+
+def test_custom_provider_rejects_internal_or_insecure_addresses(registered):
+    client, _u, _p = registered
+    for url in ("http://example.com/v1", "https://127.0.0.1/v1", "https://169.254.169.254/latest", "https://10.0.0.5/v1"):
+        res = client.put("/api/account/api-keys", json={"provider": "custom", "api_key": "sk-test-1234",
+                                                        "base_url": url, "model": "m"}, headers=csrf_headers(client))
+        assert res.status_code == 400, url
+
+
+def test_custom_provider_saved_when_valid(registered, monkeypatch):
+    from app.routers import account as account_router
+    monkeypatch.setattr(account_router, "validate_custom_base_url", lambda url: None)
+    client, _u, _p = registered
+    body = {"provider": "custom", "api_key": "sk-test-1234", "base_url": "https://openrouter.ai/api/v1", "model": ""}
+    assert client.put("/api/account/api-keys", json=body, headers=csrf_headers(client)).status_code == 400
+    body["model"] = "mistralai/mistral-large"
+    res = client.put("/api/account/api-keys", json=body, headers=csrf_headers(client))
+    assert res.status_code == 200 and res.json()["connected"] is True

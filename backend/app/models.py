@@ -10,7 +10,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from typing import Optional
+
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -45,6 +47,14 @@ class User(Base):
     # Ochrana proti hrubej sile pri prihlaseni (viz app/config.py MAX_FAILED_LOGIN_ATTEMPTS).
     failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     locked_until: Mapped[datetime] = mapped_column(DateTime, nullable=True, default=None)
+
+    # Overenie emailu kodom pri registracii. None = ucet z doby pred zavedenim
+    # overovania (alebo bez nastaveneho emailu) -> povazuje sa za overeny.
+    email_verified: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=None)
+    # 2FA (TOTP - Google Authenticator a pod.). Tajomstvo je zasifrovane.
+    totp_secret: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
+    totp_pending_secret: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
+    totp_enabled: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=None)
 
     reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
@@ -118,3 +128,49 @@ class PasswordResetToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     user: Mapped["User"] = relationship(back_populates="reset_tokens")
+
+
+
+class ForecastEvaluation(Base):
+    """Vyhodnotenie dozretej (nie ukazkovej) predikcie - zaklad verejneho
+    rebricka presnosti AI providerov. Ulozi sa raz, ked horizont ubehne."""
+    __tablename__ = "forecast_evaluations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    forecast_id: Mapped[int] = mapped_column(Integer, unique=True, index=True, nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
+    provider: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    coin: Mapped[str] = mapped_column(String(16), nullable=False)
+    timeframe: Mapped[str] = mapped_column(String(8), nullable=False)
+    accuracy_pct: Mapped[float] = mapped_column(Float, nullable=False)
+    baseline_accuracy_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    direction_correct: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    actual_final_price: Mapped[float] = mapped_column(Float, nullable=False)
+    evaluated_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class PriceTip(Base):
+    """Sutaz "tvoj tip vs AI": pouzivatel tipne konecnu cenu k vlastnej
+    ulozenej predikcii (len do 2 hodin od jej vytvorenia - aby nemal vyhodu
+    z neskorsieho vyvoja). Po dozreti sa porovna, kto bol blizsie."""
+    __tablename__ = "price_tips"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    forecast_id: Mapped[int] = mapped_column(Integer, unique=True, index=True, nullable=False)
+    tip_price: Mapped[float] = mapped_column(Float, nullable=False)
+    ai_price: Mapped[float] = mapped_column(Float, nullable=False)
+    outcome: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)  # win / loss / tie
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+
+class EmailVerificationCode(Base):
+    """6-miestny kod na overenie emailu (ulozeny len ako SHA-256 hash)."""
+    __tablename__ = "email_verification_codes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    code_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)

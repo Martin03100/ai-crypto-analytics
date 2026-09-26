@@ -253,12 +253,18 @@ def get_upcoming_market_events(lang: str = "en") -> List[Dict[str, str]]:
 # neprekrocili rate limit bezplatneho CoinGecko API (chyba 429).
 # ---------------------------------------------------------------------------
 from app.config import (  # noqa: E402
-    COINGECKO_SEARCH_URL, COINGECKO_SIMPLE_PRICE_URL, PRICE_CACHE_TTL_SECONDS,
+    COINGECKO_API_KEY, COINGECKO_SEARCH_URL, COINGECKO_SIMPLE_PRICE_URL, PRICE_CACHE_TTL_SECONDS,
 )
 
 _price_cache = TTLCache(ttl_seconds=PRICE_CACHE_TTL_SECONDS)
 _market_chart_cache = TTLCache(ttl_seconds=PRICE_CACHE_TTL_SECONDS)
 _search_cache = TTLCache(ttl_seconds=300)  # vyhladavacie vysledky sa menia zriedka
+_history_cache = TTLCache(ttl_seconds=300)  # 30d historia pre AI predikcie - 5 min staci, setri limit
+
+
+def _cg_headers() -> Dict[str, str]:
+    """Hlavicka s CoinGecko Demo klucom, ak je nastaveny (viz config.py)."""
+    return {"x-cg-demo-api-key": COINGECKO_API_KEY} if COINGECKO_API_KEY else {}
 
 
 def get_live_prices(coin_ids: List[str], vs_currency: str = "usd", timeout: int = REQUEST_TIMEOUT_SECONDS) -> Tuple[bool, Optional[Dict[str, float]], Optional[str]]:
@@ -282,6 +288,7 @@ def get_live_prices(coin_ids: List[str], vs_currency: str = "usd", timeout: int 
     try:
         response = requests.get(
             COINGECKO_SIMPLE_PRICE_URL,
+            headers=_cg_headers(),
             params={"ids": cache_key.split("|")[0], "vs_currencies": vs_currency, "include_24hr_change": "true"},
             timeout=timeout,
         )
@@ -318,6 +325,7 @@ def get_market_chart(coin_id: str, vs_currency: str = "usd", days: str = "7", ti
     try:
         response = requests.get(
             f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart",
+            headers=_cg_headers(),
             params={"vs_currency": vs_currency, "days": days},
             timeout=timeout,
         )
@@ -351,6 +359,7 @@ def get_market_chart_range(coin_id: str, vs_currency: str, from_ts: int, to_ts: 
     try:
         response = requests.get(
             f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart/range",
+            headers=_cg_headers(),
             params={"vs_currency": vs_currency, "from": from_ts, "to": to_ts},
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
@@ -381,7 +390,7 @@ def search_coins(query: str, limit: int = 8) -> Tuple[bool, List[Dict[str, str]]
         return True, cached, None
     try:
         response = requests.get(
-            COINGECKO_SEARCH_URL, params={"query": query}, timeout=REQUEST_TIMEOUT_SECONDS,
+            COINGECKO_SEARCH_URL, params={"query": query}, headers=_cg_headers(), timeout=REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
         body = response.json()
@@ -396,3 +405,60 @@ def search_coins(query: str, limit: int = 8) -> Tuple[bool, List[Dict[str, str]]
         return False, [], f"Chyba siete pri vyhladavani mincí: {exc}"
     except (ValueError, KeyError, TypeError) as exc:
         return False, [], f"Chyba pri spracovani vysledkov vyhladavania: {exc}"
+
+
+def get_market_history(coin_id: str, days: int = 30, timeout: int = REQUEST_TIMEOUT_SECONDS) -> Tuple[bool, Dict[str, List[List[float]]], Optional[str]]:
+    """30-dnova hodinova historia ceny A objemu v JEDNOM volani (predtym 2
+    samostatne volania len na cenu a 7d graf) - zaklad pre technicke
+    indikatory v AI predikciach (viz ai_engine._summarize_history)."""
+    cache_key = f"{coin_id}|{days}"
+    cached = _history_cache.get(cache_key)
+    if cached is not None:
+        return True, cached, None
+    try:
+        response = requests.get(
+            f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart",
+            params={"vs_currency": "usd", "days": days}, headers=_cg_headers(), timeout=timeout,
+        )
+        response.raise_for_status()
+        body = response.json()
+        data = {"prices": body.get("prices", []), "volumes": body.get("total_volumes", [])}
+        if len(data["prices"]) < 2:
+            return False, {}, "CoinGecko vratil prilis malo historickych dat."
+        _history_cache.set(cache_key, data)
+        return True, data, None
+    except Exception as exc:  # noqa: BLE001
+        stale = _history_cache.get(cache_key, allow_stale=True)
+        if stale is not None:
+            return True, stale, None
+        return False, {}, f"Chyba pri nacitani historickych dat: {exc}"
+
+
+_markets_cache = TTLCache(ttl_seconds=120)
+
+
+def get_coin_markets(coin_ids: List[str], timeout: int = REQUEST_TIMEOUT_SECONDS) -> Tuple[bool, Dict[str, Dict[str, Any]], Optional[str]]:
+    """Cena, rank a zmeny 24h/7d/30d pre VIAC mincí v JEDNOM volani (pre
+    analyzu portfolia - az 30 mincí by inak znamenalo 30 volani)."""
+    ids = sorted({c for c in coin_ids if c})[:50]
+    if not ids:
+        return True, {}, None
+    cache_key = ",".join(ids)
+    cached = _markets_cache.get(cache_key)
+    if cached is not None:
+        return True, cached, None
+    try:
+        response = requests.get(
+            "https://api.coingecko.com/api/v3/coins/markets",
+            params={"vs_currency": "usd", "ids": cache_key, "price_change_percentage": "24h,7d,30d"},
+            headers=_cg_headers(), timeout=timeout,
+        )
+        response.raise_for_status()
+        rows = {row["id"]: row for row in response.json() if isinstance(row, dict) and row.get("id")}
+        _markets_cache.set(cache_key, rows)
+        return True, rows, None
+    except Exception as exc:  # noqa: BLE001
+        stale = _markets_cache.get(cache_key, allow_stale=True)
+        if stale is not None:
+            return True, stale, None
+        return False, {}, f"Chyba pri nacitani trhovych dat portfolia: {exc}"

@@ -36,6 +36,9 @@ def _extract_token(request: Request, header_token: Optional[str]) -> Optional[st
     return cookie_token or header_token
 
 
+_UNVERIFIED_ALLOWED_PATHS = ("/api/auth/", "/api/account/email", "/api/account/delete")
+
+
 def get_current_user(
     request: Request,
     header_token: Optional[str] = Depends(oauth2_scheme),
@@ -63,6 +66,9 @@ def get_current_user(
     token_version = payload.get("tv", 0)
     if token_version != user.token_version:
         raise credentials_error
+    # Neovereny email -> povolene len overenie, zmena emailu, odhlasenie a zmazanie uctu.
+    if user.email_verified is False and not request.url.path.startswith(_UNVERIFIED_ALLOWED_PATHS):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Najprv si over email kódom, ktorý sme ti poslali.")
     return user
 
 
@@ -70,9 +76,14 @@ def get_decrypted_api_key(db, user_id: int, provider: str):
     """Najde ulozeny (sifrovany) API kluc pouzivatela pre providera a desifruje
     ho AZ TU, tesne pred pouzitim v aktivnom API volani. Viz app/security.py."""
     from app.models import ApiKey
-    from app.security import decrypt_secret
+    from app.security import decrypt_secret, encrypt_secret, is_legacy_ciphertext
 
     row = db.query(ApiKey).filter(ApiKey.user_id == user_id, ApiKey.provider == provider).first()
     if row is None:
         return None
-    return decrypt_secret(row.encrypted_key)
+    plain = decrypt_secret(row.encrypted_key, user_id)
+    if plain is not None and is_legacy_ciphertext(row.encrypted_key):
+        # Lenive prepisanie starsieho formatu na sifrovanie viazane na pouzivatela.
+        row.encrypted_key = encrypt_secret(plain, user_id)
+        db.commit()
+    return plain

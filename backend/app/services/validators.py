@@ -51,8 +51,9 @@ GLOBAL_CONTEXT_INSTRUCTION = (
     "(6) pri konkrétnych projektoch (nie BTC/ETH) aj ich vlastné fundamenty "
     "- token unlocks, partnerstvá, technologické míľniky; "
     "(7) klimatické a energetické vplyvy relevantné pre mining/staking. "
-    "Ak k niektorým z týchto faktorov nemáš aktuálne dáta, jasne to uveď v "
-    "zdôvodnení ako predpoklad/odhad namiesto potvrdeného faktu."
+    "Faktory, ku ktorým nemáš aktuálne dáta, nepredstieraj - ale ani ich "
+    "nevypisuj ako zoznam chýbajúcich dát; ak to podstatne znižuje istotu, "
+    "stačí jedna krátka zmienka."
 )
 
 _JSON_BLOCK_PATTERN = re.compile(r"\{.*\}", re.DOTALL)
@@ -182,6 +183,9 @@ def build_daily_digest_prompt(fear_greed_value: int, fear_greed_classification: 
     )
 
 
+_HORIZON_STEP = {"24h": "hodinu", "1T": "den", "1M": "den", "1R": "mesiac"}
+
+
 def build_forecast_prompt(coin: str, horizon: str, points: int, market_context: str | None = None) -> str:
     context_block = (
         f"SKUTOCNE aktualne trhove data pre {coin} (pouzi ako hlavny zaklad predikcie): {market_context}. "
@@ -194,8 +198,11 @@ def build_forecast_prompt(coin: str, horizon: str, points: int, market_context: 
         f"Predikcia MUSI vychadzat z poskytnuteho trendu (24h/7d zmena), NIE zo vseobecneho predpokladu, "
         f"ze kryptomeny dlhodobo rastu - ak trend klesa alebo je neisty, predikuj pokles/stagnaciu rovnako "
         f"ochotne ako rast. Falosny optimizmus je horsi ako priznana neistota. "
+        f"Prvy bod predikcie musi nadvazovat na aktualnu cenu a celkovy pohyb drz v realistickom rozsahu "
+        f"podla uvedenej dennej volatility, pokial data nedavaju silny dovod na vacsi pohyb. "
         f"Vytvor cenovu predikciu pre kryptomenu {coin} na casovy horizont {horizon} s presne {points} "
-        f"datovymi bodmi. {GLOBAL_CONTEXT_INSTRUCTION} "
+        f"datovymi bodmi. Casovanie: bod c. 1 je cena o 1 {_HORIZON_STEP.get(horizon, 'jednotku casu')} od TERAZ, dalsie body "
+        f"idu po rovnakych krokoch a posledny bod je cena na konci horizontu. {GLOBAL_CONTEXT_INSTRUCTION} "
         f"Odpovedz VYHRADNE ako platny JSON bez markdown obalu, "
         f"bez sprievodneho textu, presne v tomto tvare:\n"
         f'{{"ceny": [/* {points} cisel (float) */], '
@@ -207,12 +214,16 @@ def build_forecast_prompt(coin: str, horizon: str, points: int, market_context: 
     )
 
 
-def build_portfolio_prompt(holdings: List[Dict[str, Any]]) -> str:
+def build_portfolio_prompt(holdings: List[Dict[str, Any]], market_context: str | None = None) -> str:
     holdings_text = ", ".join(f"{item.get('minca', '?')}: {item.get('mnozstvo', 0)}" for item in holdings)
+    context_block = (
+        f"SKUTOCNE aktualne trhove data (pouzi ako hlavny zaklad analyzy; hodnoty a vahy pozicii su presne "
+        f"vypocitane): {market_context}. " if market_context else ""
+    )
     return (
         f"Si profesionalny krypto investicny poradca, ktory hodnoti kazdu poziciu striktne na zaklade jej "
         f"vlastnych rizik a fundamentov - nie automaticky ako BUY. Analyzuj portfolio: "
-        f"{holdings_text}. Zameraj sa na rizika, diverzifikaciu a sektorove "
+        f"{holdings_text}. {context_block}Zameraj sa na rizika, diverzifikaciu a sektorove "
         f"zlozenie (DeFi, L1/L2, AI, Memes, Other). {GLOBAL_CONTEXT_INSTRUCTION} "
         f"DOLEZITE: pouzivaj SELL a HOLD rovnako casto ako BUY, ked si to riziko/koncentracia/volatilita danej "
         f"pozicie realisticky vyzaduje - odporucanie BUY pre kazdu poziciu by bolo nezodpovedne a nerealisticke. "
@@ -237,3 +248,20 @@ def build_news_prompt(headlines: List[str]) -> str:
         f'{{"spravy": [{{"titulok": str, "sentiment": "Bullish|Bearish|Neutral"}}, ...], '
         f'"trendy": ["/* trend 1 */", "/* trend 2 */", "..."]}}'
     )
+
+
+_LANGUAGE_NAMES = {
+    "en": "English",
+    "sk": "slovenčina (spisovná, s diakritikou)",
+    "cz": "čeština (spisovná, s diakritikou)",
+    "cs": "čeština (spisovná, s diakritikou)",
+}
+
+
+def language_instruction(lang: str, json_mode: bool = True) -> str:
+    """Prompty su po slovensky - bez tejto instrukcie AI odpovedala po
+    slovensky aj anglickym/ceskym pouzivatelom (a obcas bez diakritiky)."""
+    name = _LANGUAGE_NAMES.get((lang or "en").lower(), _LANGUAGE_NAMES["en"])
+    if json_mode:
+        return f"\nVsetky TEXTOVE hodnoty v JSON odpovedi napis v jazyku: {name}. Kluce JSON nemen."
+    return f"\nOdpovedz v jazyku: {name}."

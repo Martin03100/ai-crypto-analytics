@@ -131,3 +131,16 @@ def test_validate_digest_payload_rejects_empty_summary():
     payload = json.dumps({"zhrnutie": "", "kluceve_body": ["bod 1"]})
     ok, data, err = validate_digest_payload(payload)
     assert ok is False
+
+
+
+def test_forecast_prompt_defines_real_timing():
+    assert "bod c. 1 je cena o 1 hodinu od TERAZ" in build_forecast_prompt("BTC", "24h", 24)
+
+
+def test_history_timestamps_are_serialized_as_utc():
+    from datetime import datetime
+    from app.schemas import ForecastHistoryOut
+    out = ForecastHistoryOut(id=1, crypto_symbol="BTC", timeframe="24h", model_used="x",
+                             forecast_data={}, created_at=datetime(2026, 9, 26, 7, 0))
+    assert "2026-09-26T07:00:00+00:00" in out.model_dump_json()

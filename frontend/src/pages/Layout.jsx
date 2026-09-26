@@ -1,10 +1,14 @@
 import { Menu } from "lucide-react";
-import { Suspense, useState } from "react";
+import { Suspense, useCallback, useState } from "react";
 import { Outlet } from "react-router-dom";
 import ChatWidget from "../components/ChatWidget";
 import DailyDigest from "../components/DailyDigest";
 import OnboardingTour from "../components/OnboardingTour";
 import Sidebar from "../components/Sidebar";
+import ShortcutsHelp from "../components/ShortcutsHelp";
+import VerifyEmailGate from "../components/VerifyEmailGate";
+import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
+import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 
 /** Ľahký loading stav LEN pre obsahovú časť (nie cez celú obrazovku) - kým sa
@@ -22,6 +26,13 @@ function ContentLoader() {
 export default function Layout() {
   const { t } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { user } = useAuth();
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const closeShortcuts = useCallback(() => setShowShortcuts(false), []);
+  useKeyboardShortcuts(useCallback(() => setShowShortcuts(true), []));
+
+  // Neovereny email -> najprv overovacia obrazovka (backend to vynucuje tiez).
+  if (user?.emailVerified === false) return <VerifyEmailGate />;
 
   return (
     <div className="shell">
@@ -40,6 +51,7 @@ export default function Layout() {
 
       <ChatWidget />
       <OnboardingTour onNeedSidebar={setMenuOpen} />
+      {showShortcuts && <ShortcutsHelp onClose={closeShortcuts} />}
     </div>
   );
 }

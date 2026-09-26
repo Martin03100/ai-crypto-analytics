@@ -17,6 +17,7 @@ export default function Account() {
   const { providers: keys, loading: keysLoading, refresh } = useProviders();
   const [links, setLinks] = useState({});
   const [inputs, setInputs] = useState({});
+  const [customCfg, setCustomCfg] = useState({ base_url: "", model: "" });
   const [saving, setSaving] = useState(null);
   const [testing, setTesting] = useState(null);
 
@@ -29,7 +30,7 @@ export default function Account() {
     if (value === undefined) return;
     setSaving(provider);
     try {
-      await api.saveApiKey(provider, value);
+      await api.saveApiKey(provider, value, provider === "custom" ? customCfg : {});
       refresh();
       setInputs((prev) => ({ ...prev, [provider]: "" }));
       push(t("account.keySaved"), "success");
@@ -90,7 +91,7 @@ export default function Account() {
               <div key={k.provider} className={`provider-row ${k.connected ? "connected" : ""}`}>
                 <span className={`provider-status-dot ${k.connected ? "on" : "off"}`} />
                 <div className="provider-label">
-                  <div style={{ fontSize: 13.5, fontWeight: 600 }}>{k.label}</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 600 }}>{k.provider === "custom" ? t("provider.customLabel") : k.label}</div>
                   {k.connected && (
                     <div className="mono text-sub" style={{ marginTop: 2 }}>{k.masked_preview}</div>
                   )}
@@ -100,6 +101,14 @@ export default function Account() {
                     </a>
                   )}
                 </div>
+                {k.provider === "custom" && (
+                  <>
+                    <input className="input" value={customCfg.base_url} placeholder={t("account.customBaseUrlPlaceholder")}
+                      onChange={(e) => setCustomCfg((c) => ({ ...c, base_url: e.target.value }))} aria-label={t("account.customBaseUrlPlaceholder")} />
+                    <input className="input" value={customCfg.model} placeholder={t("account.customModelPlaceholder")}
+                      onChange={(e) => setCustomCfg((c) => ({ ...c, model: e.target.value }))} aria-label={t("account.customModelPlaceholder")} />
+                  </>
+                )}
                 <input
                   className="input provider-key-input"
                   type="password"
@@ -145,7 +154,7 @@ export default function Account() {
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {keys.filter((k) => k.connected).map((k) => (
               <div key={k.provider} style={{ fontSize: 13.5, display: "flex", alignItems: "center", gap: 8 }}>
-                <CheckCircle2 size={14} color="var(--emerald)" /> {k.label}
+                <CheckCircle2 size={14} color="var(--emerald)" /> {k.provider === "custom" ? t("provider.customLabel") : k.label}
               </div>
             ))}
           </div>

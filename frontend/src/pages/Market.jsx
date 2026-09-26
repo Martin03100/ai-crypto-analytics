@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { MockBadge, SentimentBadge } from "../components/Badge";
 import { Card } from "../components/Card";
+import InfoTip from "../components/InfoTip";
+import OnchainCard from "../components/OnchainCard";
 import PriceChart from "../components/PriceChart";
 import { SkeletonLines } from "../components/Skeleton";
 import ProviderSelect from "../components/ProviderSelect";
@@ -113,7 +115,7 @@ export default function Market() {
       </div>
 
       <div className="grid grid-2" style={{ marginBottom: 16 }}>
-        <Card title={t("market.fearGreedTitle")} icon={Gauge} glow={fg && fg.value >= 55 ? "emerald" : fg && fg.value <= 45 ? "crimson" : undefined}>
+        <Card title={<>{t("market.fearGreedTitle")} <InfoTip text={t("help.fearGreed")} /></>} icon={Gauge} glow={fg && fg.value >= 55 ? "emerald" : fg && fg.value <= 45 ? "crimson" : undefined}>
           {fg ? (
             <>
               {fgMock && <div style={{ marginBottom: 10 }}><MockBadge /></div>}
@@ -200,6 +202,8 @@ export default function Market() {
 
         {!newsLoading && !newsResult && headlines.length === 0 && <SkeletonLines count={4} />}
       </Card>
+
+      <OnchainCard />
 
       <Card title={t("market.eventsTitle")} icon={Calendar}>
         {events.length === 0 ? <SkeletonLines count={3} /> : (

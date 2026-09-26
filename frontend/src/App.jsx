@@ -1,5 +1,6 @@
 import { lazy } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import Landing from "./pages/Landing";
 import { useAuth } from "./context/AuthContext";
 import { useLanguage } from "./context/LanguageContext";
 import Layout from "./pages/Layout";
@@ -30,8 +31,10 @@ function FullScreenLoader() {
 
 function RequireAuth({ children }) {
   const { user, checking } = useAuth();
+  const location = useLocation();
   if (checking) return <FullScreenLoader />;
-  if (!user) return <Navigate to="/auth" replace />;
+  // Neprihlaseny na hlavnej adrese -> verejna uvodna stranka, inde -> prihlasenie.
+  if (!user) return location.pathname === "/" ? <Landing /> : <Navigate to="/auth" replace />;
   return children;
 }
 

@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 
 /** localStorage kluc - ked je nastaveny, sprievodca sa uz nikdy znova
  * automaticky nespusti (viz aj Settings.jsx "Spustit sprievodcu znova"). */
 const SEEN_KEY = "aca_onboarding_seen_v1";
+
+/** Kluc per pouzivatel - inak by druhy pouzivatel na tom istom prehliadaci
+ * sprievodcu nikdy nevidel. */
+function seenKey(userKey) {
+  return userKey ? `${SEEN_KEY}:${userKey}` : SEEN_KEY;
+}
 
 /** Poradie krokov + CSS selektor cielového prvku pre kazdy z nich. Selektory
  * mieria na uz existujuce, stabilne triedy/atributy (nie na text), takze
@@ -17,26 +24,26 @@ const STEP_TARGETS = [
   { selector: 'a[href="/settings"]', titleKey: "onboarding.step5Title", textKey: "onboarding.step5Text", needsSidebar: true },
 ];
 
-export function hasSeenOnboarding() {
+export function hasSeenOnboarding(userKey) {
   try {
-    return localStorage.getItem(SEEN_KEY) === "1";
+    return localStorage.getItem(seenKey(userKey)) === "1";
   } catch {
     return true; // ak localStorage nie je dostupny (private mode a pod.), radsej sprievodcu vobec neukazuj
   }
 }
 
-function markOnboardingSeen() {
+function markOnboardingSeen(userKey) {
   try {
-    localStorage.setItem(SEEN_KEY, "1");
+    localStorage.setItem(seenKey(userKey), "1");
   } catch {
     // ticho ignorovat - nie je to kriticke, len sa sprievodca priste ukaze znova
   }
 }
 
 /** Vratane exportu na rucne znovu-spustenie z Settings.jsx ("Spustit sprievodcu znova"). */
-export function resetOnboarding() {
+export function resetOnboarding(userKey) {
   try {
-    localStorage.removeItem(SEEN_KEY);
+    localStorage.removeItem(seenKey(userKey));
   } catch {
     // ignorovat
   }
@@ -63,6 +70,8 @@ export function resetOnboarding() {
 export default function OnboardingTour({ onNeedSidebar }) {
   const location = useLocation();
   const { t } = useLanguage();
+  const { user } = useAuth();
+  const userKey = user?.id ?? user?.username;
   const [active, setActive] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [rect, setRect] = useState(null);
@@ -70,9 +79,9 @@ export default function OnboardingTour({ onNeedSidebar }) {
 
   const finish = useCallback(() => {
     setActive(false);
-    markOnboardingSeen();
+    markOnboardingSeen(userKey);
     onNeedSidebar?.(false);
-  }, [onNeedSidebar]);
+  }, [onNeedSidebar, userKey]);
 
   // Auto-spustenie: len raz, len na /dashboard, len ak este nebolo videne.
   // "Spustit sprievodcu znova" v Settings.jsx zavola resetOnboarding() a
@@ -80,7 +89,7 @@ export default function OnboardingTour({ onNeedSidebar }) {
   // odchyti presne tou istou cestou ako pri prvom prihlaseni.
   useEffect(() => {
     if (location.pathname !== "/dashboard") return;
-    if (hasSeenOnboarding()) return;
+    if (!userKey || hasSeenOnboarding(userKey)) return;
     // Kratke oneskorenie - nech Dashboard staci nacitat data (Fear&Greed
     // karta sa objavi az po fetch-i), inak by prvy krok mieril do prazdna.
     const timer = setTimeout(() => {
@@ -88,7 +97,7 @@ export default function OnboardingTour({ onNeedSidebar }) {
       setActive(true);
     }, 700);
     return () => clearTimeout(timer);
-  }, [location.pathname]);
+  }, [location.pathname, userKey]);
 
   const measure = useCallback(() => {
     const step = STEP_TARGETS[stepIndex];

@@ -1,10 +1,12 @@
-import { AtSign, Compass, Info, Key, Languages, LogOut, Moon, ShieldCheck, Sun, Wallet2 } from "lucide-react";
+import { AtSign, Compass, Info, Key, Languages, LogOut, Moon, ShieldCheck, Sun, Trash2, Wallet2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Card } from "../components/Card";
 import { resetOnboarding } from "../components/OnboardingTour";
 import PasswordInput from "../components/PasswordInput";
+import TwoFactorSettings from "../components/TwoFactorSettings";
 import { useAuth } from "../context/AuthContext";
+import { useConfirm } from "../context/ConfirmContext";
 import { CURRENCIES, useCurrency } from "../context/CurrencyContext";
 import { LANGUAGES } from "../i18n/translations";
 import { useLanguage } from "../context/LanguageContext";
@@ -20,6 +22,9 @@ export default function Settings() {
   const { currency, setCurrency } = useCurrency();
   const { logout, user, updateEmail } = useAuth();
   const navigate = useNavigate();
+  const confirm = useConfirm();
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const { push } = useToast();
 
   const [email, setEmail] = useState(user?.email || "");
@@ -34,7 +39,7 @@ export default function Settings() {
     setSavingEmail(true);
     try {
       const res = await api.updateEmail(email.trim() || null);
-      updateEmail(res.email);
+      updateEmail(res.email, { emailVerified: res.email_verified });
       push(t("settings.emailSaved"), "success");
     } catch (err) {
       push(err, "error");
@@ -59,6 +64,22 @@ export default function Settings() {
       push(err, "error");
     } finally {
       setSavingPassword(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    const ok = await confirm(t("settings.deleteAccountConfirm"));
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await api.deleteAccount(deletePassword);
+      push(t("settings.accountDeleted"), "success");
+      await logout();
+      navigate("/auth");
+    } catch (err) {
+      push(err, "error");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -151,8 +172,23 @@ export default function Settings() {
 
           <hr className="divider" />
 
+          <TwoFactorSettings />
+
+          <hr className="divider" />
+
           <button className="btn btn-ghost btn-sm" onClick={handleLogoutAllDevices} disabled={loggingOutAll}>
             <LogOut size={14} /> {t("settings.logoutAllDevices")}
+          </button>
+        </Card>
+
+        <Card title={t("settings.deleteAccountTitle")} icon={Trash2}>
+          <p className="text-sub" style={{ marginBottom: 10 }}>{t("settings.deleteAccountDesc")}</p>
+          <div className="field">
+            <label>{t("settings.currentPassword")}</label>
+            <PasswordInput value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} />
+          </div>
+          <button className="btn btn-ghost btn-sm" style={{ color: "var(--crimson)" }} onClick={handleDeleteAccount} disabled={deleting || !deletePassword}>
+            <Trash2 size={14} /> {t("settings.deleteAccountButton")}
           </button>
         </Card>
 
@@ -168,10 +204,11 @@ export default function Settings() {
             <button
               className="btn btn-ghost btn-sm"
               style={{ marginTop: 10, alignSelf: "flex-start" }}
-              onClick={() => { resetOnboarding(); navigate("/dashboard"); }}
+              onClick={() => { resetOnboarding(user?.id ?? user?.username); navigate("/dashboard"); }}
             >
               <Compass size={14} /> {t("settings.restartTour")}
             </button>
+            <p className="text-sub" style={{ marginTop: 8 }}>{t("shortcuts.hint")}</p>
           </div>
         </Card>
       </div>

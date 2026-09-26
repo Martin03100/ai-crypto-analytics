@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import { ConfidenceBadge, RiskBadge } from "../components/Badge";
 import { Card } from "../components/Card";
+import InfoTip from "../components/InfoTip";
 import { SkeletonLines } from "../components/Skeleton";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -130,7 +131,7 @@ export default function Dashboard() {
       {fg && (
         <Card id="tour-feargreed-card" glow={fg.value >= 55 ? "emerald" : fg.value <= 45 ? "crimson" : undefined}>
           <div className="card-title" style={{ justifyContent: "space-between" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Gauge size={15} /> {t("dashboard.fearGreedTitle")}</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Gauge size={15} /> {t("dashboard.fearGreedTitle")} <InfoTip text={t("help.fearGreed")} /></span>
             <button
               className="btn btn-ghost btn-sm"
               onClick={handleRefreshFg}

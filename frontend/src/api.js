@@ -85,22 +85,28 @@ async function request(path, { method = "GET", body } = {}) {
 }
 
 export const api = {
-  register: (username, password, email) => request("/auth/register", { method: "POST", body: { username, password, email } }),
-  login: (username, password) => request("/auth/login", { method: "POST", body: { username, password } }),
+  register: (username, password, email, captcha_token) => request("/auth/register", { method: "POST", body: { username, password, email, captcha_token } }),
+  login: (username, password, totp_code) => request("/auth/login", { method: "POST", body: { username, password, totp_code } }),
   logout: () => request("/auth/logout", { method: "POST" }),
   me: () => request("/auth/me"),
-  forgotPassword: (email) => request("/auth/forgot-password", { method: "POST", body: { email } }),
+  forgotPassword: (email, captcha_token) => request("/auth/forgot-password", { method: "POST", body: { email, captcha_token } }),
+  verifyEmail: (code) => request("/auth/verify-email", { method: "POST", body: { code } }),
+  resendVerification: () => request("/auth/resend-verification", { method: "POST" }),
   verifyResetCode: (email, code) => request("/auth/verify-reset-code", { method: "POST", body: { email, code } }),
   resetPassword: (email, code, new_password) => request("/auth/reset-password", { method: "POST", body: { email, code, new_password } }),
 
   listApiKeys: () => request("/account/api-keys"),
-  saveApiKey: (provider, api_key) => request("/account/api-keys", { method: "PUT", body: { provider, api_key } }),
+  saveApiKey: (provider, api_key, extra = {}) => request("/account/api-keys", { method: "PUT", body: { provider, api_key, ...extra } }),
   deleteApiKey: (provider) => request(`/account/api-keys/${provider}`, { method: "DELETE" }),
   apiKeyLinks: () => request("/account/api-keys/links"),
   testApiKey: (provider) => request(`/account/api-keys/${provider}/test`, { method: "POST" }),
   changePassword: (current_password, new_password) =>
     request("/account/change-password", { method: "POST", body: { current_password, new_password } }),
   logoutAllDevices: () => request("/account/logout-all-devices", { method: "POST" }),
+  deleteAccount: (password) => request("/account/delete", { method: "POST", body: { password } }),
+  totpSetup: () => request("/account/2fa/setup", { method: "POST" }),
+  totpEnable: (code) => request("/account/2fa/enable", { method: "POST", body: { code } }),
+  totpDisable: (password, code) => request("/account/2fa/disable", { method: "POST", body: { password, code } }),
   updateEmail: (email) => request("/account/email", { method: "PUT", body: { email } }),
 
   generateForecast: (provider, coin, horizon) =>
@@ -113,6 +119,11 @@ export const api = {
   forecastHistory: (symbol, daysBack = 30, page = 1, pageSize = 20) =>
     request(`/forecast/history?days_back=${daysBack}&page=${page}&page_size=${pageSize}${symbol ? `&symbol=${symbol}` : ""}`),
   forecastAccuracy: (id) => request(`/forecast/history/${id}/accuracy`),
+  forecastLeaderboard: () => request("/forecast/leaderboard"),
+  bulkDeleteForecasts: (ids) => request("/forecast/history/bulk-delete", { method: "POST", body: { ids } }),
+  bulkDeletePortfolio: (ids) => request("/portfolio/history/bulk-delete", { method: "POST", body: { ids } }),
+  onchain: () => request("/market/onchain"),
+  submitTip: (id, price) => request(`/forecast/history/${id}/tip`, { method: "POST", body: { price } }),
 
   analyzePortfolio: (provider, holdings) =>
     request("/portfolio/analyze", { method: "POST", body: { provider, holdings, lang: currentLang() } }),

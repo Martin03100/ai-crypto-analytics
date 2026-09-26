@@ -60,6 +60,7 @@ PROVIDERS: Final[Dict[str, str]] = {
     "Anthropic (Claude)": "anthropic",
     "DeepSeek": "deepseek",
     "Grok (xAI)": "grok",
+    "Custom (OpenAI-compatible)": "custom",
 }
 PROVIDER_LABELS: Final[Dict[str, str]] = {v: k for k, v in PROVIDERS.items()}
 PROVIDER_KEYS: Final[List[str]] = list(PROVIDERS.values())
@@ -130,6 +131,20 @@ COINGECKO_SIMPLE_PRICE_URL: Final[str] = "https://api.coingecko.com/api/v3/simpl
 COINGECKO_SEARCH_URL: Final[str] = "https://api.coingecko.com/api/v3/search"
 COINGECKO_COINS_LIST_URL: Final[str] = "https://api.coingecko.com/api/v3/coins/list"
 PRICE_CACHE_TTL_SECONDS: Final[int] = 60
+# Volitelny BEZPLATNY CoinGecko "Demo" API kluc (coingecko.com -> Developer
+# Dashboard). Bez neho appka zdiela verejny limit s ostatnymi aplikaciami na
+# rovnakej IP adrese hostingu (Render) -> casto odmietnute requesty a AI
+# predikcie bez realnych trhovych dat. S klucom ma appka vlastny limit.
+COINGECKO_API_KEY: Final[str] = os.environ.get("COINGECKO_API_KEY", "")
+# Dalsie VOLITELNE bezplatne kluce pre bohatsie AI analyzy (viz
+# app/services/data_sources.py). Bez nich sa dany zdroj preskoci/obmedzi.
+FRED_API_KEY: Final[str] = os.environ.get("FRED_API_KEY", "")            # makro: Fed, inflacia, dolar, S&P 500
+GITHUB_TOKEN: Final[str] = os.environ.get("GITHUB_TOKEN", "")            # aktivita vyvojarov (vyssi limit)
+BLOCKCHAIR_API_KEY: Final[str] = os.environ.get("BLOCKCHAIR_API_KEY", "")  # on-chain + velryby (vyssi limit)
+# Cloudflare Turnstile CAPTCHA (zadarmo). Ak nie je nastaveny, CAPTCHA je vypnuta.
+# Musi byt nastaveny SPOLU s VITE_TURNSTILE_SITE_KEY na Netlify.
+TURNSTILE_SECRET_KEY: Final[str] = os.environ.get("TURNSTILE_SECRET_KEY", "")
+EMAIL_VERIFICATION_CODE_MINUTES: Final[int] = 30
 
 # Mapovanie zakladnych symbolov na CoinGecko id (pre vyhladavaciu ponuku aj mock data).
 DEFAULT_COIN_IDS: Final[Dict[str, str]] = {
@@ -147,6 +162,7 @@ PROVIDER_KEY_LINKS: Final[Dict[str, str]] = {
     "anthropic": "https://console.anthropic.com/settings/keys",
     "deepseek": "https://platform.deepseek.com/api_keys",
     "grok": "https://console.x.ai/",
+    "custom": "https://openrouter.ai/keys",
 }
 
 # Priblizna cena za 1000 vystupnych tokenov (USD) - iba orientacny odhad pre UI.
@@ -156,6 +172,7 @@ PROVIDER_TOKEN_PRICE_USD_PER_1K: Final[Dict[str, float]] = {
     "anthropic": 0.001,
     "deepseek": 0.00028,
     "grok": 0.0005,
+    "custom": 0.0008,  # neznamy cennik - orientacny odhad
 }
 
 # ---------------------------------------------------------------------------

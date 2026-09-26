@@ -36,4 +36,11 @@ describe("onboarding seen/reset localStorage helpers", () => {
     resetOnboarding();
     expect(hasSeenOnboarding()).toBe(false);
   });
+  it("tracks the tour separately per user", () => {
+    localStorage.setItem("aca_onboarding_seen_v1:1", "1");
+    expect(hasSeenOnboarding(1)).toBe(true);
+    expect(hasSeenOnboarding(2)).toBe(false);
+    resetOnboarding(1);
+    expect(hasSeenOnboarding(1)).toBe(false);
+  });
 });

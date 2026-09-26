@@ -183,3 +183,55 @@ def test_rate_limit_cannot_be_bypassed_by_changing_path_id(registered):
     client, _username, _password = registered
     codes = [client.get(f"/api/forecast/history/{i}/accuracy").status_code for i in range(1, 26)]
     assert 429 in codes
+
+
+
+def test_forecast_rejects_invalid_horizon_and_too_long_coin(registered):
+    """Bez validacie by Postgres (Neon) pri ulozeni dlhsej hodnoty vratil 500."""
+    client, _username, _password = registered
+    base = {"provider": "gemini", "is_mock": True,
+            "forecast_data": {"ceny": [1], "casove_body": ["d1"], "odovodnenie": "x"}}
+    assert client.post("/api/forecast/save", json={**base, "coin": "BTC", "horizon": "5 rokov"},
+                       headers=csrf_headers(client)).status_code == 422
+    assert client.post("/api/forecast/save", json={**base, "coin": "X" * 40, "horizon": "1T"},
+                       headers=csrf_headers(client)).status_code == 422
+
+
+
+def _save_real_forecast(client, prices=(100.0, 110.0), is_mock=False):
+    payload = {"provider": "gemini", "coin": "BTC", "horizon": "24h", "is_mock": is_mock,
+               "forecast_data": {"ceny": list(prices), "casove_body": ["a", "b"], "odovodnenie": "test"}}
+    return client.post("/api/forecast/save", json=payload, headers=csrf_headers(client)).json()["id"]
+
+
+def test_tip_challenge_and_leaderboard(registered, monkeypatch):
+    from app.routers import forecast as forecast_router
+    client, _u, _p = registered
+    entry_id = _save_real_forecast(client)
+    assert client.get(f"/api/forecast/history/{entry_id}/accuracy").json()["can_tip"] is True
+    assert client.post(f"/api/forecast/history/{entry_id}/tip", json={"price": 108}, headers=csrf_headers(client)).status_code == 200
+    assert client.post(f"/api/forecast/history/{entry_id}/tip", json={"price": 109}, headers=csrf_headers(client)).status_code == 400
+    monkeypatch.setattr(forecast_router, "compute_forecast_accuracy", lambda *a, **k: {
+        "status": "completed", "accuracy_pct": 97.0, "predicted_prices": [100.0, 110.0], "actual_prices": [101.0, 107.0],
+        "time_labels": ["a", "b"], "matures_at": "x", "baseline_accuracy_pct": 95.0, "direction_correct": True})
+    body = client.get(f"/api/forecast/history/{entry_id}/accuracy").json()
+    assert body["tip_outcome"] == "win" and body["can_tip"] is False  # |108-107| < |110-107|
+    board = client.get("/api/forecast/leaderboard").json()
+    assert board["providers"][0]["evaluated"] == 1 and board["providers"][0]["direction_hit_pct"] == 100.0
+    assert board["challenge"]["you"]["wins"] == 1
+
+
+def test_tip_rejected_for_mock_forecast(registered):
+    client, _u, _p = registered
+    entry_id = _save_real_forecast(client, is_mock=True)
+    assert client.post(f"/api/forecast/history/{entry_id}/tip", json={"price": 108}, headers=csrf_headers(client)).status_code == 400
+
+
+
+def test_bulk_delete_only_removes_own_forecasts(registered, client):
+    owner, _u, _p = registered
+    ids = [_save_real_forecast(owner) for _ in range(3)]
+    res = owner.post("/api/forecast/history/bulk-delete", json={"ids": ids[:2] + [999999]}, headers=csrf_headers(owner))
+    assert res.status_code == 200 and res.json()["deleted"] == 2
+    assert owner.get("/api/forecast/history").json()["total"] == 1
+    assert owner.post("/api/forecast/history/bulk-delete", json={"ids": []}, headers=csrf_headers(owner)).status_code == 422

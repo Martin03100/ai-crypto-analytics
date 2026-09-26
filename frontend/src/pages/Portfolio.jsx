@@ -6,6 +6,9 @@ import { ActionBadge, MockBadge } from "../components/Badge";
 import { Card } from "../components/Card";
 import CoinSearchPicker from "../components/CoinSearchPicker";
 import CostConfirmModal from "../components/CostConfirmModal";
+import InfoTip from "../components/InfoTip";
+import { useConfirm } from "../context/ConfirmContext";
+import DataSources from "../components/DataSources";
 import PortfolioHistoryItem from "../components/PortfolioHistoryItem";
 import { SkeletonLines } from "../components/Skeleton";
 import ProviderSelect from "../components/ProviderSelect";
@@ -64,6 +67,8 @@ export default function Portfolio() {
   const [result, setResult] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const confirmDialog = useConfirm();
   const [costEstimate, setCostEstimate] = useState(null);
   const [estimating, setEstimating] = useState(false);
   const [checked, setChecked] = useState({});
@@ -171,6 +176,20 @@ export default function Portfolio() {
   });
   const totalValue = holdingValues.reduce((sum, h) => sum + (h.value || 0), 0);
   const hasAnyPrice = holdingValues.some((h) => h.value != null);
+
+  async function bulkDeletePortfolio() {
+    const ok = await confirmDialog(t("common.deleteSelectedConfirm", { n: selectedIds.length }));
+    if (!ok) return;
+    try {
+      const res = await api.bulkDeletePortfolio(selectedIds);
+      setPfHistory((prev) => prev.filter((h) => !selectedIds.includes(h.id)));
+      setPfHistoryTotal((n) => n - res.deleted);
+      setSelectedIds([]);
+      push(t("common.deleted"), "success");
+    } catch (err) {
+      push(err, "error");
+    }
+  }
 
   async function analyze() {
     if (!provider || holdings.length === 0 || hasAmountErrors) return;
@@ -395,14 +414,14 @@ export default function Portfolio() {
           </Card>
 
           {sectorData.length > 0 && (
-            <Card title={t("portfolio.sectorAllocationTitle")}>
+            <Card title={<>{t("portfolio.sectorAllocationTitle")} <InfoTip text={t("help.sectors")} /></>}>
               <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
                 <ResponsiveContainer width={200} height={200}>
                   <PieChart>
                     <Pie data={sectorData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={2}>
                       {sectorData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} stroke="none" />)}
                     </Pie>
-                    <Tooltip contentStyle={{ background: "#121824", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, fontSize: 12 }} />
+                    <Tooltip contentStyle={{ background: "var(--bg-tooltip)", border: "1px solid var(--border-strong)", borderRadius: 10, fontSize: 12, color: "var(--text-primary)" }} />
                   </PieChart>
                 </ResponsiveContainer>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -437,6 +456,7 @@ export default function Portfolio() {
 
           <Card title={t("portfolio.expertAnalysisTitle")} icon={GraduationCap}>
             <p style={{ margin: 0, lineHeight: 1.6, fontSize: 13.5, color: "var(--text-secondary)" }}>{result.data.odborna_analyza}</p>
+            <DataSources sources={result.data.zdroje_dat} />
           </Card>
         </div>
       )}
@@ -454,8 +474,27 @@ export default function Portfolio() {
           {!pfHistoryLoading && pfHistory.length === 0 && (
             <div className="empty-state">{t("portfolio.emptyHistory")}</div>
           )}
+          {!pfHistoryLoading && pfHistory.length > 0 && (
+            <div className="bulk-toolbar">
+              <label className="bulk-select-all">
+                <input type="checkbox" checked={selectedIds.length === pfHistory.length}
+                  onChange={(e) => setSelectedIds(e.target.checked ? pfHistory.map((h) => h.id) : [])} /> {t("common.selectAll")}
+              </label>
+              {selectedIds.length > 0 && (
+                <button className="btn btn-ghost btn-sm" style={{ color: "var(--crimson)" }} onClick={bulkDeletePortfolio}>
+                  <Trash2 size={13} /> {t("common.deleteSelected", { n: selectedIds.length })}
+                </button>
+              )}
+            </div>
+          )}
           {!pfHistoryLoading && pfHistory.map((entry) => (
-            <PortfolioHistoryItem key={entry.id} entry={entry} onDelete={(id) => { setPfHistory((prev) => prev.filter((h) => h.id !== id)); setPfHistoryTotal((n) => n - 1); }} />
+            <div key={entry.id} className="selectable-row">
+              <input type="checkbox" className="row-check" aria-label={t("common.selectItem")} checked={selectedIds.includes(entry.id)}
+                onChange={(e) => setSelectedIds((prev) => (e.target.checked ? [...prev, entry.id] : prev.filter((x) => x !== entry.id)))} />
+              <div className="selectable-row-body">
+                <PortfolioHistoryItem entry={entry} onDelete={(id) => { setPfHistory((prev) => prev.filter((h) => h.id !== id)); setPfHistoryTotal((n) => n - 1); setSelectedIds((prev) => prev.filter((x) => x !== id)); }} />
+              </div>
+            </div>
           ))}
           {!pfHistoryLoading && pfHistory.length < pfHistoryTotal && (
             <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>

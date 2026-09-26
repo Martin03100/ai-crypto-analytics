@@ -150,3 +150,31 @@ def vote_percentages(db: Session = Depends(get_db)) -> dict:
     percentages = {vote: (0.0 if total == 0 else round((count / total) * 100, 1)) for vote, count in counts.items()}
     percentages["total_votes"] = total
     return percentages
+
+
+
+@router.get("/onchain", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_MARKET_PUBLIC))])
+def onchain_overview() -> dict:
+    """Karta "Velryby a on-chain" na stranke Trh (BTC, ETH, DOGE) - paralelne,
+    s limitom 6 s, aby pomaly zdroj nezdrzal stranku."""
+    import time as _time
+    from concurrent.futures import ThreadPoolExecutor
+
+    from app.services import data_sources
+
+    coins = (("BTC", "bitcoin"), ("ETH", "ethereum"), ("DOGE", "dogecoin"))
+    pool = ThreadPoolExecutor(max_workers=len(coins))
+    try:
+        futures = [(symbol, pool.submit(data_sources.onchain_stats, coin_id)) for symbol, coin_id in coins]
+        deadline = _time.monotonic() + 6
+        items = []
+        for symbol, future in futures:
+            try:
+                stats = future.result(timeout=max(0.1, deadline - _time.monotonic()))
+            except Exception:  # noqa: BLE001
+                stats = None
+            if stats:
+                items.append({"coin": symbol, **stats})
+        return {"items": items}
+    finally:
+        pool.shutdown(wait=False)

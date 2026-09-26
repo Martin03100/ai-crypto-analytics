@@ -1,0 +1,4 @@
+Contact: mailto:aicryptoanalytics7@gmail.com
+Expires: 2027-09-26T00:00:00.000Z
+Preferred-Languages: sk, cs, en
+Canonical: https://aicryptopredictor.netlify.app/.well-known/security.txt

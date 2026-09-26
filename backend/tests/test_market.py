@@ -64,3 +64,14 @@ def test_vote_and_percentages_reflect_latest_vote_only(registered):
     assert body["total_votes"] == 1
     assert body["Bearish"] == 100.0
     assert body["Bullish"] == 0.0
+
+
+
+def test_onchain_overview_returns_structured_items(client, monkeypatch):
+    from app.services import data_sources
+    monkeypatch.setattr(data_sources, "onchain_stats", lambda coin_id: {
+        "chain": coin_id, "whale_threshold_usd": 1_000_000, "transactions_24h": 1000, "whale_count": 3,
+        "whale_total_usd": 5e6, "whale_max_usd": 3e6, "whale_span_hours": 2.5} if coin_id != "dogecoin" else None)
+    body = client.get("/api/market/onchain").json()
+    assert [i["coin"] for i in body["items"]] == ["BTC", "ETH"]
+    assert body["items"][0]["whale_count"] == 3

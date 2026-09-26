@@ -2,23 +2,25 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Literal, Optional
 
 import math
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 
 class RegisterRequest(BaseModel):
     username: str = Field(min_length=3, max_length=64)
     password: str = Field(min_length=8, max_length=128)
     email: str = Field(min_length=3, max_length=255)
+    captcha_token: Optional[str] = Field(default=None, max_length=4096)
 
 
 class LoginRequest(BaseModel):
     username: str
     password: str
+    totp_code: Optional[str] = Field(default=None, max_length=10)
 
 
 class TokenResponse(BaseModel):
@@ -27,11 +29,16 @@ class TokenResponse(BaseModel):
     username: str
     user_id: int
     email: Optional[str] = None
+    email_verified: Optional[bool] = None
+    totp_enabled: bool = False
 
 
 class ApiKeyIn(BaseModel):
     provider: str
     api_key: str
+    # len pre vlastny (OpenAI-kompatibilny) provider
+    base_url: Optional[str] = Field(default=None, max_length=300)
+    model: Optional[str] = Field(default=None, max_length=120)
 
 
 class ChangePasswordRequest(BaseModel):
@@ -45,6 +52,20 @@ class UpdateEmailRequest(BaseModel):
 
 class ForgotPasswordRequest(BaseModel):
     email: str
+    captcha_token: Optional[str] = Field(default=None, max_length=4096)
+
+
+class VerifyEmailRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=6)
+
+
+class TotpCodeRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=6)
+
+
+class TotpDisableRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+    code: str = Field(min_length=6, max_length=6)
 
 
 class VerifyResetCodeRequest(BaseModel):
@@ -99,9 +120,11 @@ class PortfolioRequest(BaseModel):
 
 
 class ForecastRequest(BaseModel):
-    provider: str
-    coin: str
-    horizon: str
+    # Dlzky zodpovedaju stlpcom v DB - Postgres (Neon) by pri dlhsej hodnote
+    # vratil chybu 500 namiesto zrozumitelnej 422.
+    provider: str = Field(max_length=32)
+    coin: str = Field(min_length=1, max_length=16)
+    horizon: Literal["24h", "1T", "1M", "1R"]
     lang: str = "en"
 
 
@@ -120,6 +143,12 @@ class ForecastHistoryOut(BaseModel):
     forecast_data: Dict[str, Any]
     created_at: datetime
 
+    @field_serializer("created_at")
+    def _utc_created_at(self, value: datetime) -> str:
+        # DB uklada UTC cas bez casoveho pasma - bez neho by ho prehliadac
+        # povazoval za lokalny cas (v Prahe posun o 1-2 hodiny).
+        return (value if value.tzinfo else value.replace(tzinfo=timezone.utc)).isoformat()
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -132,6 +161,25 @@ class ForecastAccuracyOut(BaseModel):
     actual_prices: List[float]
     time_labels: List[str]
     matures_at: str
+    direction_correct: Optional[bool] = None      # trafila predikcia smer (rast/pokles)?
+    baseline_accuracy_pct: Optional[float] = None  # presnost naivneho odhadu "cena sa nezmeni"
+    # sutaz "tvoj tip vs AI"
+    can_tip: bool = False
+    tip_price: Optional[float] = None
+    tip_outcome: Optional[str] = None
+    ai_final_price: Optional[float] = None
+
+
+class BulkDeleteRequest(BaseModel):
+    ids: List[int] = Field(min_length=1, max_length=100)
+
+
+class TipRequest(BaseModel):
+    price: float = Field(gt=0, lt=1e12)
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
 
 
 class CostEstimateOut(BaseModel):
@@ -146,9 +194,9 @@ class CostEstimateOut(BaseModel):
 
 
 class SaveForecastRequest(BaseModel):
-    provider: str
-    coin: str
-    horizon: str
+    provider: str = Field(max_length=32)
+    coin: str = Field(min_length=1, max_length=16)
+    horizon: Literal["24h", "1T", "1M", "1R"]
     forecast_data: Dict[str, Any]
     is_mock: bool = False
 
@@ -166,6 +214,12 @@ class PortfolioHistoryOut(BaseModel):
     analysis_data: Dict[str, Any]
     model_used: str
     created_at: datetime
+
+    @field_serializer("created_at")
+    def _utc_created_at(self, value: datetime) -> str:
+        # DB uklada UTC cas bez casoveho pasma - bez neho by ho prehliadac
+        # povazoval za lokalny cas (v Prahe posun o 1-2 hodiny).
+        return (value if value.tzinfo else value.replace(tzinfo=timezone.utc)).isoformat()
 
     model_config = ConfigDict(from_attributes=True)
 

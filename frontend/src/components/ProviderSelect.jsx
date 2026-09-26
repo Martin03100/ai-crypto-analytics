@@ -28,7 +28,7 @@ export default function ProviderSelect({ providers, value, onChange, label }) {
       <label>{fieldLabel}</label>
       <select className="select" value={value || ""} onChange={(e) => onChange(e.target.value)}>
         {connected.map((p) => (
-          <option key={p.provider} value={p.provider}>{p.label}</option>
+          <option key={p.provider} value={p.provider}>{p.provider === "custom" ? t("provider.customLabel") : p.label}</option>
         ))}
       </select>
     </div>

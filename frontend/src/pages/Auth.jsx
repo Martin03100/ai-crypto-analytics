@@ -4,6 +4,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { api } from "../api";
 import CandlestickArt from "../components/CandlestickArt";
 import PasswordInput from "../components/PasswordInput";
+import Turnstile from "../components/Turnstile";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { usePageTitle } from "../hooks/usePageTitle";
@@ -39,7 +40,7 @@ function AuthLanguageSwitch() {
 }
 
 export default function Auth() {
-  const [tab, setTab] = useState("login");
+  const [tab, setTab] = useState(() => (new URLSearchParams(window.location.search).get("tab") === "register" ? "register" : "login"));
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -51,6 +52,10 @@ export default function Auth() {
   const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const [needTotp, setNeedTotp] = useState(false);
+  const [totpCode, setTotpCode] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaKey, setCaptchaKey] = useState(0);
   const { login, register } = useAuth();
   const { t, lang } = useLanguage();
   usePageTitle("auth.pageTitle");
@@ -79,12 +84,19 @@ export default function Auth() {
     setLoading(true);
     try {
       if (tab === "login") {
-        await login(username, password);
+        await login(username, password, needTotp ? totpCode : undefined);
       } else {
-        await register(username, password, email);
+        try {
+          await register(username, password, email, captchaToken);
+        } finally {
+          setCaptchaToken("");
+          setCaptchaKey((k) => k + 1);
+        }
       }
       navigate("/forecast");
     } catch (err) {
+      // Ucet ma zapnute 2FA - zobraz pole na kod z overovacej aplikacie.
+      if (/6-miestny k[oó]d z overovacej aplik/i.test(err?.message || "")) setNeedTotp(true);
       setError(humanizeError(err, lang));
     } finally {
       setLoading(false);
@@ -92,7 +104,9 @@ export default function Auth() {
   }
 
   async function requestCode(targetEmail) {
-    const res = await api.forgotPassword(targetEmail);
+    const res = await api.forgotPassword(targetEmail, captchaToken);
+    setCaptchaToken("");
+    setCaptchaKey((k) => k + 1);
     setInfo(res.message + (res.dev_reset_code ? t("auth.devResetCodeNote", { code: res.dev_reset_code }) : ""));
   }
 
@@ -210,6 +224,7 @@ export default function Auth() {
 
           {error && <div className="alert alert-error">{error}</div>}
           {info && <div className="alert alert-success"><CheckCircle2 size={14} style={{ marginRight: 6 }} />{info}</div>}
+          {tab !== "login" && <Turnstile key={captchaKey} onToken={setCaptchaToken} />}
 
           {(tab === "login" || tab === "register") && (
             <form onSubmit={handleSubmit}>
@@ -227,6 +242,13 @@ export default function Auth() {
                 <label>{t("auth.password")}</label>
                 <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.passwordPlaceholder")} />
               </div>
+              {tab === "login" && needTotp && (
+                <div className="field">
+                  <label>{t("auth.totpLabel")}</label>
+                  <input className="input" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={totpCode}
+                    onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))} placeholder="123456" autoFocus />
+                </div>
+              )}
               {tab === "register" && (
                 <div className="field">
                   <label>{t("auth.confirmPassword")}</label>
