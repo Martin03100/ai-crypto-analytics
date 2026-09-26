@@ -12,6 +12,7 @@ nevratil 500 kvoli vypadku externeho AI providera.
 from __future__ import annotations
 
 import json
+import logging
 import random
 import time
 from datetime import datetime, timedelta, timezone
@@ -27,6 +28,8 @@ from app.config import (
     REQUEST_TIMEOUT_SECONDS, SECTOR_CATEGORIES, TIME_HORIZONS,
 )
 from app.services import market_data
+
+logger = logging.getLogger("aca.ai")
 from app.services.validators import (
     build_daily_digest_prompt, build_forecast_prompt, build_news_prompt, build_portfolio_prompt,
     validate_digest_payload, validate_forecast_payload, validate_news_payload, validate_portfolio_payload,
@@ -112,6 +115,13 @@ _TEMPERATURE = 0.4
 # (nie plny REQUEST_TIMEOUT_SECONDS) - viz podrobne vysvetlenie priamo pri
 # _fetch_market_context() nizsie.
 _MARKET_CONTEXT_TIMEOUT = 5
+# Gemini 3.x je "premyslajuci" model: do max_output_tokens sa ZAPOCITAVA aj
+# jeho vnutorne premyslanie. Pri limite 1024 a predvolenej (strednej) urovni
+# premyslania minul cely limit na premyslanie a vratil PRAZDNU odpoved -
+# appka potom spadla do ukazkovych dat s nezrozumitelnou chybou. Preto:
+# nizka uroven premyslania + vyssi strop (plati sa len za realne pouzite
+# tokeny, nie za strop, takze vyssi strop naklady nezvysuje).
+_GEMINI_MAX_OUTPUT_TOKENS = 4096
 
 
 def _call_gemini(prompt: str, api_key: str) -> tuple[bool, str, Optional[str]]:
@@ -126,11 +136,19 @@ def _call_gemini(prompt: str, api_key: str) -> tuple[bool, str, Optional[str]]:
             # Netlify proxy pred backendom sama vratila 502 skor, nez tento
             # kod vobec stihol odpovedat (viz komentar pri _MAX_RETRIES vyssie).
             client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=REQUEST_TIMEOUT_SECONDS * 1000))
+            # BEZ temperature: pri Gemini 3.6 je podla Google zastarana a moze
+            # byt odmietnuta (HTTP 400).
             response = client.models.generate_content(
                 model="gemini-3.6-flash", contents=prompt,
-                config=types.GenerateContentConfig(max_output_tokens=_MAX_OUTPUT_TOKENS, temperature=_TEMPERATURE),
+                config=types.GenerateContentConfig(
+                    max_output_tokens=_GEMINI_MAX_OUTPUT_TOKENS,
+                    thinking_config=types.ThinkingConfig(thinking_level="low"),
+                ),
             )
-            return True, response.text or "", None
+            text = response.text or ""
+            if not text.strip():
+                return False, "", "Gemini vratil prazdnu odpoved (limit vystupu bol vycerpany premyslanim modelu)."
+            return True, text, None
         except Exception as exc:  # noqa: BLE001 - musime zachytit vsetko, nikdy nepadnut
             last_error = str(exc)
             # Retry len na docasne vypadky (preťaženie/rate limit), nie napr. na neplatny kluc.
@@ -178,7 +196,7 @@ def _call_anthropic(prompt: str, api_key: str) -> tuple[bool, str, Optional[str]
         return False, "", f"Neocakavany format odpovede Anthropic: {exc}"
 
 
-def call_ai_provider(provider: str, prompt: str, api_key: str) -> tuple[bool, str, Optional[str]]:
+def _call_ai_provider_raw(provider: str, prompt: str, api_key: str) -> tuple[bool, str, Optional[str]]:
     if provider == "gemini":
         return _call_gemini(prompt, api_key)
     if provider == "openai":
@@ -540,3 +558,16 @@ def chat_with_ai(provider: str, messages: List[Dict[str, str]], api_key: Optiona
     return AIEngineResult(True, {
         "reply": text.strip(), "tokens_used": tokens, "estimated_cost_usd": cost,
     }, False)
+
+
+def call_ai_provider(provider: str, prompt: str, api_key: str) -> tuple[bool, str, Optional[str]]:
+    """Obal okolo _call_ai_provider_raw(), ktory kazde zlyhanie zapise do
+    serverovych logov (Render -> Logs). Bez toho pouzivatel videl len
+    ukazkove data so vseobecnou chybou a skutocna pricina sa dala len hadat.
+    API kluc sa z chybovej spravy pre istotu vymaze, keby ho tam provider
+    niekedy vratil."""
+    success, text, error = _call_ai_provider_raw(provider, prompt, api_key)
+    if not success:
+        safe_error = (error or "").replace(api_key, "***") if api_key else (error or "")
+        logger.warning("AI provider '%s' zlyhal: %s", provider, safe_error[:500])
+    return success, text, error

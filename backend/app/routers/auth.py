@@ -19,7 +19,7 @@ from app.config import (
 )
 from app.deps import get_current_user, get_db
 from app.models import PasswordResetToken, User
-from app.rate_limit import rate_limit_by_ip
+from app.rate_limit import check_rate_limit, rate_limit_by_ip
 from app.schemas import (
     ForgotPasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest, TokenResponse,
     VerifyResetCodeRequest,
@@ -125,6 +125,10 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
         "message": "Ak účet s emailom existuje, poslali sme naň kód na reset hesla.",
     }
     email = sanitize_text(payload.email, max_length=255).lower()
+    # Per-email limit (nie len per-IP): bez neho by sa dala cudzia schranka
+    # zahltit reset emailmi z mnohych IP adries. Aplikuje sa rovnako pre
+    # existujuce aj neexistujuce emaily - neprezradza, kto ma ucet.
+    check_rate_limit(f"forgot-email:{email}", 3, 900)
     user = db.query(User).filter(User.email == email).first()
     if user is None or not user.email:
         return generic_response
@@ -183,15 +187,20 @@ def verify_reset_code(payload: VerifyResetCodeRequest, db: Session = Depends(get
     padom vie hned ukazat 'kod je spravny' a prejst na formular noveho
     hesla, este predtym, nez si pouzivatel heslo skutocne zvoli."""
     email = sanitize_text(payload.email, max_length=255).lower()
+    check_rate_limit(f"reset-code:{email}", 5, 900)
     user = db.query(User).filter(User.email == email).first()
     if user is None or _find_valid_reset_token(db, user.id, payload.code) is None:
         raise HTTPException(status_code=400, detail="Kód je nesprávny alebo expirovaný.")
     return {"valid": True}
 
 
-@router.post("/reset-password")
+@router.post("/reset-password", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_RESET_CODE))])
 def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)) -> dict:
     email = sanitize_text(payload.email, max_length=255).lower()
+    # Spolocny limit s /verify-reset-code: 6-ciferny kod ma len 1 000 000
+    # moznosti - bez limitu per-email (nielen per-IP) by sa dal uhadnut
+    # distribuovanym utokom z mnohych IP adries pocas 15 minut platnosti.
+    check_rate_limit(f"reset-code:{email}", 5, 900)
     user = db.query(User).filter(User.email == email).first()
     row = _find_valid_reset_token(db, user.id, payload.code) if user else None
 

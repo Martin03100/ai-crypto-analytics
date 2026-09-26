@@ -8,6 +8,16 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.services import market_data  # noqa: E402
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _clear_headlines_cache():
+    """get_crypto_headlines() cachuje vysledok - bez vycistenia by jeden test
+    dostal cachovany vysledok z predchadzajuceho testu."""
+    market_data._headlines_cache._store.clear()
+    yield
+    market_data._headlines_cache._store.clear()
 
 
 def _rss_xml(title: str, item_titles: list) -> bytes:

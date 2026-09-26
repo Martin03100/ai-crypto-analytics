@@ -74,17 +74,17 @@ def mock_forecast_reasoning(coin: str, horizon: str, trend_direction: str, lang:
     trend = trend_word(trend_direction, lang)
     templates = {
         "en": (
-            f"[MOCK DATA] Simulated forecast for {coin} over {horizon} suggests a "
+            f"[SAMPLE DATA] Simulated forecast for {coin} over {horizon} suggests a "
             f"{trend} trend based on a demonstration model. Connect a valid API key "
             f"in Account for a real AI analysis."
         ),
         "sk": (
-            f"[MOCK DATA] Simulovaná predikcia pre {coin} na horizont {horizon} "
+            f"[UKÁŽKOVÉ DÁTA] Simulovaná predikcia pre {coin} na horizont {horizon} "
             f"naznačuje {trend} trend na základe demonštračného modelu. "
             f"Pripoj platný API kľúč v Účte pre reálnu AI analýzu."
         ),
         "cs": (
-            f"[MOCK DATA] Simulovaná predikce pro {coin} na horizont {horizon} "
+            f"[UKÁZKOVÁ DATA] Simulovaná predikce pro {coin} na horizont {horizon} "
             f"naznačuje {trend} trend na základě demonstračního modelu. "
             f"Připoj platný API klíč v Účtu pro reálnou AI analýzu."
         ),
@@ -119,19 +119,19 @@ def mock_portfolio_reason(action: str, coin: str, lang: str) -> str:
 
 MOCK_PORTFOLIO_ANALYSIS_TEXT: Dict[str, str] = {
     "en": (
-        "[MOCK DATA] The portfolio could benefit from broader diversification "
+        "[SAMPLE DATA] The portfolio could benefit from broader diversification "
         "across sectors such as RWA, L2 solutions and DeFi protocols. Consider "
         "reducing concentration in a single dominant position. Connect a valid "
         "API key for a real AI analysis."
     ),
     "sk": (
-        "[MOCK DATA] Portfólio by mohlo profitovať zo širšej diverzifikácie "
+        "[UKÁŽKOVÉ DÁTA] Portfólio by mohlo profitovať zo širšej diverzifikácie "
         "naprieč sektormi ako RWA, L2 riešenia a DeFi protokoly. Zváž zníženie "
         "koncentrácie do jednej dominantnej pozície. Pripoj platný API kľúč "
         "pre reálnu AI analýzu."
     ),
     "cs": (
-        "[MOCK DATA] Portfolio by mohlo profitovat ze širší diverzifikace "
+        "[UKÁZKOVÁ DATA] Portfolio by mohlo profitovat ze širší diverzifikace "
         "napříč sektory jako RWA, L2 řešení a DeFi protokoly. Zvaž snížení "
         "koncentrace do jedné dominantní pozice. Připoj platný API klíč "
         "pro reálnou AI analýzu."
@@ -189,17 +189,17 @@ def mock_digest_summary(fg_value: int, fg_classification: str, lang: str) -> str
     lang = normalize_lang(lang)
     templates = {
         "en": (
-            f"[MOCK DATA] The Fear & Greed Index is at {fg_value} today ({fg_classification}). "
+            f"[SAMPLE DATA] The Fear & Greed Index is at {fg_value} today ({fg_classification}). "
             f"The market is currently in demo mode — connect a valid API key in "
             f"Account & API Keys for a real AI morning overview."
         ),
         "sk": (
-            f"[MOCK DATA] Fear & Greed Index je dnes na {fg_value} ({fg_classification}). "
+            f"[UKÁŽKOVÉ DÁTA] Fear & Greed Index je dnes na {fg_value} ({fg_classification}). "
             f"Trh sa momentálne pohybuje v demonštračnom režime — pripoj platný API "
             f"kľúč v Účet & API kľúče pre reálny AI ranný prehľad."
         ),
         "cs": (
-            f"[MOCK DATA] Fear & Greed Index je dnes na {fg_value} ({fg_classification}). "
+            f"[UKÁZKOVÁ DATA] Fear & Greed Index je dnes na {fg_value} ({fg_classification}). "
             f"Trh se momentálně pohybuje v demonstračním režimu — připoj platný API "
             f"klíč v Účet & API klíče pro reálný AI ranní přehled."
         ),
@@ -234,17 +234,17 @@ def mock_chat_reply(last_user_question: str, lang: str) -> str:
     snippet = last_user_question[:120]
     templates = {
         "en": (
-            "[MOCK DATA] I don't have an API key connected for the selected provider, "
+            "[SAMPLE DATA] I don't have an API key connected for the selected provider, "
             f"so this is a demo reply. Connect a valid key in Account & API Keys for a "
             f'real AI answer to: "{snippet}"'
         ),
         "sk": (
-            "[MOCK DATA] Nemám pripojený API kľúč pre zvoleného providera, takže "
+            "[UKÁŽKOVÉ DÁTA] Nemám pripojený API kľúč pre zvoleného providera, takže "
             f"odpovedám demonštračne. Pripoj platný kľúč v sekcii Účet & API kľúče "
             f'pre skutočnú AI odpoveď na otázku: "{snippet}"'
         ),
         "cs": (
-            "[MOCK DATA] Nemám připojený API klíč pro zvoleného providera, takže "
+            "[UKÁZKOVÁ DATA] Nemám připojený API klíč pro zvoleného providera, takže "
             f"odpovídám demonstračně. Připoj platný klíč v sekci Účet & API klíče "
             f'pro skutečnou AI odpověď na otázku: "{snippet}"'
         ),

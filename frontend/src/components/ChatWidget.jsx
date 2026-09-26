@@ -157,7 +157,7 @@ export default function ChatWidget() {
 
   return (
     <>
-      <button className="fab-chat" title={t("chat.title")} onClick={() => setOpen((v) => !v)}>
+      <button className="fab-chat" title={t("chat.title")} aria-label={t("chat.title")} onClick={() => setOpen((v) => !v)}>
         {open ? <X size={22} /> : <MessageCircle size={22} />}
       </button>
 
@@ -169,10 +169,10 @@ export default function ChatWidget() {
               <strong style={{ fontSize: 13.5 }}>{t("chat.title")}</strong>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => setShowHistory((v) => !v)} title={t("chat.historyTooltip")}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowHistory((v) => !v)} title={t("chat.historyTooltip")} aria-label={t("chat.historyTooltip")}>
                 <History size={13} />
               </button>
-              <button className="btn btn-ghost btn-sm" onClick={startNewConversation} title={t("chat.newTooltip")}>
+              <button className="btn btn-ghost btn-sm" onClick={startNewConversation} title={t("chat.newTooltip")} aria-label={t("chat.newTooltip")}>
                 <Plus size={13} />
               </button>
               <button className="btn btn-ghost btn-sm" onClick={() => setOpen(false)} aria-label={t("chat.closeChat")}>

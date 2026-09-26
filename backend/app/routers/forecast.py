@@ -90,6 +90,12 @@ def get_forecast_accuracy(entry_id: int, user: User = Depends(get_current_user),
         forecast_data = {}
     predicted_prices = forecast_data.get("ceny", [])
     time_labels = forecast_data.get("casove_body", [])
+    if row.model_used == "mock":
+        # Ukazkove data su vygenerovane demonstracnym modelom (nie AI) - ich
+        # "presnost" by bola nezmyselne cislo, ktore by pouzivatela len
+        # zavadzalo. Radsej jasne povieme, ze sa presnost nesleduje.
+        return ForecastAccuracyOut(status="mock", predicted_prices=predicted_prices, actual_prices=[],
+                                   time_labels=time_labels, matures_at="")
     result = compute_forecast_accuracy(row.crypto_symbol, row.timeframe, predicted_prices, time_labels, row.created_at)
     return ForecastAccuracyOut(**result)
 

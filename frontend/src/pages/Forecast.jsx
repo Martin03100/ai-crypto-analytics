@@ -151,6 +151,12 @@ function HistoryItem({ entry, onDelete }) {
                 </div>
               )}
               {accuracyLoading && <p className="text-sub" style={{ marginTop: 4 }}>{t("forecast.accuracyLoading")}</p>}
+              {accuracy?.status === "unavailable" && (
+                <p className="text-sub" style={{ marginTop: 4 }}>{t("forecast.accuracyUnavailable")}</p>
+              )}
+              {accuracy?.status === "mock" && (
+                <p className="text-sub" style={{ marginTop: 4 }}>{t("forecast.accuracyMock")}</p>
+              )}
               {accuracy?.status === "pending" && (
                 <p className="text-sub" style={{ marginTop: 4 }}>
                   {t("forecast.accuracyPending", { date: new Date(accuracy.matures_at).toLocaleDateString(locale) })}

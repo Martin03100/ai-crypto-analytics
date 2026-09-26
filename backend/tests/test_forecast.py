@@ -21,7 +21,7 @@ def test_generate_forecast_without_api_key_returns_mock_data(registered):
     assert body["success"] is True
     assert body["is_mock"] is True
     assert "ceny" in body["data"] and "casove_body" in body["data"]
-    assert "MOCK DATA" in body["data"]["odovodnenie"]
+    assert "SAMPLE DATA" in body["data"]["odovodnenie"]
 
 
 def test_save_and_read_forecast_history(registered):
@@ -108,7 +108,7 @@ def test_forecast_accuracy_pending_for_recent_forecast(registered):
     data na porovnanie este neexistuju, status musi byt "pending"."""
     client, _username, _password = registered
     payload = {
-        "provider": "gemini", "coin": "BTC", "horizon": "1T", "is_mock": True,
+        "provider": "gemini", "coin": "BTC", "horizon": "1T", "is_mock": False,
         "forecast_data": {"ceny": [100, 105], "casove_body": ["d1", "d2"], "odovodnenie": "test"},
     }
     res = client.post("/api/forecast/save", json=payload, headers=csrf_headers(client))
@@ -152,3 +152,34 @@ def test_estimate_forecast_cost_without_api_key_returns_mock(registered):
     body = res.json()
     assert body["is_mock"] is True
     assert body["estimated_cost_usd"] == 0.0
+
+
+def test_forecast_accuracy_not_tracked_for_mock_forecast(registered):
+    """Ukazkove (mock) predikcie su z demonstracneho modelu, nie z AI - ich
+    "presnost" by bola nezmyselne, zavadzajuce cislo."""
+    client, _username, _password = registered
+    payload = {
+        "provider": "gemini", "coin": "BTC", "horizon": "24h", "is_mock": True,
+        "forecast_data": {"ceny": [100, 105], "casove_body": ["d1", "d2"], "odovodnenie": "test"},
+    }
+    entry_id = client.post("/api/forecast/save", json=payload, headers=csrf_headers(client)).json()["id"]
+    body = client.get(f"/api/forecast/history/{entry_id}/accuracy").json()
+    assert body["status"] == "mock"
+    assert body["accuracy_pct"] is None
+
+
+def test_news_sentiment_rejects_too_many_titles(registered):
+    client, _username, _password = registered
+    res = client.post("/api/market/news-sentiment",
+                       json={"provider": "gemini", "titles": [f"titulok {i}" for i in range(21)]},
+                       headers=csrf_headers(client))
+    assert res.status_code == 422
+
+
+
+def test_rate_limit_cannot_be_bypassed_by_changing_path_id(registered):
+    """Limit sa pocita podla sablony routy - prechadzanie roznych ID
+    (/history/1/accuracy, /history/2/accuracy...) ho nesmie obist."""
+    client, _username, _password = registered
+    codes = [client.get(f"/api/forecast/history/{i}/accuracy").status_code for i in range(1, 26)]
+    assert 429 in codes

@@ -18,7 +18,7 @@ def test_chat_without_api_key_returns_mock_reply(registered):
     assert body["success"] is True
     assert body["is_mock"] is True
     assert "reply" in body["data"]
-    assert "MOCK DATA" in body["data"]["reply"]
+    assert "SAMPLE DATA" in body["data"]["reply"]
 
 
 def test_chat_empty_messages_reports_failure(registered):

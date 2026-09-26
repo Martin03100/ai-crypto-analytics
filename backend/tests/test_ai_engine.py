@@ -187,3 +187,54 @@ def test_estimate_cost_differs_by_provider_price():
     expensive = ai_engine.estimate_forecast_cost("anthropic", "BTC", "1T")
     assert cheap["estimated_total_tokens"] == expensive["estimated_total_tokens"]
     assert cheap["estimated_cost_usd"] < expensive["estimated_cost_usd"]
+
+
+
+def _fake_gemini(monkeypatch, text):
+    from google import genai
+    captured = {}
+
+    class FakeModels:
+        def generate_content(self, model, contents, config):
+            captured["config"] = config
+
+            class Resp:
+                pass
+            r = Resp()
+            r.text = text
+            return r
+
+    class FakeClient:
+        def __init__(self, api_key, http_options=None):
+            self.models = FakeModels()
+
+    monkeypatch.setattr(genai, "Client", FakeClient)
+    return captured
+
+
+def test_gemini_uses_low_thinking_no_temperature_and_enough_tokens(monkeypatch):
+    """Gemini 3.x zapocitava premyslanie do limitu vystupu - s 1024 tokenmi a
+    predvolenym premyslanim vracal prazdnu odpoved (vzdy ukazkove data)."""
+    captured = _fake_gemini(monkeypatch, '{"ok": 1}')
+    ok, text, err = ai_engine._call_gemini("prompt", "fake-key")
+    assert ok is True and err is None
+    cfg = captured["config"]
+    assert cfg.temperature is None
+    assert cfg.thinking_config is not None and cfg.thinking_config.thinking_level is not None
+    assert cfg.max_output_tokens >= 2048
+
+
+def test_gemini_empty_response_returns_explicit_error(monkeypatch):
+    _fake_gemini(monkeypatch, None)
+    ok, text, err = ai_engine._call_gemini("prompt", "fake-key")
+    assert ok is False
+    assert "prazdnu odpoved" in err
+
+
+def test_call_ai_provider_never_logs_api_key(monkeypatch, caplog):
+    monkeypatch.setattr(ai_engine, "_call_ai_provider_raw",
+                        lambda p, pr, k: (False, "", f"chyba s klucom {k} v sprave"))
+    with caplog.at_level("WARNING", logger="aca.ai"):
+        ai_engine.call_ai_provider("gemini", "prompt", "TAJNY-KLUC-123")
+    assert "TAJNY-KLUC-123" not in caplog.text
+    assert "***" in caplog.text

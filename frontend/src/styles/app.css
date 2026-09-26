@@ -801,6 +801,10 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
   padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   transition: opacity 0.25s var(--ease);
 }
+.onboarding-tip-docked-top {
+  bottom: auto; top: calc(20px + env(safe-area-inset-top, 0px));
+  padding-bottom: 16px;
+}
 .onboarding-step-no {
   font-size: 11px; font-weight: 700; color: var(--cyan);
   font-family: var(--font-mono); margin-bottom: 8px; letter-spacing: 0.03em;

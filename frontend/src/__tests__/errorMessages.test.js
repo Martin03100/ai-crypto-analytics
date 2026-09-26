@@ -78,4 +78,10 @@ describe("humanizeError()", () => {
     const err = new Error("Nespravne pouzivatelske meno alebo heslo.");
     expect(humanizeError(err, "en")).toBe("Incorrect username or password.");
   });
+  it("translates an empty/invalid AI response instead of the generic error", () => {
+    const expected = "The AI returned an incomplete or invalid response. Try again, or pick a different provider.";
+    expect(humanizeError("V odpovedi sa nepodarilo najst ziadny JSON objekt.", "en")).toBe(expected);
+    expect(humanizeError("Gemini vratil prazdnu odpoved (limit vystupu bol vycerpany premyslanim modelu).", "en")).toBe(expected);
+    expect(humanizeError("Pole 'ceny' musi byt neprazdny zoznam cisel.", "en")).toBe(expected);
+  });
 });

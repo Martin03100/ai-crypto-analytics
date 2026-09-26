@@ -33,6 +33,13 @@ class ChatRequest(BaseModel):
 def send_chat_message(payload: ChatRequest, user: User = Depends(get_current_user),
                        db: Session = Depends(get_db)) -> AIResultOut:
     api_key = get_decrypted_api_key(db, user.id, payload.provider)
-    messages = [m.model_dump() for m in payload.messages]
+    # Len poslednych 20 sprav, kazda max 4000 znakov: frontend posiela celu
+    # historiu konverzacie, takze bez orezania by kazda dalsia sprava v dlhom
+    # chate stala viac tokenov (a pri extremne dlhych konverzaciach aj
+    # prekrocila limity providera).
+    messages = [
+        {**m.model_dump(), "content": str(m.content)[:4000]}
+        for m in payload.messages[-20:]
+    ]
     result = chat_with_ai(payload.provider, messages, api_key, payload.lang)
     return AIResultOut(**result.as_dict())

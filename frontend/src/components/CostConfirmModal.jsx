@@ -1,6 +1,7 @@
 import { Coins, Loader2 } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useLanguage } from "../context/LanguageContext";
+import { localeForLang } from "../i18n/locale";
 
 /** Potvrdzovacie okno s odhadom ceny, zobrazene PRED skutocnym volanim AI
  * (Forecast.jsx, Portfolio.jsx) - pouzivatel vidi priblizny naklad este
@@ -9,9 +10,14 @@ import { useLanguage } from "../context/LanguageContext";
  * informativnou farbou namiesto varovnej cervenej - toto nie je
  * deštruktivna akcia. */
 export default function CostConfirmModal({ estimate, providerLabel, onConfirm, onCancel, confirming }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const modalRef = useRef(null);
   const confirmBtnRef = useRef(null);
+  // onCancel prichadza ako nova inline funkcia pri kazdom renderi rodica -
+  // ako zavislost efektu by sposobila opakovane presuvanie fokusu. Ref drzi
+  // vzdy aktualnu verziu, efekt bezi len raz pri otvoreni okna.
+  const onCancelRef = useRef(onCancel);
+  onCancelRef.current = onCancel;
 
   useEffect(() => {
     confirmBtnRef.current?.focus();
@@ -19,7 +25,7 @@ export default function CostConfirmModal({ estimate, providerLabel, onConfirm, o
     function handleKeyDown(e) {
       if (e.key === "Escape") {
         e.preventDefault();
-        onCancel();
+        onCancelRef.current();
         return;
       }
       if (e.key !== "Tab" || !modalRef.current) return;
@@ -39,7 +45,7 @@ export default function CostConfirmModal({ estimate, providerLabel, onConfirm, o
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onCancel]);
+  }, []);
 
   return (
     <div className="confirm-overlay" onClick={onCancel}>
@@ -60,7 +66,7 @@ export default function CostConfirmModal({ estimate, providerLabel, onConfirm, o
         <div className="cost-breakdown">
           <div className="cost-row">
             <span>{t("costConfirm.tokens")}</span>
-            <span>~{estimate.estimated_total_tokens.toLocaleString()}</span>
+            <span>~{estimate.estimated_total_tokens.toLocaleString(localeForLang(lang))}</span>
           </div>
           <div className="cost-row cost-row-highlight">
             <span>{t("costConfirm.estimatedCost")}</span>

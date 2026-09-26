@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any, Dict, List, Optional, Tuple
@@ -28,6 +29,11 @@ _fear_greed_cache = TTLCache(ttl_seconds=900)  # 15 min
 _FEAR_GREED_KEY = "fear_greed"
 
 _DEFAULT_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; AICryptoAnalytics/2.0)"}
+
+# Kratky timeout pre JEDNOTLIVE zdroje sprav (nacitavaju sa paralelne) - viz
+# vysvetlenie pri get_crypto_headlines(). Spravy sa cachuju 5 minut.
+_NEWS_SOURCE_TIMEOUT = 5
+_headlines_cache = TTLCache(ttl_seconds=300)
 
 
 def get_fear_greed_index(force_refresh: bool = False) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
@@ -94,7 +100,10 @@ def _parse_rss_date(raw: str) -> Optional[datetime]:
         dt = parsedate_to_datetime(raw)
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
-        return dt
+        # Vzdy prevod na UTC - rozne RSS zdroje posielaju rozne casove pasma
+        # (+0000, -0400...), a zoradovanie ISO retazcov s roznymi offsetmi
+        # by bolo nespravne (textove porovnanie, nie casove).
+        return dt.astimezone(timezone.utc)
     except (TypeError, ValueError):
         return None
 
@@ -103,7 +112,7 @@ def _fetch_one_rss_source(url: str, per_source_limit: int) -> List[Dict[str, str
     """Nacita a sparsuje JEDEN RSS feed. Volajuce get_crypto_headlines() to
     obali try/except per-zdroj, takze vypadok jedneho feedu (napr. docasne
     nedostupny CoinTelegraph) nezhodi zvysne zdroje."""
-    response = requests.get(url, timeout=REQUEST_TIMEOUT_SECONDS, headers=_DEFAULT_HEADERS)
+    response = requests.get(url, timeout=_NEWS_SOURCE_TIMEOUT, headers=_DEFAULT_HEADERS)
     response.raise_for_status()
     root = ET.fromstring(response.content)
     items = root.findall(".//item")
@@ -136,7 +145,7 @@ def get_reddit_crypto_posts(limit: int = 5) -> List[Dict[str, str]]:
     zoznam a appka pokracuje len s RSS zdrojmi."""
     try:
         response = requests.get(
-            REDDIT_CRYPTO_URL, timeout=REQUEST_TIMEOUT_SECONDS,
+            REDDIT_CRYPTO_URL, timeout=_NEWS_SOURCE_TIMEOUT,
             headers={"User-Agent": "web:ai-crypto-analytics:2.2.0 (crypto sentiment aggregator)"},
         )
         response.raise_for_status()
@@ -166,28 +175,49 @@ def get_crypto_headlines(limit: int = 8) -> Tuple[bool, List[Dict[str, str]], Op
     """Agreguje titulky z VIACERYCH nezavislych RSS zdrojov (viz
     CRYPTO_NEWS_RSS_URLS v config.py) plus Reddit - diverzifikuje spravy
     naprieč viacerymi redakciami namiesto jedneho pohladu. Kazdy zdroj je
-    izolovany (try/except per-zdroj) - vypadok jedneho feedu neovplyvni
-    zvysne. Vysledky su zoradene podla casu publikovania (najnovsie prve)."""
+    izolovany (vypadok jedneho neovplyvni zvysne). Vysledky su zoradene
+    podla casu publikovania (najnovsie prve).
+
+    DOLEZITE (casovy rozpocet): zdroje sa nacitavaju PARALELNE (nie jeden
+    po druhom) a s kratkym timeoutom na zdroj. Pri sekvencnom nacitani 4
+    zdrojov s plnym timeoutom mohol najhorsi pripad trvat az ~48s - co by
+    samo o sebe prekrocilo ~40s limit Netlify proxy (502 chyba), a pri
+    Daily Digest by sa k tomu este pridalo AI volanie. Paralelne + kratky
+    timeout = najhorsi pripad cca _NEWS_SOURCE_TIMEOUT sekund celkovo.
+    Vysledok sa navyse cachuje, aby opakovane nacitania stranky nevolali
+    vsetky zdroje znova."""
+    cache_key = f"headlines|{limit}"
+    cached = _headlines_cache.get(cache_key)
+    if cached is not None:
+        return True, cached, None
+
     per_source_limit = max(2, limit // len(CRYPTO_NEWS_RSS_URLS) + 1)
     all_headlines: List[Dict[str, str]] = []
     errors: List[str] = []
 
-    for url in CRYPTO_NEWS_RSS_URLS:
-        try:
-            all_headlines.extend(_fetch_one_rss_source(url, per_source_limit))
-        except requests.exceptions.RequestException as exc:
-            errors.append(f"{url}: {exc}")
-        except ET.ParseError as exc:
-            errors.append(f"{url}: {exc}")
-
-    all_headlines.extend(get_reddit_crypto_posts(limit=3))
+    with ThreadPoolExecutor(max_workers=len(CRYPTO_NEWS_RSS_URLS) + 1) as pool:
+        rss_futures = {pool.submit(_fetch_one_rss_source, url, per_source_limit): url for url in CRYPTO_NEWS_RSS_URLS}
+        reddit_future = pool.submit(get_reddit_crypto_posts, 3)
+        for future, url in rss_futures.items():
+            try:
+                all_headlines.extend(future.result())
+            except (requests.exceptions.RequestException, ET.ParseError) as exc:
+                errors.append(f"{url}: {exc}")
+            except Exception as exc:  # noqa: BLE001 - jeden zly zdroj nesmie zhodit ostatne
+                errors.append(f"{url}: {exc}")
+        all_headlines.extend(reddit_future.result())
 
     if not all_headlines:
+        stale = _headlines_cache.get(cache_key, allow_stale=True)
+        if stale is not None:
+            return True, stale, "Pouzivam starsie cachovane spravy (vsetky zdroje zlyhali)."
         detail = "; ".join(errors) if errors else "Ziadny zdroj sprav nevratil data."
         return False, [], f"Nepodarilo sa nacitat spravy zo ziadneho zdroja: {detail}"
 
     all_headlines.sort(key=lambda h: h.get("published_at") or "", reverse=True)
-    return True, all_headlines[:limit], None
+    result = all_headlines[:limit]
+    _headlines_cache.set(cache_key, result)
+    return True, result, None
 
 
 def get_dummy_crypto_headlines(limit: int = 6) -> List[Dict[str, str]]:

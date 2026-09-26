@@ -42,6 +42,9 @@ const KNOWN_BACKEND_PATTERNS = [
   { test: /neplatn[aá] hodnota hlasu/i, key: "errors.invalidVote" },
   { test: /api kluc je pr[aá]zdny/i, key: "errors.emptyApiKey" },
   { test: /kluc sa nepodarilo overit/i, key: "errors.keyVerificationFailed" },
+  // AI vratila prazdnu/orezanu/neplatnu odpoved (spravy z backend validatorov
+  // a prazdnej Gemini odpovede) - predtym koncili ako vseobecne "Nieco sa pokazilo".
+  { test: /pr[aá]zdn[uú] odpove[dď]|nepodarilo na[jĵ]?[sš]t [zž]iadny json|naparsovan[yý] json|pol(e|ia) '[^']+'.*mus[ií]/i, key: "errors.aiInvalidResponse" },
   { test: /najprv ulo[zž] api kl[uú][cč] pre tohto providera/i, key: "errors.noKeyToTest" },
 ];
 

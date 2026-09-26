@@ -190,6 +190,14 @@ class VoteRequest(BaseModel):
     sentiment_vote: str
 
 
+class NewsSentimentRequest(BaseModel):
+    """Predtym surovy `dict` bez validacie - neobmedzeny zoznam titulkov by
+    vedel vytvorit obrovsky prompt (a zbytocne minut tokeny)."""
+    provider: Optional[str] = None
+    titles: List[str] = Field(default_factory=list, max_length=20)
+    lang: str = "en"
+
+
 class DailyDigestRequest(BaseModel):
     provider: str
     lang: str = "en"

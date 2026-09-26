@@ -204,3 +204,18 @@ def test_mutating_request_with_csrf_token_succeeds(registered):
     client, _username, _password = registered
     res = client.put("/api/account/email", json={"email": "test@example.com"}, headers=csrf_headers(client))
     assert res.status_code == 200
+
+
+
+def test_reset_password_blocks_brute_force_per_email(client):
+    """6-ciferny kod (1 000 000 moznosti) - po 5 zlych pokusoch pre rovnaky
+    email musi prist 429, aj keby utocnik stridal IP adresy."""
+    for _ in range(5):
+        res = client.post("/api/auth/reset-password",
+                          json={"email": "obet@example.com", "code": "000000", "new_password": "noveheslo123"},
+                          headers=anon_csrf_headers(client))
+        assert res.status_code == 400
+    res = client.post("/api/auth/reset-password",
+                      json={"email": "obet@example.com", "code": "000000", "new_password": "noveheslo123"},
+                      headers=anon_csrf_headers(client))
+    assert res.status_code == 429

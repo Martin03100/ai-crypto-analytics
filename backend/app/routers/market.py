@@ -14,7 +14,7 @@ from app.config import (
 from app.deps import get_current_user, get_db, get_decrypted_api_key
 from app.models import CommunityVote, User
 from app.rate_limit import rate_limit_by_ip, rate_limit_by_user
-from app.schemas import AIResultOut, DailyDigestRequest, VoteRequest
+from app.schemas import AIResultOut, DailyDigestRequest, NewsSentimentRequest, VoteRequest
 from app.services.ai_engine import get_daily_digest, get_news_sentiment_summary
 from app.services.market_data import (
     get_crypto_headlines, get_dummy_crypto_headlines, get_dummy_fear_greed_index,
@@ -43,11 +43,11 @@ def headlines() -> dict:
 
 
 @router.post("/news-sentiment", response_model=AIResultOut, dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
-def news_sentiment(payload: dict, user: User = Depends(get_current_user),
+def news_sentiment(payload: NewsSentimentRequest, user: User = Depends(get_current_user),
                     db: Session = Depends(get_db)) -> AIResultOut:
-    provider = payload.get("provider")
-    titles: List[str] = payload.get("titles", [])
-    lang = payload.get("lang", "en")
+    provider = payload.provider
+    titles: List[str] = [title[:300] for title in payload.titles]
+    lang = payload.lang
     api_key = get_decrypted_api_key(db, user.id, provider) if provider else None
     result = get_news_sentiment_summary(provider, titles, api_key, lang)
     return AIResultOut(**result.as_dict())
@@ -61,7 +61,7 @@ def prices(ids: str, vs_currency: str = "usd") -> dict:
     Rate-limitovane podla IP (nie je to autentifikovany endpoint) - inak by
     mohol jeden pouzivatel spamom vycerpat bezplatny CoinGecko rate limit
     a znefunkcnit ceny pre vsetkych ostatnych."""
-    coin_ids = [c.strip() for c in ids.split(",") if c.strip()]
+    coin_ids = [c.strip() for c in ids.split(",") if c.strip()][:50]  # ochrana pred zneuzitim CoinGecko limitu
     success, data, error = get_live_prices(coin_ids, vs_currency)
     if not success or data is None:
         return {"prices": {}, "is_mock": True, "error_message": error}

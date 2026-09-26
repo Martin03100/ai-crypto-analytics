@@ -59,12 +59,24 @@ def get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+def _route_key(request: Request) -> str:
+    """Sablona routy (napr. /api/forecast/history/{entry_id}/accuracy), nie
+    realna URL. Inak by kazde ID malo vlastny, samostatny limit - a limit by
+    sa dal obist jednoduchym prechadzanim ID (1, 2, 3...)."""
+    route = request.scope.get("route")
+    return getattr(route, "path", None) or request.url.path
+
+
+# Verejny alias - pre limity podla hodnoty z tela requestu (napr. per-email).
+check_rate_limit = _check
+
+
 def rate_limit_by_ip(max_calls: int, window_seconds: int):
     """FastAPI dependency factory: limituje podla IP adresy volajuceho.
     Vhodne pre neautentifikovane endpointy ako /auth/login."""
     def dependency(request: Request) -> None:
         client_ip = get_client_ip(request)
-        _check(f"ip:{request.url.path}:{client_ip}", max_calls, window_seconds)
+        _check(f"ip:{_route_key(request)}:{client_ip}", max_calls, window_seconds)
     return dependency
 
 
@@ -76,6 +88,6 @@ def rate_limit_by_user(max_calls: int, window_seconds: int):
     from app.deps import get_current_user  # lazy import, aby sa predislo cyklu
 
     def dependency(request: Request, user=Depends(get_current_user)) -> None:
-        key = f"user:{request.url.path}:{user.id}"
+        key = f"user:{_route_key(request)}:{user.id}"
         _check(key, max_calls, window_seconds)
     return dependency

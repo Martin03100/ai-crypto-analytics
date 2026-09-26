@@ -89,3 +89,13 @@ def anon_csrf_headers(client) -> dict:
     cookie (GET request), a az s tou poslat POST/PUT/DELETE bez prihlasenia."""
     client.get("/api/health")
     return csrf_headers(client)
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    """Rate limiter drzi stav v pamati procesu - bez vycistenia by sa pocty
+    requestov scitavali naprieč testami (rovnake emaily/user ID)."""
+    from app import rate_limit
+    rate_limit._hits.clear()
+    yield
+    rate_limit._hits.clear()

@@ -100,9 +100,6 @@ export default function OnboardingTour({ onNeedSidebar }) {
       setStepIndex((i) => (i + 1 < STEP_TARGETS.length ? i + 1 : -1));
       return;
     }
-    // Nech je zvyrazneny prvok skutocne vidiet (nie len tooltip o nom) -
-    // "nearest" nehybe strankou, ak uz je prvok viditelny.
-    el.scrollIntoView({ behavior: "smooth", block: "nearest" });
     setRect(el.getBoundingClientRect());
   }, [stepIndex]);
 
@@ -122,6 +119,10 @@ export default function OnboardingTour({ onNeedSidebar }) {
       return () => clearTimeout(t2);
     }
     onNeedSidebar?.(false);
+    // Scroll k cielu LEN RAZ pri zmene kroku - nie v measure(), ta bezi aj pri
+    // kazdom scroll evente a pretahovala by pouzivatela spat k cielu, cim by
+    // sa stranka pri pokuse o scroll "zasekla".
+    document.querySelector(step.selector)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     measure();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, stepIndex]);
@@ -152,6 +153,10 @@ export default function OnboardingTour({ onNeedSidebar }) {
   if (!step) return null;
   const isLast = stepIndex === STEP_TARGETS.length - 1;
   const pad = 8;
+  // Ak je zvyrazneny prvok v dolnej casti obrazovky (napr. tlacidlo chatu v
+  // pravom dolnom rohu), okno sa ukotvi hore - inak by na mobile prekrylo
+  // presne ten prvok, ktory ma ukazovat.
+  const dockTop = rect && rect.bottom > window.innerHeight - 240;
 
   return (
     <div className="onboarding-layer" role="dialog" aria-modal="true" aria-label={t("onboarding.dialogLabel")}>
@@ -164,7 +169,7 @@ export default function OnboardingTour({ onNeedSidebar }) {
       {/* Pevne pripnute dole na obrazovke (nikdy nie dynamicky vedla ciela) -
          tlacidla Dalej/Preskocit su tak VZDY v ramci viewportu, bez ohladu na
          to, kde je cielovy prvok na stranke. */}
-      <div className="onboarding-tip onboarding-tip-docked">
+      <div className={`onboarding-tip onboarding-tip-docked${dockTop ? " onboarding-tip-docked-top" : ""}`}>
         <div className="onboarding-step-no">{t("onboarding.stepCounter", { current: stepIndex + 1, total: STEP_TARGETS.length })}</div>
         <h4>{t(step.titleKey)}</h4>
         <p aria-live="polite">{t(step.textKey)}</p>
