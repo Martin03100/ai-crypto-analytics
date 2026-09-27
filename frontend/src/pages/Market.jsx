@@ -172,15 +172,15 @@ export default function Market() {
           <>
             {newsResult.is_mock && <div style={{ marginBottom: 10 }}><MockBadge /></div>}
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
-              {newsResult.data.spravy.map((item, i) => {
-                const headline = headlineFor(item.titulok);
+              {(Array.isArray(newsResult.data.spravy) ? newsResult.data.spravy : []).map((item, i) => {
+                const headline = headlineFor(item?.titulok);
                 const link = headline?.link;
                 return (
                   <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 10, background: "var(--bg-inset)", border: "1px solid var(--border-subtle)" }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       {link && link !== "#" ? (
-                        <a href={link} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: "var(--text-primary)", textDecoration: "none" }}>{item.titulok}</a>
-                      ) : <span style={{ fontSize: 13 }}>{item.titulok}</span>}
+                        <a href={link} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: "var(--text-primary)", textDecoration: "none" }}>{item?.titulok || "—"}</a>
+                      ) : <span style={{ fontSize: 13 }}>{item?.titulok || "—"}</span>}
                       {headline && (headline.source || headline.published_at) && (
                         <div className="headline-meta">
                           {headline.source}{headline.source && headline.published_at ? " · " : ""}
@@ -188,14 +188,14 @@ export default function Market() {
                         </div>
                       )}
                     </div>
-                    <SentimentBadge sentiment={item.sentiment} />
+                    <SentimentBadge sentiment={item?.sentiment} />
                   </div>
                 );
               })}
             </div>
             <p className="card-title" style={{ marginBottom: 8 }}>{t("market.trendingTitle")}</p>
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.8 }}>
-              {newsResult.data.trendy.map((trend, i) => <li key={i}>{trend}</li>)}
+              {(Array.isArray(newsResult.data.trendy) ? newsResult.data.trendy : []).map((trend, i) => <li key={i}>{trend}</li>)}
             </ul>
           </>
         )}

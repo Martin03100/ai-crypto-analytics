@@ -296,8 +296,8 @@ export default function Portfolio() {
     w.print();
   }
 
-  const sectorData = result?.data?.sektorova_alokacia
-    ? Object.entries(result.data.sektorova_alokacia).map(([name, value]) => ({ name, value }))
+  const sectorData = result?.data?.sektorova_alokacia && typeof result.data.sektorova_alokacia === "object"
+    ? Object.entries(result.data.sektorova_alokacia).map(([name, value]) => ({ name, value })).filter((item) => typeof item.value === "number")
     : [];
 
   return (

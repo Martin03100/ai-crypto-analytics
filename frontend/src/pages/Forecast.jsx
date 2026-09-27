@@ -28,20 +28,25 @@ const COINS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "DOT", 
 const HORIZONS = ["24h", "1T", "1M", "1R"];
 
 function ForecastChart({ data, t, actualPrices, createdAt, horizon, locale }) {
-  const n = data.ceny.length;
+  const prices = Array.isArray(data?.ceny) ? data.ceny : [];
+  const labels = Array.isArray(data?.casove_body) ? data.casove_body : [];
+  const n = prices.length;
   const hasActual = Array.isArray(actualPrices) && actualPrices.length === n;
+  if (n === 0) {
+    return <p className="text-sub">{t("forecast.noChartData")}</p>;
+  }
   // Skutocne casy (od casu vytvorenia predikcie), nie popisky vymyslene AI.
   const points = buildTimePoints(data.vytvorene || createdAt, horizon, n);
   const startPrice = points && typeof data.aktualna_cena === "number" ? data.aktualna_cena : null;
-  const shortLabel = (i) => (points ? formatTimeShort(points[i], horizon, locale) : data.casove_body[i - 1]);
-  const fullLabel = (i) => (points ? formatTimeFull(points[i], locale) : data.casove_body[i - 1]);
+  const shortLabel = (i) => (points ? formatTimeShort(points[i], horizon, locale) : labels[i - 1]);
+  const fullLabel = (i) => (points ? formatTimeFull(points[i], locale) : labels[i - 1]);
 
   const chartData = [];
   if (startPrice !== null) {
     // Bod 0 = skutocna cena v case vytvorenia - obe krivky zacinaju z rovnakeho miesta.
     chartData.push({ t: shortLabel(0), full: `${fullLabel(0)} · ${t("forecast.startPoint")}`, price: startPrice, upper: startPrice, actual: hasActual ? startPrice : undefined });
   }
-  data.ceny.forEach((price, idx) => {
+  prices.forEach((price, idx) => {
     chartData.push({ t: shortLabel(idx + 1), full: fullLabel(idx + 1), price, upper: +(price * 1.05).toFixed(8), actual: hasActual ? actualPrices[idx] : undefined });
   });
 
