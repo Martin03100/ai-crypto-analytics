@@ -607,5 +607,15 @@
   "compare.chartLabel": "Chart comparing forecasts from several models",
   "compare.now": "now",
   "compare.step": "Step {n}",
-  "compare.nothingToChart": "No model returned a real forecast that could be shown on the chart."
+  "compare.nothingToChart": "No model returned a real forecast that could be shown on the chart.",
+  "portfolio.csvImportButton": "Import CSV",
+  "portfolio.csvHelp": "Upload a CSV with coin and amount columns (e.g. \"coin,amount\" or an exchange balance export with Coin and Total columns). The file is processed only in your browser.",
+  "portfolio.csvTooLarge": "The file is too large (max 200 kB).",
+  "portfolio.csvNoColumns": "No coin and amount columns found in the CSV. Use e.g. the header \"coin,amount\".",
+  "portfolio.csvNothingImported": "No coin could be loaded from the file.",
+  "portfolio.csvReplaceConfirm": "Replace your current portfolio with {n} coins from the file?",
+  "portfolio.csvImported": "Coins imported: {n}.",
+  "portfolio.csvBadLines": "Skipped rows with invalid data: {lines}.",
+  "portfolio.csvUnknownCoins": "These coins could not be found: {coins}.",
+  "backtest.failed": "The backtest could not run because historical data is currently unavailable. Try again shortly."
 }

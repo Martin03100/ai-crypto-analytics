@@ -1,7 +1,7 @@
 /** Portfolio advisor page. */
 
-import { CheckCircle2, Compass, Download, FileText, GraduationCap, Loader2, Plus, RefreshCw, Save, Search, Trash2, Wallet } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { CheckCircle2, Compass, Download, FileText, GraduationCap, Loader2, Plus, RefreshCw, Save, Search, Trash2, Upload, Wallet } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { api } from "../api";
 import { ActionBadge, MockBadge } from "../components/Badge";
@@ -22,6 +22,7 @@ import { humanizeError } from "../i18n/errorMessages";
 import { localeForLang } from "../i18n/locale";
 import { usePageTitle } from "../hooks/usePageTitle";
 import { stripMockTag } from "../utils/mockText";
+import { MAX_CSV_BYTES, parsePortfolioCsv } from "../utils/portfolioCsv";
 
 const COINS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "DOT", "LINK"];
 const PIE_COLORS = ["#22d3ee", "#34d399", "#a78bfa", "#fbbf24", "#fb5a6a"];
@@ -158,6 +159,54 @@ export default function Portfolio() {
 
   function removeRow(i) {
     setHoldings((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  const csvInputRef = useRef(null);
+  const [importing, setImporting] = useState(false);
+
+  // Unknown symbols are looked up through the coin search; only an exact symbol match is accepted.
+  async function resolveCoinId(symbol) {
+    if (DEFAULT_COIN_IDS[symbol]) return DEFAULT_COIN_IDS[symbol];
+    try {
+      const res = await api.searchCoins(symbol);
+      return res.results.find((c) => c.symbol === symbol)?.id || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function importCsv(file) {
+    if (!file) return;
+    if (file.size > MAX_CSV_BYTES) {
+      push(t("portfolio.csvTooLarge"), "error", { translated: true });
+      return;
+    }
+    setImporting(true);
+    try {
+      const { holdings: parsed, errors } = parsePortfolioCsv(await file.text());
+      if (errors.some((e) => e.reason === "noColumns")) {
+        push(t("portfolio.csvNoColumns"), "error", { translated: true });
+        return;
+      }
+      const limited = parsed.slice(0, MAX_HOLDINGS);
+      const resolved = await Promise.all(limited.map(async (h) => ({ ...h, coinId: await resolveCoinId(h.symbol) })));
+      const found = resolved.filter((h) => h.coinId);
+      const unknown = resolved.filter((h) => !h.coinId).map((h) => h.symbol);
+      if (found.length === 0) {
+        push(t("portfolio.csvNothingImported"), "error", { translated: true });
+        return;
+      }
+      const isUntouched = holdings.length === 1 && holdings[0].minca === "BTC" && holdings[0].amountText === "1";
+      if (!isUntouched && !(await confirmDialog(t("portfolio.csvReplaceConfirm", { n: found.length })))) return;
+      setHoldings(found.map((h) => newRow({ minca: h.symbol, coin_id: h.coinId, mnozstvo: h.amount, amountText: String(h.amount) })));
+      push(t("portfolio.csvImported", { n: found.length }), "success");
+      if (errors.length) push(t("portfolio.csvBadLines", { lines: errors.map((e) => e.line).join(", ") }), "warn");
+      if (unknown.length) push(t("portfolio.csvUnknownCoins", { coins: unknown.join(", ") }), "warn");
+      if (parsed.length > MAX_HOLDINGS) push(t("portfolio.maxHoldingsReached", { max: MAX_HOLDINGS }), "warn");
+    } finally {
+      setImporting(false);
+      if (csvInputRef.current) csvInputRef.current.value = "";
+    }
   }
 
   const hasAmountErrors = holdings.some((h) => h.amountError);
@@ -345,6 +394,12 @@ export default function Portfolio() {
 
         <div style={{ display: "flex", gap: 10, marginTop: 10, marginBottom: 14, flexWrap: "wrap" }}>
           <button className="btn btn-ghost btn-sm" onClick={addRow}><Plus size={14} /> {t("portfolio.addCoinButton")}</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => csvInputRef.current?.click()} disabled={importing}>
+            {importing ? <Loader2 size={14} className="spin" /> : <Upload size={14} />} {t("portfolio.csvImportButton")}
+          </button>
+          <InfoTip text={t("portfolio.csvHelp")} />
+          <input ref={csvInputRef} type="file" accept=".csv,text/csv,text/plain" hidden data-testid="csv-input"
+            onChange={(e) => importCsv(e.target.files?.[0])} />
         </div>
 
         <CoinSearchPicker onPick={addCustomCoin} />

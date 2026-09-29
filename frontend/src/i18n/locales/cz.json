@@ -607,5 +607,15 @@
   "compare.chartLabel": "Graf porovnání predikcí více modelů",
   "compare.now": "nyní",
   "compare.step": "Krok {n}",
-  "compare.nothingToChart": "Žádný model nevrátil skutečnou predikci, kterou by bylo možné zobrazit v grafu."
+  "compare.nothingToChart": "Žádný model nevrátil skutečnou predikci, kterou by bylo možné zobrazit v grafu.",
+  "portfolio.csvImportButton": "Importovat CSV",
+  "portfolio.csvHelp": "Nahraj CSV se sloupci mince a množství (např. „coin,amount“ nebo export zůstatků z burzy se sloupci Coin a Total). Soubor se zpracuje pouze v tvém prohlížeči.",
+  "portfolio.csvTooLarge": "Soubor je příliš velký (max. 200 kB).",
+  "portfolio.csvNoColumns": "V CSV jsme nenašli sloupce s mincí a množstvím. Použij např. hlavičku „coin,amount“.",
+  "portfolio.csvNothingImported": "Ze souboru se nepodařilo načíst žádnou minci.",
+  "portfolio.csvReplaceConfirm": "Nahradit aktuální portfolio {n} mincemi ze souboru?",
+  "portfolio.csvImported": "Importováno mincí: {n}.",
+  "portfolio.csvBadLines": "Přeskočené řádky s neplatnými údaji: {lines}.",
+  "portfolio.csvUnknownCoins": "Tyto mince se nepodařilo najít: {coins}.",
+  "backtest.failed": "Backtest se nepodařilo spustit, historická data momentálně nejsou dostupná. Zkus to za chvíli znovu."
 }
