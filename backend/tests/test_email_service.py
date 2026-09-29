@@ -1,5 +1,4 @@
-"""Testy pre app/services/email_service.py — Brevo HTTPS API (prioritne,
-funguje aj na Render free tier) a SMTP fallback."""
+"""Email service tests."""
 
 import sys
 import os
@@ -24,8 +23,6 @@ def test_is_email_configured_false_with_nothing_set(monkeypatch):
 
 
 def test_send_email_prefers_brevo_over_smtp_when_both_configured(monkeypatch):
-    """Ak su nastavene OBE (Brevo aj SMTP), Brevo (HTTPS, funguje aj na
-    Render free tier) musi mat prednost pred SMTP (tam casto zablokovane)."""
     monkeypatch.setattr(email_service, "BREVO_API_KEY", "fake-brevo-key")
     monkeypatch.setattr(email_service, "SMTP_HOST", "smtp.example.com")
     monkeypatch.setattr(email_service, "SMTP_USER", "user@example.com")

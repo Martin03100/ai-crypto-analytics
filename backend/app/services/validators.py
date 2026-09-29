@@ -1,15 +1,9 @@
-"""
-app/services/validators.py
-============================
-Cistenie a bezpecne parsovanie JSON odpovedi z AI providerov, a
-zostavovanie strictnych JSON-mode promptov. Ziadna funkcia tu nikdy
-nevyhodi nezachytenu vynimku - safe_json_loads vzdy vracia predvidatelnu
-(bool, dict|None, str|None) strukturu.
-"""
+"""AI prompts and response validation."""
 
 from __future__ import annotations
 
 import json
+import math
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -23,14 +17,6 @@ PORTFOLIO_REQUIRED_KEYS: Tuple[str, ...] = (
 NEWS_REQUIRED_KEYS: Tuple[str, ...] = ("spravy", "trendy")
 DIGEST_REQUIRED_KEYS: Tuple[str, ...] = ("zhrnutie", "kluceve_body")
 
-# Spolocna instrukcia pre AI, aby nezohladnovala len historicke ceny, ale
-# SIRSIU sadu realnych cenotvornych faktorov naprieč kryptotrhom - makro,
-# regulacia, on-chain/derivatove trhove data, mainstreamove aj socialne
-# medialne pokrytie, vyjadrenia vplyvnych osobnosti, a pri altcoinoch aj
-# projektove fundamenty. LLM tu cerpa z vlastnych trenovacich dat (ziadny
-# live web-search nie je k dispozicii pri volani provider API), takze ide
-# o "odhad na zaklade vseobecnej znalosti kontextu", nie o realtime
-# scraping - preto instrukcia explicitne ziada priznat, kde ide o predpoklad.
 GLOBAL_CONTEXT_INSTRUCTION = (
     "Pri analyze NEBER do uvahy iba historicke cenove data. Zohladni siri "
     "kontext, ktory realne hyba kryptotrhom: "
@@ -91,7 +77,12 @@ def _missing_keys(data: Dict[str, Any], required: Tuple[str, ...]) -> List[str]:
     return [key for key in required if key not in data]
 
 
-def validate_forecast_payload(raw_text: str) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
+def _is_price(value: Any) -> bool:
+    return (isinstance(value, (int, float)) and not isinstance(value, bool)
+            and math.isfinite(value) and value > 0)
+
+
+def validate_forecast_payload(raw_text: str, expected_points: Optional[int] = None) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
     success, data, error = safe_json_loads(raw_text)
     if not success or data is None:
         return False, None, error
@@ -100,14 +91,23 @@ def validate_forecast_payload(raw_text: str) -> Tuple[bool, Optional[Dict[str, A
         return False, None, f"Chybajuce kluce: {', '.join(missing)}"
     if not isinstance(data.get("ceny"), list) or not data["ceny"]:
         return False, None, "Pole 'ceny' musi byt neprazdny zoznam cisel."
+    if not all(_is_price(p) for p in data["ceny"]):
+        return False, None, "Pole 'ceny' smie obsahovat iba kladne, konecne cisla."
     if not isinstance(data.get("casove_body"), list) or not data["casove_body"]:
         return False, None, "Pole 'casove_body' musi byt neprazdny zoznam."
     if len(data["ceny"]) != len(data["casove_body"]):
         return False, None, "Polia 'ceny' a 'casove_body' musia mat rovnaku dlzku."
+    if expected_points is not None:
+        if len(data["ceny"]) < expected_points:
+            return False, None, f"AI vratila {len(data['ceny'])} bodov namiesto {expected_points}."
+        data["ceny"] = [float(p) for p in data["ceny"][:expected_points]]
+        data["casove_body"] = data["casove_body"][:expected_points]
+    else:
+        data["ceny"] = [float(p) for p in data["ceny"]]
     if not isinstance(data.get("odovodnenie"), str) or not data["odovodnenie"].strip():
         return False, None, "Pole 'odovodnenie' musi byt neprazdny text."
     score = data.get("confidence_score")
-    if not isinstance(score, (int, float)) or not (0 <= float(score) <= 100):
+    if not isinstance(score, (int, float)) or isinstance(score, bool) or not (0 <= float(score) <= 100):
         return False, None, "Pole 'confidence_score' musi byt cislo 0-100."
     risk = data.get("risk_level")
     if risk not in VALID_RISK_LEVELS:
@@ -131,8 +131,15 @@ def validate_portfolio_payload(raw_text: str) -> Tuple[bool, Optional[Dict[str, 
         item_missing = _missing_keys(item, ("minca", "akcia", "dovod"))
         if item_missing:
             return False, None, f"Odporucanie {i} nema kluce: {', '.join(item_missing)}"
+        action = str(item.get("akcia", "")).strip().upper()
+        if action not in ("BUY", "SELL", "HOLD"):
+            return False, None, f"Odporucanie {i} ma neplatnu akciu (ocakavane BUY/SELL/HOLD)."
+        item["akcia"] = action
     if not isinstance(data.get("sektorova_alokacia"), dict) or not data["sektorova_alokacia"]:
         return False, None, "Pole 'sektorova_alokacia' musi byt neprazdny objekt."
+    for sector, weight in list(data["sektorova_alokacia"].items()):
+        if isinstance(weight, bool) or not isinstance(weight, (int, float)) or not math.isfinite(weight) or weight < 0:
+            return False, None, f"Sektor '{sector}' nema platny (nezaporny) podiel."
     if not isinstance(data.get("rebalancing_checklist"), list) or not data["rebalancing_checklist"]:
         return False, None, "Pole 'rebalancing_checklist' musi byt neprazdny zoznam."
     if not isinstance(data.get("odborna_analyza"), str) or not data["odborna_analyza"].strip():
@@ -149,6 +156,11 @@ def validate_news_payload(raw_text: str) -> Tuple[bool, Optional[Dict[str, Any]]
         return False, None, f"Chybajuce kluce: {', '.join(missing)}"
     if not isinstance(data.get("spravy"), list) or not data["spravy"]:
         return False, None, "Pole 'spravy' musi byt neprazdny zoznam."
+    sentiments = {"bullish": "Bullish", "bearish": "Bearish", "neutral": "Neutral"}
+    for item in data["spravy"]:
+        if not isinstance(item, dict):
+            return False, None, "Kazda polozka v 'spravy' musi byt objekt."
+        item["sentiment"] = sentiments.get(str(item.get("sentiment", "")).strip().lower(), "Neutral")
     if not isinstance(data.get("trendy"), list) or not data["trendy"]:
         return False, None, "Pole 'trendy' musi byt neprazdny zoznam."
     return True, data, None
@@ -259,8 +271,6 @@ _LANGUAGE_NAMES = {
 
 
 def language_instruction(lang: str, json_mode: bool = True) -> str:
-    """Prompty su po slovensky - bez tejto instrukcie AI odpovedala po
-    slovensky aj anglickym/ceskym pouzivatelom (a obcas bez diakritiky)."""
     name = _LANGUAGE_NAMES.get((lang or "en").lower(), _LANGUAGE_NAMES["en"])
     if json_mode:
         return f"\nVsetky TEXTOVE hodnoty v JSON odpovedi napis v jazyku: {name}. Kluce JSON nemen."

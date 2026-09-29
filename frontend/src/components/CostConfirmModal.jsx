@@ -1,21 +1,14 @@
+/** Cost confirmation dialog. */
+
 import { Coins, Loader2 } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useLanguage } from "../context/LanguageContext";
 import { localeForLang } from "../i18n/locale";
 
-/** Potvrdzovacie okno s odhadom ceny, zobrazene PRED skutocnym volanim AI
- * (Forecast.jsx, Portfolio.jsx) - pouzivatel vidi priblizny naklad este
- * predtym, nez sa realne minu platene tokeny. Vizualne a klavesnicovo
- * (focus trap, Escape) zrkadli ConfirmContext.jsx, ale s neutralnou/
- * informativnou farbou namiesto varovnej cervenej - toto nie je
- * deštruktivna akcia. */
 export default function CostConfirmModal({ estimate, providerLabel, onConfirm, onCancel, confirming }) {
   const { t, lang } = useLanguage();
   const modalRef = useRef(null);
   const confirmBtnRef = useRef(null);
-  // onCancel prichadza ako nova inline funkcia pri kazdom renderi rodica -
-  // ako zavislost efektu by sposobila opakovane presuvanie fokusu. Ref drzi
-  // vzdy aktualnu verziu, efekt bezi len raz pri otvoreni okna.
   const onCancelRef = useRef(onCancel);
   onCancelRef.current = onCancel;
 

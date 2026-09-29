@@ -1,3 +1,5 @@
+/** Dashboard page. */
+
 import { ArrowRight, Gauge, RefreshCw, Sparkles, TrendingUp, Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";

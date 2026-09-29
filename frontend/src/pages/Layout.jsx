@@ -1,6 +1,8 @@
+/** App layout. */
+
 import { Menu } from "lucide-react";
 import { Suspense, useCallback, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import ChatWidget from "../components/ChatWidget";
 import DailyDigest from "../components/DailyDigest";
 import OnboardingTour from "../components/OnboardingTour";
@@ -11,9 +13,6 @@ import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 
-/** Ľahký loading stav LEN pre obsahovú časť (nie cez celú obrazovku) - kým sa
- * stiahne JS balíček pre danú stránku (lazy-loaded route, viď App.jsx).
- * Sidebar aj hlavička ostávajú na mieste, nezmiznú počas prepínania stránok. */
 function ContentLoader() {
   const { t } = useLanguage();
   return (
@@ -21,6 +20,11 @@ function ContentLoader() {
       {t("app.loading")}
     </div>
   );
+}
+
+function PageTransition({ children }) {
+  const { pathname } = useLocation();
+  return <div key={pathname} className="page-transition">{children}</div>;
 }
 
 export default function Layout() {
@@ -31,7 +35,6 @@ export default function Layout() {
   const closeShortcuts = useCallback(() => setShowShortcuts(false), []);
   useKeyboardShortcuts(useCallback(() => setShowShortcuts(true), []));
 
-  // Neovereny email -> najprv overovacia obrazovka (backend to vynucuje tiez).
   if (user?.emailVerified === false) return <VerifyEmailGate />;
 
   return (
@@ -45,7 +48,9 @@ export default function Layout() {
         <DailyDigest />
 
         <Suspense fallback={<ContentLoader />}>
-          <Outlet />
+          <PageTransition>
+            <Outlet />
+          </PageTransition>
         </Suspense>
       </main>
 

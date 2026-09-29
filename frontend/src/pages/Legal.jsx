@@ -1,16 +1,15 @@
+/** Privacy policy and terms pages. */
+
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 import { usePageTitle } from "../hooks/usePageTitle";
 
-/** Spolocny layout pre Privacy Policy a Terms of Service — obe su
- * verejne dostupne aj bez prihlasenia (viz App.jsx, routy mimo
- * RequireAuth), aby na ne vedel odkazovat aj Auth screen. */
 function LegalPage({ titleKey, sections }) {
   const { t } = useLanguage();
   usePageTitle(titleKey);
   return (
-    <div style={{ minHeight: "100vh", padding: "40px 20px", maxWidth: 720, margin: "0 auto" }}>
+    <main style={{ minHeight: "100vh", padding: "40px 20px", maxWidth: 720, margin: "0 auto" }}>
       <Link to="/" className="key-link" style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 24 }}>
         <ArrowLeft size={14} /> {t("legal.backToApp")}
       </Link>
@@ -18,7 +17,7 @@ function LegalPage({ titleKey, sections }) {
       <p className="text-sub" style={{ marginBottom: 28 }}>{t("legal.lastUpdated")}</p>
       <p style={{ lineHeight: 1.7, marginBottom: 28 }}>{t(`${sections}.intro`)}</p>
       <LegalSections prefix={sections} t={t} />
-    </div>
+    </main>
   );
 }
 

@@ -1,6 +1,6 @@
-"""Testy pre app/routers/forecast.py — AI predikcia (mock rezim) a historia."""
+"""Forecast API tests."""
 
-from tests.conftest import anon_csrf_headers, csrf_headers
+from tests.conftest import anon_csrf_headers, csrf_headers, signed_forecast_payload
 
 
 def test_generate_forecast_requires_auth(client):
@@ -10,9 +10,6 @@ def test_generate_forecast_requires_auth(client):
 
 
 def test_generate_forecast_without_api_key_returns_mock_data(registered):
-    """Bez pripojeneho API klucu appka NIKDY nevrati chybu - vzdy vygeneruje
-    mock predikciu (is_mock: true), aby appka bola pouzitelna aj bez
-    vlastneho AI klucu."""
     client, _username, _password = registered
     res = client.post("/api/forecast", json={"provider": "gemini", "coin": "BTC", "horizon": "1T", "lang": "en"},
                        headers=csrf_headers(client))
@@ -67,10 +64,6 @@ def test_delete_own_forecast_succeeds(registered):
 
 
 def test_forecast_history_pagination(registered):
-    """Ulozi 5 predikcii a overi, ze page_size=2 vrati spravne stranky aj
-    spravny celkovy pocet (total), aj ked na aktualnu stranku nesedia
-    vsetky zaznamy naraz - predtym pevny .limit(100) by starsie zaznamy
-    proste "stratil" bez akehokolvek naznaku, ze existuju dalsie."""
     client, _username, _password = registered
     for i in range(5):
         payload = {
@@ -83,13 +76,12 @@ def test_forecast_history_pagination(registered):
     body = res.json()
     assert body["total"] == 5
     assert len(body["items"]) == 2
-    # Najnovsi ulozeny zaznam (COIN4) ma byt prvy (zoradene od najnovsieho).
     assert body["items"][0]["crypto_symbol"] == "COIN4"
 
     res = client.get("/api/forecast/history?page=3&page_size=2")
     body = res.json()
     assert body["total"] == 5
-    assert len(body["items"]) == 1  # posledna, neuplna stranka
+    assert len(body["items"]) == 1
 
 
 def test_forecast_accuracy_requires_auth(client):
@@ -104,14 +96,10 @@ def test_forecast_accuracy_404_for_nonexistent_entry(registered):
 
 
 def test_forecast_accuracy_pending_for_recent_forecast(registered):
-    """Predikcia ulozena prave teraz s horizontom "1T" (1 tyzden) - realne
-    data na porovnanie este neexistuju, status musi byt "pending"."""
     client, _username, _password = registered
-    payload = {
-        "provider": "gemini", "coin": "BTC", "horizon": "1T", "is_mock": False,
-        "forecast_data": {"ceny": [100, 105], "casove_body": ["d1", "d2"], "odovodnenie": "test"},
-    }
+    payload = signed_forecast_payload(client, prices=(100, 105), horizon="1T")
     res = client.post("/api/forecast/save", json=payload, headers=csrf_headers(client))
+    assert res.status_code == 201, res.text
     entry_id = res.json()["id"]
 
     res = client.get(f"/api/forecast/history/{entry_id}/accuracy")
@@ -123,8 +111,6 @@ def test_forecast_accuracy_pending_for_recent_forecast(registered):
 
 
 def test_forecast_accuracy_cannot_be_read_by_another_user(registered, client):
-    """Presnost cudzej ulozenej predikcie sa nikdy nesmie dat nahliadnut cez
-    len uhadnute ID zaznamu - rovnaky princip ako pri mazani cudzej analyzy."""
     owner_client, _username, _password = registered
     payload = {
         "provider": "gemini", "coin": "BTC", "horizon": "1T", "is_mock": True,
@@ -143,8 +129,6 @@ def test_forecast_accuracy_cannot_be_read_by_another_user(registered, client):
 
 
 def test_estimate_forecast_cost_without_api_key_returns_mock(registered):
-    """Bez pripojeneho klucu by realne volanie bolo zadarmo (mock rezim) -
-    odhad sa preto vobec nepocita, len sa vrati is_mock=true."""
     client, _username, _password = registered
     res = client.post("/api/forecast/estimate-cost", json={"provider": "gemini", "coin": "BTC", "horizon": "1T"},
                        headers=csrf_headers(client))
@@ -155,8 +139,6 @@ def test_estimate_forecast_cost_without_api_key_returns_mock(registered):
 
 
 def test_forecast_accuracy_not_tracked_for_mock_forecast(registered):
-    """Ukazkove (mock) predikcie su z demonstracneho modelu, nie z AI - ich
-    "presnost" by bola nezmyselne, zavadzajuce cislo."""
     client, _username, _password = registered
     payload = {
         "provider": "gemini", "coin": "BTC", "horizon": "24h", "is_mock": True,
@@ -178,8 +160,6 @@ def test_news_sentiment_rejects_too_many_titles(registered):
 
 
 def test_rate_limit_cannot_be_bypassed_by_changing_path_id(registered):
-    """Limit sa pocita podla sablony routy - prechadzanie roznych ID
-    (/history/1/accuracy, /history/2/accuracy...) ho nesmie obist."""
     client, _username, _password = registered
     codes = [client.get(f"/api/forecast/history/{i}/accuracy").status_code for i in range(1, 26)]
     assert 429 in codes
@@ -187,7 +167,6 @@ def test_rate_limit_cannot_be_bypassed_by_changing_path_id(registered):
 
 
 def test_forecast_rejects_invalid_horizon_and_too_long_coin(registered):
-    """Bez validacie by Postgres (Neon) pri ulozeni dlhsej hodnoty vratil 500."""
     client, _username, _password = registered
     base = {"provider": "gemini", "is_mock": True,
             "forecast_data": {"ceny": [1], "casove_body": ["d1"], "odovodnenie": "x"}}
@@ -199,9 +178,14 @@ def test_forecast_rejects_invalid_horizon_and_too_long_coin(registered):
 
 
 def _save_real_forecast(client, prices=(100.0, 110.0), is_mock=False):
-    payload = {"provider": "gemini", "coin": "BTC", "horizon": "24h", "is_mock": is_mock,
-               "forecast_data": {"ceny": list(prices), "casove_body": ["a", "b"], "odovodnenie": "test"}}
-    return client.post("/api/forecast/save", json=payload, headers=csrf_headers(client)).json()["id"]
+    if is_mock:
+        payload = {"provider": "gemini", "coin": "BTC", "horizon": "24h", "is_mock": True,
+                   "forecast_data": {"ceny": list(prices), "casove_body": ["a", "b"], "odovodnenie": "test"}}
+    else:
+        payload = signed_forecast_payload(client, prices=prices, horizon="24h")
+    res = client.post("/api/forecast/save", json=payload, headers=csrf_headers(client))
+    assert res.status_code == 201, res.text
+    return res.json()["id"]
 
 
 def test_tip_challenge_and_leaderboard(registered, monkeypatch):
@@ -215,7 +199,7 @@ def test_tip_challenge_and_leaderboard(registered, monkeypatch):
         "status": "completed", "accuracy_pct": 97.0, "predicted_prices": [100.0, 110.0], "actual_prices": [101.0, 107.0],
         "time_labels": ["a", "b"], "matures_at": "x", "baseline_accuracy_pct": 95.0, "direction_correct": True})
     body = client.get(f"/api/forecast/history/{entry_id}/accuracy").json()
-    assert body["tip_outcome"] == "win" and body["can_tip"] is False  # |108-107| < |110-107|
+    assert body["tip_outcome"] == "win" and body["can_tip"] is False
     board = client.get("/api/forecast/leaderboard").json()
     assert board["providers"][0]["evaluated"] == 1 and board["providers"][0]["direction_hit_pct"] == 100.0
     assert board["challenge"]["you"]["wins"] == 1
@@ -235,3 +219,85 @@ def test_bulk_delete_only_removes_own_forecasts(registered, client):
     assert res.status_code == 200 and res.json()["deleted"] == 2
     assert owner.get("/api/forecast/history").json()["total"] == 1
     assert owner.post("/api/forecast/history/bulk-delete", json={"ids": []}, headers=csrf_headers(owner)).status_code == 422
+
+
+def test_save_rejects_unsigned_real_forecast(registered):
+    client, _u, _p = registered
+    payload = signed_forecast_payload(client)
+    payload["forecast_data"].pop("podpis")
+    res = client.post("/api/forecast/save", json=payload, headers=csrf_headers(client))
+    assert res.status_code == 400
+
+
+def test_save_rejects_tampered_prices_or_coin(registered):
+    client, _u, _p = registered
+    payload = signed_forecast_payload(client, prices=(100, 110), coin="BTC")
+    tampered = {**payload, "forecast_data": {**payload["forecast_data"], "ceny": [100.0, 999.0]}}
+    assert client.post("/api/forecast/save", json=tampered, headers=csrf_headers(client)).status_code == 400
+    other_coin = {**payload, "coin": "ETH"}
+    assert client.post("/api/forecast/save", json=other_coin, headers=csrf_headers(client)).status_code == 400
+    assert client.post("/api/forecast/save", json=payload, headers=csrf_headers(client)).status_code == 201
+
+
+def test_signature_cannot_be_reused_by_another_user(registered, client):
+    owner, _u, _p = registered
+    payload = signed_forecast_payload(owner)
+    owner.cookies.clear()
+    res = owner.post("/api/auth/register", json={"username": "druhy_user", "password": "heslo12345", "email": "d@example.com"})
+    assert res.status_code == 201
+    res = owner.post("/api/forecast/save", json=payload, headers=csrf_headers(owner))
+    assert res.status_code == 400
+
+
+def test_save_rejects_unknown_provider(registered):
+    client, _u, _p = registered
+    payload = signed_forecast_payload(client, provider="gemini")
+    payload["provider"] = "TotallyFakeAI"
+    assert client.post("/api/forecast/save", json=payload, headers=csrf_headers(client)).status_code == 400
+
+
+def test_accuracy_survives_corrupted_prices(registered, monkeypatch):
+    from app.services import ai_engine
+    client, _u, _p = registered
+    payload = signed_forecast_payload(client, prices=(1, 2), horizon="24h")
+    entry_id = client.post("/api/forecast/save", json=payload, headers=csrf_headers(client)).json()["id"]
+    from app.database import SessionLocal
+    from app.models import ForecastHistory
+    import json as _json
+    from datetime import datetime, timedelta, timezone
+    db = SessionLocal()
+    try:
+        row = db.get(ForecastHistory, entry_id)
+        data = _json.loads(row.forecast_json)
+        data["ceny"] = ["x", "y"]
+        row.forecast_json = _json.dumps(data)
+        row.created_at = datetime.now(timezone.utc) - timedelta(days=3)
+        db.commit()
+    finally:
+        db.close()
+    monkeypatch.setattr(ai_engine.market_data, "get_market_chart_range", lambda *a, **k: (True, [[0, 100.0], [10**13, 101.0]], None))
+    res = client.get(f"/api/forecast/history/{entry_id}/accuracy")
+    assert res.status_code == 200
+    assert res.json()["status"] == "unavailable"
+
+
+def test_leaderboard_flags_low_sample_and_ranks_reliable_first(registered):
+    from app.database import SessionLocal
+    from app.models import ForecastEvaluation
+    client, _u, _p = registered
+    db = SessionLocal()
+    try:
+        for i in range(6):
+            db.add(ForecastEvaluation(forecast_id=i + 1, user_id=1, provider="A", coin="BTC", timeframe="1T",
+                                      accuracy_pct=90.0, baseline_accuracy_pct=95.0, direction_correct=i % 2 == 0,
+                                      actual_final_price=1.0))
+        db.add(ForecastEvaluation(forecast_id=100, user_id=1, provider="B", coin="BTC", timeframe="1T",
+                                  accuracy_pct=99.0, baseline_accuracy_pct=95.0, direction_correct=True,
+                                  actual_final_price=1.0))
+        db.commit()
+    finally:
+        db.close()
+    board = client.get("/api/forecast/leaderboard").json()
+    names = [p["provider"] for p in board["providers"]]
+    assert names == ["A", "B"], "a provider with enough samples must rank above one with a single forecast"
+    assert board["providers"][0]["low_sample"] is False and board["providers"][1]["low_sample"] is True

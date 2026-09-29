@@ -1,6 +1,9 @@
+/** AI chat widget. */
+
 import { AlertCircle, History, MessageCircle, Plus, Send, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
+import { useAuth } from "../context/AuthContext";
 import { useConfirm } from "../context/ConfirmContext";
 import { useToast } from "../context/ToastContext";
 import { useProviders } from "../context/ProvidersContext";
@@ -8,6 +11,7 @@ import { useLanguage } from "../context/LanguageContext";
 import { localeForLang } from "../i18n/locale";
 
 const CONVERSATIONS_KEY = "aca_chat_conversations";
+const keyFor = (userId) => `${CONVERSATIONS_KEY}:${userId ?? "anon"}`;
 const MAX_CONVERSATIONS = 20;
 const PROVIDER_LABELS = {
   gemini: "Gemini",
@@ -17,21 +21,28 @@ const PROVIDER_LABELS = {
   grok: "Grok (xAI)",
 };
 
-/** Kazda konverzacia: { id, title, messages: [...], updatedAt } */
-function loadConversations() {
+function loadConversations(userId) {
   try {
-    const raw = localStorage.getItem(CONVERSATIONS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    let raw = localStorage.getItem(keyFor(userId));
+    const legacy = localStorage.getItem(CONVERSATIONS_KEY);
+    if (legacy !== null) {
+      if (raw === null) {
+        raw = legacy;
+        localStorage.setItem(keyFor(userId), legacy);
+      }
+      localStorage.removeItem(CONVERSATIONS_KEY);
+    }
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
 }
 
-function saveConversations(conversations) {
+function saveConversations(userId, conversations) {
   try {
-    localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(conversations.slice(0, MAX_CONVERSATIONS)));
+    localStorage.setItem(keyFor(userId), JSON.stringify(conversations.slice(0, MAX_CONVERSATIONS)));
   } catch {
-    // localStorage plny / nedostupny — historia sa proste neulozi pre tuto relaciu
   }
 }
 
@@ -49,7 +60,9 @@ export default function ChatWidget() {
   const providersCtx = useProviders();
   const providers = providersCtx.providers;
   const [provider, setProvider] = useState(null);
-  const [conversations, setConversations] = useState(loadConversations);
+  const { user } = useAuth();
+  const userId = user?.id;
+  const [conversations, setConversations] = useState(() => loadConversations(userId));
   const [activeId, setActiveId] = useState(() => conversations[0]?.id || null);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -74,7 +87,7 @@ export default function ChatWidget() {
   function updateConversation(id, updater) {
     setConversations((prev) => {
       const next = prev.map((c) => (c.id === id ? updater(c) : c));
-      saveConversations(next);
+      saveConversations(userId, next);
       return next;
     });
   }
@@ -84,7 +97,7 @@ export default function ChatWidget() {
     const fresh = { id, title: newConvTitle, messages: [], updatedAt: Date.now() };
     setConversations((prev) => {
       const next = [fresh, ...prev];
-      saveConversations(next);
+      saveConversations(userId, next);
       return next;
     });
     setActiveId(id);
@@ -96,7 +109,7 @@ export default function ChatWidget() {
     if (!ok) return;
     setConversations((prev) => {
       const next = prev.filter((c) => c.id !== id);
-      saveConversations(next);
+      saveConversations(userId, next);
       if (activeId === id) setActiveId(next[0]?.id || null);
       return next;
     });
@@ -115,7 +128,7 @@ export default function ChatWidget() {
       conv = { id: `conv-${Date.now()}`, title: newConvTitle, messages: [], updatedAt: Date.now() };
       setConversations((prev) => {
         const next = [conv, ...prev];
-        saveConversations(next);
+        saveConversations(userId, next);
         return next;
       });
       setActiveId(conv.id);

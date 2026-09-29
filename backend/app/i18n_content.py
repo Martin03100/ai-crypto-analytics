@@ -1,16 +1,4 @@
-"""
-app/i18n_content.py
-=====================
-Preklady pre STATICKY/DEMONSTRACNY (mock) obsah generovany priamo backendom
-(nie AI providerom) — napr. keď používateľ nemá pripojený API kľúč, alebo pre
-zoznam nadchádzajúcich trhových udalostí. Skutočný text z AI providerov
-(forecast/portfolio/news odôvodnenia pri pripojenom kľúči) sa NEPREKLADÁ —
-ten prichádza priamo v jazyku promptu (viď app/services/validators.py).
-
-Frontend posiela aktuálny jazyk UI (`lang`, jedna z "en"/"sk"/"cs") v tele
-requestu pre všetky AI endpointy (viď frontend/src/api.js -> currentLang()).
-Bez tejto hodnoty (napr. staršie Postman testy) sa použije "en" ako default.
-"""
+"""Localized backend texts (EN, SK, CS)."""
 
 from __future__ import annotations
 
@@ -24,11 +12,6 @@ def normalize_lang(lang: str | None) -> str:
     return lang if lang in SUPPORTED_LANGS else DEFAULT_LANG
 
 
-# ---------------------------------------------------------------------------
-# Jednotky pre casove body mock predikcie (naviazane na existujuce
-# TIME_HORIZONS[...]["unit"] hodnoty v app/config.py — tie ostavaju ako
-# interne identifikatory, tu sa iba prekladaju pre zobrazenie).
-# ---------------------------------------------------------------------------
 UNIT_LABELS: Dict[str, Dict[str, str]] = {
     "hodina": {"en": "hour", "sk": "hodina", "cs": "hodina"},
     "den": {"en": "day", "sk": "deň", "cs": "den"},
@@ -41,10 +24,6 @@ def unit_label(unit_key: str, lang: str) -> str:
     return entry.get(normalize_lang(lang), entry[DEFAULT_LANG])
 
 
-# ---------------------------------------------------------------------------
-# "Chyba API kluc" — spolocna hlaska, ktora sprevadza VSETKY mock odpovede
-# (forecast/portfolio/news/digest/chat), keď pouzivatel nema pripojeny kluc.
-# ---------------------------------------------------------------------------
 MISSING_API_KEY: Dict[str, str] = {
     "en": "Missing API key for the selected provider.",
     "sk": "Chýba API kľúč pre zvoleného providera.",
@@ -56,9 +35,6 @@ def missing_api_key_message(lang: str) -> str:
     return MISSING_API_KEY.get(normalize_lang(lang), MISSING_API_KEY[DEFAULT_LANG])
 
 
-# ---------------------------------------------------------------------------
-# Mock forecast (Forecast.jsx)
-# ---------------------------------------------------------------------------
 _TREND_WORDS: Dict[str, Dict[str, str]] = {
     "up": {"en": "rising", "sk": "rastúci", "cs": "rostoucí"},
     "down": {"en": "falling", "sk": "klesajúci", "cs": "klesající"},
@@ -92,9 +68,37 @@ def mock_forecast_reasoning(coin: str, horizon: str, trend_direction: str, lang:
     return templates.get(lang, templates[DEFAULT_LANG])
 
 
-# ---------------------------------------------------------------------------
-# Mock portfolio analysis (Portfolio.jsx)
-# ---------------------------------------------------------------------------
+def _fmt_price(value: float) -> str:
+    return f"{value:,.2f}" if value >= 1 else f"{value:.6g}"
+
+
+def quant_reasoning(lang: str, coin: str, horizon: str, sigma_day_pct: float, change_pct: float,
+                    low: float, high: float, spot: float) -> str:
+    lang = normalize_lang(lang)
+    lo, hi, now = _fmt_price(low), _fmt_price(high), _fmt_price(spot)
+    templates = {
+        "en": (
+            f"Free statistical model (no AI): {coin} at ${now}, horizon {horizon}. Typical daily volatility over "
+            f"the last 30 days is {sigma_day_pct:.1f}%. The median path moves {change_pct:+.1f}% (momentum is "
+            f"deliberately damped - short-term crypto trends are unreliable). With 80% probability the price at "
+            f"the end of the horizon lands between ${lo} and ${hi}. This is a reference estimate, not advice."
+        ),
+        "sk": (
+            f"Bezplatný štatistický model (bez AI): {coin} za ${now}, horizont {horizon}. Typická denná volatilita "
+            f"za posledných 30 dní je {sigma_day_pct:.1f} %. Stredná trajektória sa pohybuje o {change_pct:+.1f} % "
+            f"(momentum je zámerne utlmené - krátkodobé trendy na kryptotrhu sú nespoľahlivé). S 80 % "
+            f"pravdepodobnosťou skončí cena na konci horizontu medzi ${lo} a ${hi}. Ide o referenčný odhad, nie o radu."
+        ),
+        "cs": (
+            f"Bezplatný statistický model (bez AI): {coin} za ${now}, horizont {horizon}. Typická denní volatilita "
+            f"za posledních 30 dní je {sigma_day_pct:.1f} %. Střední trajektorie se pohybuje o {change_pct:+.1f} % "
+            f"(momentum je záměrně utlumeno - krátkodobé trendy na kryptotrhu jsou nespolehlivé). S 80% "
+            f"pravděpodobností skončí cena na konci horizontu mezi ${lo} a ${hi}. Jde o referenční odhad, ne o radu."
+        ),
+    }
+    return templates.get(lang, templates[DEFAULT_LANG])
+
+
 def mock_portfolio_reason(action: str, coin: str, lang: str) -> str:
     lang = normalize_lang(lang)
     templates = {
@@ -160,9 +164,6 @@ MOCK_REBALANCING_CHECKLIST: Dict[str, List[str]] = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Mock news summary (Market.jsx)
-# ---------------------------------------------------------------------------
 MOCK_NEWS_TRENDS: Dict[str, List[str]] = {
     "en": [
         "[MOCK] Growing interest in L2 scaling solutions.",
@@ -182,9 +183,6 @@ MOCK_NEWS_TRENDS: Dict[str, List[str]] = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Mock daily digest (DailyDigest.jsx)
-# ---------------------------------------------------------------------------
 def mock_digest_summary(fg_value: int, fg_classification: str, lang: str) -> str:
     lang = normalize_lang(lang)
     templates = {
@@ -226,9 +224,6 @@ MOCK_DIGEST_KEY_POINTS: Dict[str, List[str]] = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Mock chat reply (ChatWidget.jsx)
-# ---------------------------------------------------------------------------
 def mock_chat_reply(last_user_question: str, lang: str) -> str:
     lang = normalize_lang(lang)
     snippet = last_user_question[:120]
@@ -252,9 +247,6 @@ def mock_chat_reply(last_user_question: str, lang: str) -> str:
     return templates.get(lang, templates[DEFAULT_LANG])
 
 
-# ---------------------------------------------------------------------------
-# Nadchadzajuce trhove udalosti (staticky demo obsah, Market.jsx)
-# ---------------------------------------------------------------------------
 MARKET_EVENTS_BY_LANG: Dict[str, List[Dict[str, object]]] = {
     "en": [
         {"offset_days": 3, "event": "FOMC meeting (interest rates)", "type": "Macro"},

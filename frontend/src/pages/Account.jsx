@@ -1,3 +1,5 @@
+/** Account and API keys page. */
+
 import { CheckCircle2, ExternalLink, KeyRound, Loader2, Save, Shield, Trash2, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../api";
@@ -58,9 +60,7 @@ export default function Account() {
     setTesting(provider);
     try {
       const res = await api.testApiKey(provider);
-      // res.message prichadza z backendu (viz app/routers/account.py) — pri
-      // neuspechu ho humanizujeme cez push(..., "error"), rovnako ako ine chyby.
-      push(res.message, res.valid ? "success" : "error");
+      push(res.valid ? t("account.keyValid") : res.message, res.valid ? "success" : "error");
     } catch (err) {
       push(err, "error");
     } finally {
@@ -154,7 +154,7 @@ export default function Account() {
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {keys.filter((k) => k.connected).map((k) => (
               <div key={k.provider} style={{ fontSize: 13.5, display: "flex", alignItems: "center", gap: 8 }}>
-                <CheckCircle2 size={14} color="var(--emerald)" /> {k.provider === "custom" ? t("provider.customLabel") : k.label}
+                <CheckCircle2 size={14} color="var(--emerald-fg)" /> {k.provider === "custom" ? t("provider.customLabel") : k.label}
               </div>
             ))}
           </div>

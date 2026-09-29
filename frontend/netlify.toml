@@ -1,9 +1,21 @@
+# Build
 [build]
   command = "npm install --dangerously-allow-all-scripts && npm run build"
   publish = "dist"
 
-# Presmerovania (API proxy + SPA fallback) su teraz v public/_redirects,
-# NIE tu. Netlify subor _redirects vyhodnocuje PRED pravidlami v tomto
-# subore - ak by tu boli oba naraz, tieto by sa aj tak ignorovali, co by
-# mohlo byt zavadzajuce pri buducej uprave. Uprav teda backend URL v
-# frontend/public/_redirects, nie tu.
+# Security headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
+    Strict-Transport-Security = "max-age=63072000; includeSubDomains"
+
+# Static asset caching
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

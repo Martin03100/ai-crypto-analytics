@@ -1,9 +1,4 @@
-"""app/routers/auth.py — registracia, prihlasenie, odhlasenie a reset hesla.
-
-JWT zije v HttpOnly cookie (viz app/deps.py). Prihlasenie je chranene proti
-hrubej sile dvoma vrstvami: rate limit podla IP (app/rate_limit.py) a
-account lockout podla poctu neuspesnych pokusov (app/config.py).
-"""
+"""Authentication API."""
 
 from __future__ import annotations
 
@@ -11,6 +6,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import (
@@ -22,13 +18,14 @@ from app.deps import get_current_user, get_db
 from app.models import EmailVerificationCode, PasswordResetToken, User
 from app.rate_limit import check_rate_limit, get_client_ip, rate_limit_by_ip
 from app.schemas import (
-    ForgotPasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest, TokenResponse,
+    USERNAME_RE, ForgotPasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest, TokenResponse,
     VerifyEmailRequest, VerifyResetCodeRequest,
 )
 from app.security import (
-    create_access_token, generate_reset_code, hash_password, hash_reset_token,
-    decrypt_secret, sanitize_text, verify_password, verify_totp,
+    create_access_token, decrypt_secret, dummy_verify, generate_reset_code, hash_password, hash_reset_token,
+    needs_rehash, sanitize_text, verify_password, verify_totp,
 )
+from app.services.account_cleanup import release_email_if_unverified
 from app.services.captcha import verify_captcha
 from app.services.email_service import is_email_configured, render_lockout_email, render_reset_password_email, send_email
 from app.services.verification import send_verification_code
@@ -51,7 +48,12 @@ def register(payload: RegisterRequest, response: Response, request: Request, bac
     if not verify_captcha(payload.captcha_token, get_client_ip(request)):
         raise HTTPException(status_code=400, detail="Overenie, že nie si robot, zlyhalo. Skús to znova.")
     username = sanitize_text(payload.username, max_length=64)
-    existing = db.query(User).filter(User.username == username).first()
+    if not USERNAME_RE.match(username):
+        raise HTTPException(
+            status_code=400,
+            detail="Používateľské meno musí mať 3–32 znakov: písmená bez diakritiky, čísla, bodku, pomlčku alebo podčiarkovník.",
+        )
+    existing = db.query(User).filter(func.lower(User.username) == username.lower()).first()
     if existing is not None:
         raise HTTPException(status_code=400, detail="Toto pouzivatelske meno je uz obsadene.")
 
@@ -60,9 +62,9 @@ def register(payload: RegisterRequest, response: Response, request: Request, bac
         raise HTTPException(status_code=400, detail="Zadaj platnú emailovú adresu.")
     existing_email = db.query(User).filter(User.email == email).first()
     if existing_email is not None:
-        raise HTTPException(status_code=400, detail="Tento email už používa iný účet.")
+        if not (is_email_configured() and release_email_if_unverified(db, email)):
+            raise HTTPException(status_code=400, detail="Tento email už používa iný účet.")
 
-    # Overovanie emailu je zapnute len ak appka vie posielat emaily.
     user = User(username=username, password_hash=hash_password(payload.password), email=email,
                 email_verified=False if is_email_configured() else None)
     db.add(user)
@@ -82,12 +84,13 @@ def login(payload: LoginRequest, response: Response, background_tasks: Backgroun
           db: Session = Depends(get_db)) -> TokenResponse:
     username = sanitize_text(payload.username, max_length=64)
     user = db.query(User).filter(User.username == username).first()
+    if user is None:
+        user = db.query(User).filter(func.lower(User.username) == username.lower()).first()
 
-    # Rovnaka chybova sprava pre "neexistuje" aj "zle heslo" (nikdy neprezradzuj,
-    # ktore pouzivatelske mena existuju).
     generic_error = HTTPException(status_code=401, detail="Nespravne pouzivatelske meno alebo heslo.")
 
     if user is None:
+        dummy_verify(payload.password)
         raise generic_error
 
     now = datetime.now(timezone.utc)
@@ -104,7 +107,8 @@ def login(payload: LoginRequest, response: Response, background_tasks: Backgroun
 
     if user.totp_enabled:
         if not payload.totp_code:
-            raise HTTPException(status_code=401, detail="Zadaj 6-miestny kód z overovacej aplikácie (2FA).")
+            raise HTTPException(status_code=401, detail="Zadaj 6-miestny kód z overovacej aplikácie (2FA).",
+                                headers={"X-Error-Code": "totp_required"})
         secret = decrypt_secret(user.totp_secret or "", user.id)
         if not secret or not verify_totp(secret, payload.totp_code):
             _register_failed_attempt(db, user, now, background_tasks)
@@ -112,6 +116,8 @@ def login(payload: LoginRequest, response: Response, background_tasks: Backgroun
 
     user.failed_login_attempts = 0
     user.locked_until = None
+    if needs_rehash(user.password_hash):
+        user.password_hash = hash_password(payload.password)
     db.commit()
 
     _set_auth_cookie(response, user)
@@ -128,8 +134,6 @@ def logout(response: Response) -> dict:
 
 @router.get("/me", response_model=TokenResponse)
 def me(user: User = Depends(get_current_user)) -> TokenResponse:
-    """Zisti, ci je pouzivatel prihlaseny na zaklade HttpOnly cookie (volane
-    pri nacitani appky namiesto citania tokenu z localStorage)."""
     return TokenResponse(access_token="", username=user.username, user_id=user.id, email=user.email,
                          email_verified=user.email_verified, totp_enabled=bool(user.totp_enabled))
 
@@ -139,24 +143,16 @@ def forgot_password(payload: ForgotPasswordRequest, request: Request, background
                     db: Session = Depends(get_db)) -> dict:
     if not verify_captcha(payload.captcha_token, get_client_ip(request)):
         raise HTTPException(status_code=400, detail="Overenie, že nie si robot, zlyhalo. Skús to znova.")
-    """Vzdy vrati rovnaku genericku odpoved (aj ked pouzivatel/email
-    neexistuje), aby sa nedalo cez tento endpoint zistovat, kto ma ucet."""
     generic_response = {
         "success": True,
         "message": "Ak účet s emailom existuje, poslali sme naň kód na reset hesla.",
     }
     email = sanitize_text(payload.email, max_length=255).lower()
-    # Per-email limit (nie len per-IP): bez neho by sa dala cudzia schranka
-    # zahltit reset emailmi z mnohych IP adries. Aplikuje sa rovnako pre
-    # existujuce aj neexistujuce emaily - neprezradza, kto ma ucet.
     check_rate_limit(f"forgot-email:{email}", 3, 900)
     user = db.query(User).filter(User.email == email).first()
     if user is None or not user.email:
         return generic_response
 
-    # Predchadzajuce nepouzite kody pre tohto pouzivatela znehodnot - platny
-    # je vzdy len ten najnovsi, aby aj starsi unikly/nezmazany kod prestal
-    # fungovat hned, ako si pouzivatel vyziada novy.
     db.query(PasswordResetToken).filter(
         PasswordResetToken.user_id == user.id, PasswordResetToken.used.is_(False)
     ).update({"used": True})
@@ -169,29 +165,17 @@ def forgot_password(payload: ForgotPasswordRequest, request: Request, background
     text_body, html_body = render_reset_password_email(user.username, code, PASSWORD_RESET_TOKEN_MINUTES)
     subject = "Kód na obnovenie hesla — AI Crypto Analytics"
     if is_email_configured():
-        # Odoslanie AZ PO odpovedi: inak by odpoved pre existujuci email trvala
-        # citelne dlhsie (odosielanie) a z casu by sa dalo zistit, kto ma ucet.
         background_tasks.add_task(send_email, user.email, subject, text_body, html_body)
     else:
-        send_email(user.email, subject, text_body, html_body)  # len zaloguje
+        send_email(user.email, subject, text_body, html_body)
 
     result = dict(generic_response)
-    # V dev rezime (bez SMTP) vratime kod priamo v odpovedi, aby sa dal tok
-    # realne otestovat bez emailoveho servera. V PRODUKCII sa kod NIKDY
-    # nevracia v odpovedi, aj keby administrator zabudol nastavit SMTP —
-    # inak by ktokolvek, kto pozna existujuci email, mohol cez tento
-    # endpoint ziskat funkcny reset kod priamo z API odpovede.
     if not is_email_configured() and APP_ENV != "production":
         result["dev_reset_code"] = code
     return result
 
 
 def _find_valid_reset_token(db: Session, user_id: int, code: str) -> PasswordResetToken | None:
-    """Najde najnovsi nepouzity kod pre pouzivatela a overi, ci sedi so
-    zadanym kodom a ci este neexpiroval. Hlada podla user_id (nie len podla
-    hashu kodu) - 6-ciferny kod ma oveľa mensi priestor nez povodny dlhy
-    nahodny token, takze bez filtra na konkretneho pouzivatela by teoreticky
-    mohla (velmi zriedkavo) nastat zhoda hashu naprieč dvoma rôznymi uctami."""
     row = (
         db.query(PasswordResetToken)
         .filter(PasswordResetToken.user_id == user_id, PasswordResetToken.used.is_(False))
@@ -210,9 +194,6 @@ def _find_valid_reset_token(db: Session, user_id: int, code: str) -> PasswordRes
 
 @router.post("/verify-reset-code", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_RESET_CODE))])
 def verify_reset_code(payload: VerifyResetCodeRequest, db: Session = Depends(get_db)) -> dict:
-    """Overi kod BEZ toho, aby ho spotreboval (nemeni 'used') - appka tym
-    padom vie hned ukazat 'kod je spravny' a prejst na formular noveho
-    hesla, este predtym, nez si pouzivatel heslo skutocne zvoli."""
     email = sanitize_text(payload.email, max_length=255).lower()
     check_rate_limit(f"reset-code:{email}", 5, 900)
     user = db.query(User).filter(User.email == email).first()
@@ -224,9 +205,6 @@ def verify_reset_code(payload: VerifyResetCodeRequest, db: Session = Depends(get
 @router.post("/reset-password", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_RESET_CODE))])
 def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)) -> dict:
     email = sanitize_text(payload.email, max_length=255).lower()
-    # Spolocny limit s /verify-reset-code: 6-ciferny kod ma len 1 000 000
-    # moznosti - bez limitu per-email (nielen per-IP) by sa dal uhadnut
-    # distribuovanym utokom z mnohych IP adries pocas 15 minut platnosti.
     check_rate_limit(f"reset-code:{email}", 5, 900)
     user = db.query(User).filter(User.email == email).first()
     row = _find_valid_reset_token(db, user.id, payload.code) if user else None
@@ -235,7 +213,7 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
         raise HTTPException(status_code=400, detail="Kód je nesprávny alebo expirovaný.")
 
     user.password_hash = hash_password(payload.new_password)
-    user.token_version += 1  # invaliduje vsetky doteraz vydane JWT
+    user.token_version += 1
     user.failed_login_attempts = 0
     user.locked_until = None
     row.used = True
@@ -246,7 +224,6 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
 
 
 def _register_failed_attempt(db: Session, user: User, now, background_tasks: BackgroundTasks) -> None:
-    """Zapocita neuspesny pokus; pri uzamknuti uctu posle majitelovi upozornenie."""
     user.failed_login_attempts += 1
     locked = False
     if user.failed_login_attempts >= MAX_FAILED_LOGIN_ATTEMPTS:
@@ -256,9 +233,6 @@ def _register_failed_attempt(db: Session, user: User, now, background_tasks: Bac
     db.commit()
     if locked and user.email and is_email_configured():
         text_body, html_body = render_lockout_email(user.username, ACCOUNT_LOCKOUT_MINUTES)
-        # Samostatne vlakno, NIE background_tasks: neuspesne prihlasenie vzdy konci
-        # chybou 401 a pri chybovej odpovedi FastAPI ulohy na pozadi zahodi -
-        # upozornenie by sa tak nikdy neodoslalo.
         threading.Thread(target=send_email, daemon=True, args=(
             user.email, "Upozornenie: pokusy o prihlásenie — AI Crypto Analytics", text_body, html_body)).start()
 

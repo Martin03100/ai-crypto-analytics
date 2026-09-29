@@ -1,3 +1,5 @@
+/** Formatting tests. */
+
 import { describe, expect, it } from "vitest";
 import { axisDecimals, buildTimePoints, formatPrice, parseServerDate } from "../utils/formatPrice";
 

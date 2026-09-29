@@ -1,3 +1,5 @@
+/** AI accuracy leaderboard. */
+
 import { Trophy, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../api";
@@ -6,9 +8,8 @@ import InfoTip from "./InfoTip";
 import { useLanguage } from "../context/LanguageContext";
 
 const CUSTOM_LABEL = "Custom (OpenAI-compatible)";
+const QUANT_LABEL = "Quant (free model)";
 
-/** Verejny rebricek presnosti AI providerov + sutaz "tvoj tip vs AI".
- * Cisla su zo vsetkych vyhodnotenych (dozretych, nie ukazkovych) predikcii. */
 export default function Leaderboard() {
   const { t } = useLanguage();
   const [data, setData] = useState(null);
@@ -18,13 +19,16 @@ export default function Leaderboard() {
   }, []);
 
   if (!data) return <Card><p className="text-sub">{t("leaderboard.loading")}</p></Card>;
-  const label = (name) => (name === CUSTOM_LABEL ? t("provider.customLabel") : name);
+  const label = (name) => (name === CUSTOM_LABEL ? t("provider.customLabel") : name === QUANT_LABEL ? t("provider.quantLabel") : name);
+  const trophyIndex = data.providers.findIndex((p) => !p.low_sample && p.evaluated >= (data.min_sample ?? 5));
+  const hasQuant = data.providers.some((p) => p.provider === QUANT_LABEL);
   const everyone = data.challenge?.everyone;
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
       <Card title={t("leaderboard.title")} icon={Trophy}>
         <p className="text-sub" style={{ marginBottom: 12 }}>{t("leaderboard.desc")}</p>
+        {hasQuant && <p className="text-sub" style={{ marginBottom: 12 }}>{t("leaderboard.quantNote")}</p>}
         {data.providers.length === 0 ? (
           <p className="text-sub">{t("leaderboard.empty")}</p>
         ) : (
@@ -43,8 +47,8 @@ export default function Leaderboard() {
                 {data.providers.map((p, i) => (
                   <tr key={p.provider}>
                     <td>
-                      {i === 0 ? "🏆 " : ""}{label(p.provider)}
-                      {p.evaluated < 5 && <span className="text-sub"> · {t("leaderboard.fewData")}</span>}
+                      {i === trophyIndex ? "🏆 " : ""}{label(p.provider)}
+                      {(p.low_sample ?? p.evaluated < 5) && <span className="text-sub"> · {t("leaderboard.fewData")}</span>}
                     </td>
                     <td>{p.evaluated}</td>
                     <td>{p.direction_hit_pct}%</td>
@@ -56,6 +60,7 @@ export default function Leaderboard() {
             </table>
           </div>
         )}
+        {data.providers.length > 0 && <p className="text-sub" style={{ marginTop: 10 }}>{t("leaderboard.minSample", { n: data.min_sample ?? 5 })}</p>}
       </Card>
       {data.challenge && (
         <Card title={t("challenge.title")} icon={Users}>

@@ -1,4 +1,5 @@
-"""Testy pre app/security.py — cisto funkcionalne, bez DB."""
+"""Security utility tests."""
+
 import os
 import sys
 

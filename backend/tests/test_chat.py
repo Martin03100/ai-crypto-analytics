@@ -1,4 +1,4 @@
-"""Testy pre app/routers/chat.py — AI chat asistent (mock rezim)."""
+"""Chat API tests."""
 
 from tests.conftest import anon_csrf_headers, csrf_headers
 

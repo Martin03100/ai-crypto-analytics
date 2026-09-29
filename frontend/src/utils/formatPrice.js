@@ -1,7 +1,5 @@
-/** Formatovanie cien a casov pre grafy AI predikcii. */
+/** Price and time formatting. */
 
-/** Presna cena pre texty a tooltipy - vzdy dost desatinnych miest, aby bolo
- * vidiet aj male zmeny ($84,123.46 namiesto predosleho $84.1k). */
 export function formatPrice(v) {
   if (v == null || !Number.isFinite(Number(v))) return "";
   const n = Number(v);
@@ -10,9 +8,6 @@ export function formatPrice(v) {
   return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: max });
 }
 
-/** Pocet desatinnych miest pre popisky osi Y podla rozpatia grafu - aby sa
- * susedne popisky navzajom lisili (24h graf BTC: $84,120 vs $84,180;
- * ADA: $0.4512 vs $0.4530). */
 export function axisDecimals(min, max) {
   const span = Math.abs(max - min) || Math.abs(max) * 0.01 || 1;
   return Math.min(8, Math.max(0, Math.ceil(-Math.log10(span / 5)) + 1));
@@ -29,8 +24,6 @@ export function formatUsd(v, decimals) {
   return "$" + Number(v).toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
-/** Server posiela UTC cas - ak chyba casove pasmo, doplni "Z". Inak by ho
- * prehliadac povazoval za lokalny cas (v Prahe posun o 1-2 hodiny). */
 export function parseServerDate(value) {
   if (!value) return null;
   if (value instanceof Date) return value;
@@ -41,8 +34,6 @@ export function parseServerDate(value) {
 
 const HORIZON_UNIT = { "24h": "hour", "1T": "day", "1M": "day", "1R": "month" };
 
-/** Skutocne casy bodov predikcie: [cas vytvorenia, +1 jednotka, ..., +count].
- * Napr. 24h predikcia vytvorena o 7:00 -> 7:00, 8:00, ..., 7:00 nasledujuci den. */
 export function buildTimePoints(createdAt, horizon, count) {
   const start = parseServerDate(createdAt);
   if (!start || !count) return null;
@@ -52,7 +43,6 @@ export function buildTimePoints(createdAt, horizon, count) {
     if (unit === "hour") d.setTime(start.getTime() + i * 3600000);
     else if (unit === "day") d.setDate(d.getDate() + i);
     else {
-      // 31. januar + 1 mesiac = 28. februar (nie 3. marec)
       const day = start.getDate();
       d.setDate(1);
       d.setMonth(start.getMonth() + i);

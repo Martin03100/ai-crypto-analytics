@@ -1,3 +1,5 @@
+/** App routes. */
+
 import { lazy } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import Landing from "./pages/Landing";
@@ -5,12 +7,6 @@ import { useAuth } from "./context/AuthContext";
 import { useLanguage } from "./context/LanguageContext";
 import Layout from "./pages/Layout";
 
-// Route-based code splitting: kazda stranka je samostatny JS chunk, ktory
-// sa stiahne az ked ju pouzivatel skutocne navstivi, namiesto toho, aby sa
-// cela appka (vratane vsetkych grafov, chatu, exportu...) stiahla naraz pri
-// prvom nacitani. Auth je vynimka - ostava eager (staticky) import, lebo je
-// to prva stranka, ktoru takmer kazdy navstivi hned po nacitani appky, takze
-// lazy-loading by tam len pridal zbytocny extra network round-trip.
 import Auth from "./pages/Auth";
 import { PrivacyPolicy, TermsOfService } from "./pages/Legal";
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -33,7 +29,6 @@ function RequireAuth({ children }) {
   const { user, checking } = useAuth();
   const location = useLocation();
   if (checking) return <FullScreenLoader />;
-  // Neprihlaseny na hlavnej adrese -> verejna uvodna stranka, inde -> prihlasenie.
   if (!user) return location.pathname === "/" ? <Landing /> : <Navigate to="/auth" replace />;
   return children;
 }
@@ -49,7 +44,7 @@ export default function App() {
       <div className="aurora-layer" aria-hidden="true"><div className="aurora-blob-3" /></div>
       <div className="grain-layer" aria-hidden="true" />
       <Routes>
-        <Route path="/auth" element={user ? <Navigate to="/dashboard" replace /> : <Auth />} />
+        <Route path="/auth" element={user ? <Navigate to="/forecast" replace /> : <Auth />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route

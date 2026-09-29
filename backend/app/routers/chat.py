@@ -1,11 +1,11 @@
-"""app/routers/chat.py — AI Crypto Assistant (plávajúce chat okno)."""
+"""AI chat API."""
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Literal
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.config import RATE_LIMIT_CHAT
@@ -19,13 +19,13 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
 class ChatMessageIn(BaseModel):
-    role: str
-    content: str
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=8000)
 
 
 class ChatRequest(BaseModel):
-    provider: str
-    messages: List[ChatMessageIn]
+    provider: str = Field(max_length=32)
+    messages: List[ChatMessageIn] = Field(max_length=200)
     lang: str = "en"
 
 
@@ -33,10 +33,6 @@ class ChatRequest(BaseModel):
 def send_chat_message(payload: ChatRequest, user: User = Depends(get_current_user),
                        db: Session = Depends(get_db)) -> AIResultOut:
     api_key = get_decrypted_api_key(db, user.id, payload.provider)
-    # Len poslednych 20 sprav, kazda max 4000 znakov: frontend posiela celu
-    # historiu konverzacie, takze bez orezania by kazda dalsia sprava v dlhom
-    # chate stala viac tokenov (a pri extremne dlhych konverzaciach aj
-    # prekrocila limity providera).
     messages = [
         {**m.model_dump(), "content": str(m.content)[:4000]}
         for m in payload.messages[-20:]

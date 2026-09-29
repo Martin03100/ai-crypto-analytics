@@ -1,3 +1,5 @@
+/** Keyboard shortcuts dialog. */
+
 import { Keyboard } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useLanguage } from "../context/LanguageContext";

@@ -1,27 +1,10 @@
-/**
- * api.js
- * =======
- * Tenky fetch wrapper pre FastAPI backend. Autentifikacia bezi cez
- * HttpOnly cookie (nastavenu backendom pri /auth/login|/register), takze
- * kazdy request posiela `credentials: "include"` a ZIADNY token sa uz
- * neuklada ani necita z localStorage (ochrana proti XSS kradezi tokenu).
- *
- * CSRF: backend pouziva "double-submit cookie" - kazdy mutacny request
- * (POST/PUT/DELETE) musi zopakovat hodnotu JS-citatelnej `aca_csrf` cookie
- * v hlavicke X-CSRF-Token. Cudzia stranka nasu cookie precitat nevie
- * (same-origin policy), takze bez tejto hlavicky backend request odmietne.
- */
+/** API client. */
 
 const BASE = "/api";
 const CSRF_COOKIE_NAME = "aca_csrf";
 const LANG_STORAGE_KEY = "aca_lang";
 const VALID_LANGS = ["en", "sk", "cs"];
 
-/** Cita aktualne zvoleny jazyk UI priamo z localStorage (rovnaky kluc ako
- * LanguageContext), aby ho mohli AI endpointy (forecast/portfolio/news/
- * digest/chat/events) poslat backendu - ten ho pouziva na lokalizaciu
- * DEMO/MOCK obsahu (viď app/i18n_content.py). Skutocny text z AI providera
- * sa nou neriadi - ten je vzdy v jazyku promptu. */
 function currentLang() {
   try {
     const stored = localStorage.getItem(LANG_STORAGE_KEY);
@@ -36,13 +19,6 @@ function readCookie(name) {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-/**
- * FastAPI's `detail` field isn't always a plain string: Pydantic validation
- * errors (HTTP 422) return an ARRAY of `{loc, msg, type}` objects. Without
- * this, `new Error(detail)` used to stringify that array as "[object
- * Object]" and show it straight to the user. Here we always reduce `detail`
- * down to a single readable string before it reaches humanizeError().
- */
 function extractDetailMessage(detail) {
   if (!detail) return undefined;
   if (typeof detail === "string") return detail;
@@ -55,6 +31,9 @@ function extractDetailMessage(detail) {
   if (typeof detail === "object") return detail.message || detail.msg || undefined;
   return undefined;
 }
+
+const AUTH_401_EXEMPT = ["/auth/login", "/auth/register", "/auth/me", "/auth/forgot-password", "/auth/verify-reset-code", "/auth/reset-password"];
+export const SESSION_EXPIRED_EVENT = "aca:session-expired";
 
 async function request(path, { method = "GET", body } = {}) {
   const headers = { "Content-Type": "application/json" };
@@ -74,10 +53,13 @@ async function request(path, { method = "GET", body } = {}) {
       const payload = await res.json();
       detail = extractDetailMessage(payload.detail) || detail;
     } catch {
-      // ignore parse error (e.g. empty body, non-JSON response)
     }
     const err = new Error(detail);
     err.status = res.status;
+    err.code = res.headers.get("X-Error-Code") || undefined;
+    if (res.status === 401 && !AUTH_401_EXEMPT.some((p) => path.startsWith(p))) {
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+    }
     throw err;
   }
   if (res.status === 204) return null;
@@ -117,7 +99,7 @@ export const api = {
     request("/forecast/save", { method: "POST", body: { provider, coin, horizon, forecast_data, is_mock } }),
   deleteForecast: (id) => request(`/forecast/history/${id}`, { method: "DELETE" }),
   forecastHistory: (symbol, daysBack = 30, page = 1, pageSize = 20) =>
-    request(`/forecast/history?days_back=${daysBack}&page=${page}&page_size=${pageSize}${symbol ? `&symbol=${symbol}` : ""}`),
+    request(`/forecast/history?days_back=${daysBack}&page=${page}&page_size=${pageSize}${symbol ? `&symbol=${encodeURIComponent(symbol)}` : ""}`),
   forecastAccuracy: (id) => request(`/forecast/history/${id}/accuracy`),
   forecastLeaderboard: () => request("/forecast/leaderboard"),
   bulkDeleteForecasts: (ids) => request("/forecast/history/bulk-delete", { method: "POST", body: { ids } }),

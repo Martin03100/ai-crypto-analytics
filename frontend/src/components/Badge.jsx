@@ -1,3 +1,5 @@
+/** Status badges. */
+
 import { useLanguage } from "../context/LanguageContext";
 
 export function ActionBadge({ action }) {

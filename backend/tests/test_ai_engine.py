@@ -1,6 +1,4 @@
-"""Testy pre app/services/ai_engine.py — hlavne _fetch_market_context(), ktora
-dava AI predikciam realnu kotvu (aktualnu cenu a trend) namiesto toho, aby si
-model vymyslal cisla len z vseobecneho "crypto rastie" narativu."""
+"""AI engine tests."""
 
 import sys
 import os
@@ -13,8 +11,6 @@ from app.services import ai_engine  # noqa: E402
 
 
 def test_fetch_market_context_returns_none_for_unknown_coin():
-    """Minca, ktora nie je v DEFAULT_COIN_IDS (napr. custom hladana minca) -
-    ziadny coin_id na dotaz, prompt sa zostavi bez realnych dat namiesto padu."""
     assert ai_engine._fetch_market_context("TOTALLY_UNKNOWN_COIN") is None
 
 
@@ -26,7 +22,7 @@ def test_fetch_market_context_returns_none_for_unknown_coin():
 
 def test_compute_accuracy_pending_when_horizon_not_yet_matured():
     from datetime import datetime, timezone
-    created_at = datetime.now(timezone.utc)  # "1T" (1 tyzden) predikcia vytvorena prave teraz
+    created_at = datetime.now(timezone.utc)
     result = ai_engine.compute_forecast_accuracy("BTC", "1T", [100, 105, 110], ["d1", "d2", "d3"], created_at)
     assert result["status"] == "pending"
     assert result["accuracy_pct"] is None
@@ -35,15 +31,13 @@ def test_compute_accuracy_pending_when_horizon_not_yet_matured():
 
 def test_compute_accuracy_unavailable_for_unknown_coin():
     from datetime import datetime, timedelta, timezone
-    created_at = datetime.now(timezone.utc) - timedelta(days=10)  # horizont uz davno ubehol
+    created_at = datetime.now(timezone.utc) - timedelta(days=10)
     result = ai_engine.compute_forecast_accuracy("SOME_UNKNOWN_COIN", "1T", [100, 105], ["d1", "d2"], created_at)
     assert result["status"] == "unavailable"
     assert result["accuracy_pct"] is None
 
 
 def test_compute_accuracy_completed_with_correct_percentage(monkeypatch):
-    """1T predikcia s 2 bodmi: bod 1 = cas vytvorenia + 3.5 dna, bod 2 = +7 dni
-    (rovnako ako casy v grafe). Skutocna cena rastie linearne zo 100 na 110."""
     from datetime import datetime, timedelta, timezone
     created_at = datetime.now(timezone.utc) - timedelta(days=10)
 
@@ -54,9 +48,8 @@ def test_compute_accuracy_completed_with_correct_percentage(monkeypatch):
     monkeypatch.setattr(ai_engine.market_data, "get_market_chart_range", fake_range)
     result = ai_engine.compute_forecast_accuracy("BTC", "1T", [105.0, 110.0], ["d1", "d2"], created_at)
     assert result["status"] == "completed"
-    assert result["accuracy_pct"] >= 99.9  # predikcia sedela so "skutocnostou"
+    assert result["accuracy_pct"] >= 99.9
     assert abs(result["actual_prices"][0] - 105.0) < 0.1 and abs(result["actual_prices"][1] - 110.0) < 0.1
-    # predikcia trafila smer (rast) a bola lepsia nez naivny odhad "cena sa nezmeni"
     assert result["direction_correct"] is True
     assert result["baseline_accuracy_pct"] < result["accuracy_pct"]
 
@@ -70,9 +63,6 @@ def test_compute_accuracy_unavailable_when_chart_fetch_fails(monkeypatch):
 
 
 def test_openai_compatible_payload_caps_tokens_and_temperature(monkeypatch):
-    """Bez explicitneho max_tokens by model mohol generovat neobmedzene dlho -
-    a appka aj tak pouzije len strukturovany JSON, zvysok su zbytocne platene
-    tokeny. Tento test zamyka, ze limit tam ostane aj po buducich upravach."""
     captured = {}
 
     class FakeResponse:
@@ -117,10 +107,8 @@ def test_anthropic_payload_caps_tokens_and_temperature(monkeypatch):
 
 
 def test_estimate_forecast_cost_scales_with_points():
-    """Vacsi horizont (viac datovych bodov) = viac ocakavanych vystupnych
-    tokenov = vyssia odhadovana cena."""
-    short = ai_engine.estimate_forecast_cost("gemini", "BTC", "24h")  # 24 bodov
-    long = ai_engine.estimate_forecast_cost("gemini", "BTC", "1R")   # 12 bodov, ale este viac textu v prompte
+    short = ai_engine.estimate_forecast_cost("gemini", "BTC", "24h")
+    long = ai_engine.estimate_forecast_cost("gemini", "BTC", "1R")
     assert short["estimated_total_tokens"] > 0
     assert short["estimated_cost_usd"] > 0
     assert "estimated_input_tokens" in short and "estimated_output_tokens" in short
@@ -136,8 +124,6 @@ def test_estimate_portfolio_cost_scales_with_holdings_count():
 
 
 def test_estimate_cost_differs_by_provider_price():
-    """Anthropic ma v config.py vyssiu cenu/1K tokenov nez DeepSeek - odhad
-    pre rovnaky prompt sa musi lisit podla zvoleneho providera."""
     cheap = ai_engine.estimate_forecast_cost("deepseek", "BTC", "1T")
     expensive = ai_engine.estimate_forecast_cost("anthropic", "BTC", "1T")
     assert cheap["estimated_total_tokens"] == expensive["estimated_total_tokens"]
@@ -168,8 +154,6 @@ def _fake_gemini(monkeypatch, text):
 
 
 def test_gemini_uses_low_thinking_no_temperature_and_enough_tokens(monkeypatch):
-    """Gemini 3.x zapocitava premyslanie do limitu vystupu - s 1024 tokenmi a
-    predvolenym premyslanim vracal prazdnu odpoved (vzdy ukazkove data)."""
     captured = _fake_gemini(monkeypatch, '{"ok": 1}')
     ok, text, err = ai_engine._call_gemini("prompt", "fake-key")
     assert ok is True and err is None
@@ -197,7 +181,6 @@ def test_call_ai_provider_never_logs_api_key(monkeypatch, caplog):
 
 
 def _hist(start, end, hours=720):
-    """Linearny vyvoj ceny zo `start` na `end` za 30 dni, hodinove body."""
     now = 1_800_000_000_000
     pts = [[now - (hours - i) * 3_600_000, start + (end - start) * i / hours] for i in range(hours + 1)]
     return {"prices": pts, "volumes": [[p[0], 1_000_000.0] for p in pts]}
@@ -316,14 +299,16 @@ def test_custom_provider_call_revalidates_and_blocks_redirects(monkeypatch):
         def json(self):
             return {"choices": [{"message": {"content": "OK"}}]}
 
-    def fake_post(url, headers=None, json=None, timeout=None, allow_redirects=True):
-        captured.update(url=url, allow_redirects=allow_redirects)
+    def fake_post(self, url, headers=None, json=None, timeout=None, allow_redirects=True):
+        captured.update(url=url, allow_redirects=allow_redirects,
+                        adapter=type(self.get_adapter("https://api.example.com")).__name__, trust_env=self.trust_env)
         return Resp()
 
-    monkeypatch.setattr(ai_engine.requests, "post", fake_post)
+    monkeypatch.setattr(ai_engine.requests.Session, "post", fake_post)
     secret = _json.dumps({"base_url": "https://api.example.com/v1/", "model": "m1", "key": "k"})
     assert ai_engine.call_ai_provider("custom", "hi", secret) == (True, "OK", None)
-    assert captured == {"url": "https://api.example.com/v1/chat/completions", "allow_redirects": False}
+    assert captured == {"url": "https://api.example.com/v1/chat/completions", "allow_redirects": False,
+                        "adapter": "_PublicOnlyAdapter", "trust_env": False}
 
 
 def test_validate_custom_base_url_blocks_private_and_http():

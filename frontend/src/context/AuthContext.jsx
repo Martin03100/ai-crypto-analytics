@@ -1,9 +1,10 @@
+/** Authentication context. */
+
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { api } from "../api";
+import { api, SESSION_EXPIRED_EVENT } from "../api";
 
 const AuthContext = createContext(null);
 
-/** Odpoved servera -> objekt pouzivatela v appke. */
 function toUser(res) {
   return {
     username: res.username, id: res.user_id, email: res.email,
@@ -15,13 +16,24 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
 
-  // Prihlasenie zije v HttpOnly cookie, nie v localStorage. Pri nacitani
-  // appky preto overime session cez /auth/me namiesto citania tokenu.
   useEffect(() => {
     api.me()
       .then((res) => setUser(toUser(res)))
       .catch(() => setUser(null))
       .finally(() => setChecking(false));
+  }, []);
+
+  useEffect(() => {
+    function onExpired() {
+      setUser((prev) => {
+        if (prev) {
+          try { sessionStorage.setItem("aca_session_expired", "1"); } catch {  }
+        }
+        return null;
+      });
+    }
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
   }, []);
 
   const login = useCallback(async (username, password, totpCode) => {

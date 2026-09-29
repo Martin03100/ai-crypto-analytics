@@ -1,5 +1,4 @@
-"""Testy pre app/services/data_sources.py - kazdy zdroj musi spravne
-spracovat data a pri akomkolvek zlyhani vratit None (nikdy vynimku)."""
+"""External data source tests."""
 
 import os
 import sys

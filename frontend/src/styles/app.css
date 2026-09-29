@@ -1,6 +1,5 @@
-/* ==========================================================================
-   app.css — layout shell + reusable component classes
-   ========================================================================== */
+/* Component styles. */
+
 @import "./theme.css";
 
 /* ---------- Shell ---------- */
@@ -23,28 +22,8 @@
   z-index: 2;
 }
 
-/* Zakladne (vzdy plati) pravidlo pre stmavene pozadie za mobilnym menu.
-   BEZ TOHTO by <button class="sidebar-backdrop"> na desktope nemal ziadne
-   `display` nastavene vobec, teda by pouzival prehliadacov default
-   (inline-block pre <button>) - a keďze je vykresleny ako priamy potomok
-   `.shell` (grid kontajner s presne 2 definovanymi stlpcami: 260px 1fr),
-   stal by sa TRETIM grid polozkou, ktoru grid engine automaticky umiestni
-   do "extra" riadku/stlpca a POSUNIE tym padom sidebar aj hlavny obsah o
-   jednu poziciu — presne bug, ktory sme naprieč viacerymi kolami lovili
-   (sidebar sa na PC javil "na cely riadok", obsah zbytocne uzky vedla).
-   Media query nizsie iba DOPLNA "ake ma byt vidno, ked je otvoreny", nie
-   ci ma vobec existovat v grid toku. */
 .sidebar-backdrop { display: none; }
 
-/* Tento mobilny override MUSI byt v subore AZ PO zakladnom (desktopovom)
-   .sidebar pravidle vyssie. Obe pravidla maju rovnaku CSS specificitu
-   (jeden class selector), takze pri zhode vyhrava to, ktore je v subore
-   NESKOR - nie to, ktore je "logickejsie" alebo vnorene v @media. Ak by
-   tento blok bol pred zakladnym pravidlom (ako to bolo drivej), zakladne
-   `display: flex` by VZDY prepisalo mobilne `display: none`, a sidebar by
-   sa na mobile aj pri "zavretom" stave stale zobrazoval ako bezny blok v
-   toku stranky namiesto skryteho/vysuvacieho panelu - presne bug, ktory
-   sme naprieč viacerymi kolami lovili. */
 @media (max-width: 860px) {
   .shell { grid-template-columns: 1fr; }
   .sidebar { display: none; }
@@ -52,10 +31,6 @@
     display: flex;
     position: fixed; top: 0; left: 0; bottom: 0; z-index: 51;
     width: min(82vw, 300px);
-    /* Solid enough background that page content behind it never "bleeds
-       through" on mobile - the glassy translucent look stays fine on
-       desktop, where the sidebar sits next to page content rather than
-       floating on top of it. */
     background: linear-gradient(180deg, rgba(6, 10, 22, 0.98), rgba(3, 7, 18, 0.99));
     box-shadow: 20px 0 60px -12px rgba(0,0,0,0.7);
     overflow-y: auto;
@@ -132,7 +107,7 @@
 
 .nav-link.active {
   background: var(--cyan-dim);
-  color: var(--cyan);
+  color: var(--cyan-fg);
   border-color: rgba(34, 211, 238, 0.25);
   box-shadow: 0 0 20px -6px rgba(34, 211, 238, 0.4);
 }
@@ -188,7 +163,7 @@
   cursor: pointer;
   transition: border-color 0.15s var(--ease), color 0.15s var(--ease);
 }
-.logout-btn:hover { border-color: var(--crimson); color: var(--crimson); }
+.logout-btn:hover { border-color: var(--crimson); color: var(--crimson-fg); }
 
 /* ---------- Main content ---------- */
 .main {
@@ -197,6 +172,12 @@
   width: 100%;
 }
 @media (max-width: 600px) { .main { padding: 18px 16px 90px; } }
+
+@keyframes page-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.page-transition { animation: page-fade-in 0.32s var(--ease); }
 
 .topbar {
   display: flex;
@@ -263,8 +244,8 @@
 }
 .metric-label { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
 .metric-delta { font-size: 12px; font-weight: 600; margin-top: 6px; display: inline-flex; align-items: center; gap: 4px; }
-.metric-delta.up { color: var(--emerald); }
-.metric-delta.down { color: var(--crimson); }
+.metric-delta.up { color: var(--emerald-fg); }
+.metric-delta.down { color: var(--crimson-fg); }
 
 /* ---------- Buttons ---------- */
 .btn {
@@ -277,6 +258,7 @@
   border: 1px solid transparent;
   transition: transform 0.12s var(--ease), box-shadow 0.15s var(--ease), border-color 0.15s var(--ease), background 0.15s var(--ease);
   white-space: nowrap;
+  text-decoration: none;
 }
 .btn:active { transform: scale(0.98); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -298,6 +280,12 @@
 .btn-primary:hover:not(:disabled)::after { left: 130%; }
 .btn-primary:hover:not(:disabled) { box-shadow: 0 0 0 1px rgba(34,211,238,0.5), 0 8px 26px -6px rgba(34,211,238,0.7); }
 
+.btn-success {
+  background: linear-gradient(135deg, var(--emerald), #22b881);
+  color: #04130d;
+  box-shadow: 0 0 0 1px rgba(52,211,153,0.3), 0 6px 20px -8px rgba(52,211,153,0.45);
+}
+
 .btn-ghost {
   background: var(--bg-card);
   border-color: var(--border-subtle);
@@ -305,7 +293,7 @@
 }
 .btn-ghost:hover:not(:disabled) { border-color: var(--border-strong); background: var(--bg-card-hover); }
 
-.btn-danger-ghost { background: transparent; border-color: rgba(251,90,106,0.3); color: var(--crimson); }
+.btn-danger-ghost { background: transparent; border-color: rgba(251,90,106,0.3); color: var(--crimson-fg); }
 .btn-danger-ghost:hover:not(:disabled) { background: var(--crimson-dim); }
 
 .btn-block { width: 100%; }
@@ -344,30 +332,27 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 }
 .badge-dot { width: 6px; height: 6px; border-radius: 50%; }
 
-/* Micro-interaction: brief highlight flash when a live value updates
-   (e.g. a price tick). Add/remove the class programmatically; respects
-   prefers-reduced-motion via the global rule above. */
 @keyframes pulse-flash {
   0% { background-color: rgba(34, 211, 238, 0.22); }
   100% { background-color: transparent; }
 }
 .pulse-flash { animation: pulse-flash 900ms var(--ease); border-radius: var(--radius-sm); }
 
-.badge-buy { background: var(--emerald-dim); color: var(--emerald); }
+.badge-buy { background: var(--emerald-dim); color: var(--emerald-fg); }
 .badge-buy .badge-dot { background: var(--emerald); }
-.badge-sell { background: var(--crimson-dim); color: var(--crimson); }
+.badge-sell { background: var(--crimson-dim); color: var(--crimson-fg); }
 .badge-sell .badge-dot { background: var(--crimson); }
-.badge-hold { background: var(--cyan-dim); color: var(--cyan); }
+.badge-hold { background: var(--cyan-dim); color: var(--cyan-fg); }
 .badge-hold .badge-dot { background: var(--cyan); }
 
-.badge-bullish { background: var(--emerald-dim); color: var(--emerald); }
+.badge-bullish { background: var(--emerald-dim); color: var(--emerald-fg); }
 .badge-bullish .badge-dot { background: var(--emerald); }
-.badge-bearish { background: var(--crimson-dim); color: var(--crimson); }
+.badge-bearish { background: var(--crimson-dim); color: var(--crimson-fg); }
 .badge-bearish .badge-dot { background: var(--crimson); }
 .badge-neutral { background: rgba(154,164,184,0.14); color: var(--text-secondary); }
 .badge-neutral .badge-dot { background: var(--text-secondary); }
 
-.badge-mock { background: var(--amber-dim); color: var(--amber); }
+.badge-mock { background: var(--amber-dim); color: var(--amber-fg); }
 
 /* ---------- Skeleton loaders ---------- */
 .skeleton {
@@ -428,7 +413,7 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 .auth-hero h1 { font-size: 20px; margin: 0 0 6px; letter-spacing: -0.02em; }
 .auth-hero p { color: var(--text-secondary); font-size: 13px; margin: 0; }
 
-/* ---------- Auth: two-column masterpiece layout ---------- */
+/* ---------- Auth: two-column layout ---------- */
 .auth-shell { min-height: 100vh; display: flex; }
 .auth-brand-panel {
   position: relative; flex: 1.1; display: flex; align-items: center; justify-content: center;
@@ -451,9 +436,9 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 .auth-feature {
   display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-secondary);
 }
-.auth-feature svg { color: var(--cyan); flex-shrink: 0; }
+.auth-feature svg { color: var(--cyan-fg); flex-shrink: 0; }
 .auth-feature-highlight { color: var(--text-primary); font-weight: 700; }
-.auth-feature-highlight svg { color: var(--emerald); }
+.auth-feature-highlight svg { color: var(--emerald-fg); }
 
 .candle-art { width: 100%; max-width: 340px; height: 110px; margin-top: 8px; }
 .candle-trendline {
@@ -481,7 +466,7 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
   .auth-hero-mobile-only p { color: var(--text-secondary); font-size: 13px; margin: 0; }
 }
 
-/* ---------- Auth screen: language switcher (bottom-right corner) ---------- */
+/* ---------- Auth screen: language switcher ---------- */
 .auth-lang-switch {
   position: fixed; right: 20px; bottom: 20px; z-index: 20;
   display: flex; gap: 6px; padding: 6px; border-radius: var(--radius-md);
@@ -517,8 +502,6 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 .checklist-item {
   display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; font-size: 13.5px;
   border-bottom: 1px solid var(--border-subtle);
-  /* Je to teraz <button> (kvoli klavesovej pristupnosti - viz Portfolio.jsx),
-     takze treba resetovat vsetky defaultne button styly prehliadaca. */
   width: 100%; background: none; border-left: none; border-right: none; border-top: none;
   color: inherit; font-family: inherit; text-align: left; cursor: pointer;
 }
@@ -562,11 +545,11 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 .fab-chat:hover { transform: scale(1.06); }
 
 /* ---------- Risk level badges ---------- */
-.badge-risk-low { background: var(--emerald-dim); color: var(--emerald); }
+.badge-risk-low { background: var(--emerald-dim); color: var(--emerald-fg); }
 .badge-risk-low .badge-dot { background: var(--emerald); }
-.badge-risk-medium { background: var(--amber-dim); color: var(--amber); }
+.badge-risk-medium { background: var(--amber-dim); color: var(--amber-fg); }
 .badge-risk-medium .badge-dot { background: var(--amber); }
-.badge-risk-high { background: var(--crimson-dim); color: var(--crimson); }
+.badge-risk-high { background: var(--crimson-dim); color: var(--crimson-fg); }
 .badge-risk-high .badge-dot { background: var(--crimson); }
 
 /* ---------- AI Chat drawer ---------- */
@@ -590,7 +573,7 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
   padding: 12px 14px; border-bottom: 1px solid var(--border-subtle);
 }
 .chat-drawer-toolbar { padding: 10px 14px; border-bottom: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 6px; }
-.chat-key-warning { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--amber); }
+.chat-key-warning { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--amber-fg); }
 .chat-drawer-messages { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .chat-bubble { max-width: 85%; padding: 9px 12px; border-radius: 14px; font-size: 13px; line-height: 1.5; }
 .chat-bubble.user { align-self: flex-end; background: var(--cyan-dim); color: var(--text-primary); border-bottom-right-radius: 4px; }
@@ -608,8 +591,6 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 }
 .coin-search-item {
   padding: 9px 12px; font-size: 13px; cursor: pointer; display: flex; justify-content: space-between; gap: 8px;
-  /* Je to teraz <button> (kvoli klavesovej pristupnosti), takze treba
-     resetovat defaultne button styly prehliadaca. */
   width: 100%; background: none; border: none; color: inherit; font-family: inherit; text-align: left;
 }
 .coin-search-item:hover { background: var(--bg-card-hover); }
@@ -624,19 +605,15 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 
 /* ---------- Account: key links / test button row ---------- */
 .provider-row-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.key-link { font-size: 11px; color: var(--cyan); text-decoration: none; white-space: nowrap; }
+.key-link { font-size: 11px; color: var(--cyan-fg); text-decoration: none; white-space: nowrap; }
 .key-link:hover { text-decoration: underline; }
 
-/* ---------- Final mobile polish ---------- */
+/* ---------- Mobile layout: small screens ---------- */
 @media (max-width: 600px) {
   .page-title { font-size: 19px; }
   .topbar { flex-direction: column; align-items: flex-start; }
   .fab-chat { bottom: 20px; right: 16px; }
   .portfolio-total { flex-direction: column; align-items: flex-start; gap: 2px; }
-  /* Bez tohto by sa na uzkom telefone natlacili vedla seba: bodka + 150px
-     label + input + 3 ikonove tlacidla - matematicky sa to na male
-     obrazovky vobec nezmesti (150px label uz sam o sebe zabera vela z
-     dostupnej sirky). Rozlozenie sa preto na mobile prehodi na stlpec. */
   .provider-row { flex-wrap: wrap; align-items: stretch; }
   .provider-label { flex: 1 1 100%; order: 1; }
   .provider-key-input { flex: 1 1 100%; order: 2; }
@@ -653,7 +630,7 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 }
 .daily-digest-icon {
   width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
-  background: var(--cyan-dim); color: var(--cyan);
+  background: var(--cyan-dim); color: var(--cyan-fg);
   display: flex; align-items: center; justify-content: center;
 }
 .daily-digest-title { font-size: 13.5px; font-weight: 600; display: flex; align-items: center; }
@@ -669,7 +646,7 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 .chat-history-title { font-size: 12.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-history-date { font-size: 10.5px; color: var(--text-tertiary); margin-top: 2px; }
 
-/* ---------- Mobile optimization pass (Settings, PriceChart, DailyDigest, chat) ---------- */
+/* ---------- Mobile layout ---------- */
 @media (max-width: 640px) {
   .tabs { width: 100%; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
   .tab { flex-shrink: 0; padding: 8px 12px; font-size: 12.5px; }
@@ -685,15 +662,9 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
   .btn { padding: 8px 12px; font-size: 12.5px; }
 }
 
-/* Touch target sizing: interactive controls stay >=40px tall on touch devices */
 @media (pointer: coarse) {
   .btn, .tab, select.select, input.input, .nav-link { min-height: 40px; }
   .btn-sm { min-height: 36px; }
-  /* iOS Safari auto-zooms the whole page when focusing any input/select
-     whose font-size is below 16px - very disorienting (every text field
-     in the app triggers it: username, password, amounts...). Bumping just
-     the touch-device font-size to 16px prevents that zoom without
-     changing the (slightly smaller) look on desktop/mouse input. */
   .input, .select { font-size: 16px; }
 }
 
@@ -720,7 +691,7 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 }
 .confirm-icon {
   width: 36px; height: 36px; border-radius: 50%;
-  background: var(--crimson-dim); color: var(--crimson);
+  background: var(--crimson-dim); color: var(--crimson-fg);
   display: flex; align-items: center; justify-content: center;
   margin-bottom: 12px;
 }
@@ -728,7 +699,7 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 .confirm-message { margin: 0 0 18px; font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
 .confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
-.confirm-icon-neutral { background: var(--cyan-dim); color: var(--cyan); }
+.confirm-icon-neutral { background: var(--cyan-dim); color: var(--cyan-fg); }
 .cost-breakdown {
   background: var(--bg-inset); border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 12px;
@@ -743,10 +714,10 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 }
 .cost-disclaimer { margin: 0 0 18px; font-size: 11.5px; color: var(--text-tertiary); line-height: 1.5; }
 
-/* ---------- Inline link-style button (forgot password a pod.) ---------- */
+/* ---------- Inline link button ---------- */
 .link-btn {
   display: block; width: 100%; text-align: center; margin-top: 12px;
-  background: none; border: none; color: var(--cyan); font-size: 12.5px;
+  background: none; border: none; color: var(--cyan-fg); font-size: 12.5px;
   cursor: pointer; padding: 4px;
 }
 .link-btn:hover { text-decoration: underline; }
@@ -769,13 +740,10 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 }
 .quick-link-icon {
   width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
-  background: var(--cyan-dim); color: var(--cyan);
+  background: var(--cyan-dim); color: var(--cyan-fg);
   display: flex; align-items: center; justify-content: center;
 }
 
-/* ============================================================
-   OnboardingTour — first-login spotlight + tooltip walkthrough
-   ============================================================ */
 .onboarding-layer { position: fixed; inset: 0; z-index: 500; pointer-events: none; }
 .onboarding-hole {
   position: fixed; border-radius: 14px;
@@ -790,11 +758,6 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
   pointer-events: auto;
   max-height: calc(100vh - 24px); overflow-y: auto;
 }
-/* Pevne pripnute dole na strede obrazovky - NIKDY dynamicky vedla ciela.
-   Zamerny navrhovy princip (viz komentar v OnboardingTour.jsx): tlacidla
-   Dalej/Preskocit musia byt VZDY v ramci viewportu bez ohladu na to, kde na
-   dlhej stranke je zvyrazneny prvok - inak sa da pri dynamickom pozicovani
-   pri urcitych scroll pozicich zaseknut mimo viditelnu plochu. */
 .onboarding-tip-docked {
   position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
   width: 320px; max-width: calc(100vw - 32px);
@@ -806,10 +769,10 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
   padding-bottom: 16px;
 }
 .onboarding-step-no {
-  font-size: 11px; font-weight: 700; color: var(--cyan);
+  font-size: 11px; font-weight: 700; color: var(--cyan-fg);
   font-family: var(--font-mono); margin-bottom: 8px; letter-spacing: 0.03em;
 }
-.onboarding-tip h4 { margin: 0 0 6px; font-size: 14.5px; font-weight: 800; color: var(--text-primary); }
+.onboarding-tip h2 { margin: 0 0 6px; font-size: 14.5px; font-weight: 800; color: var(--text-primary); }
 .onboarding-tip p { margin: 0 0 14px; font-size: 12.5px; color: var(--text-secondary); line-height: 1.55; }
 .onboarding-actions { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .btn-skip-tour {
@@ -831,7 +794,6 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
   outline: 2px solid var(--cyan); outline-offset: 2px;
 }
 
-/* PasswordInput — show/hide toggle */
 .password-input-wrap { position: relative; display: flex; }
 .password-input-wrap .input { padding-right: 40px; width: 100%; }
 .password-toggle-btn {
@@ -844,14 +806,12 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 .password-toggle-btn:hover { color: var(--text-secondary); }
 .password-toggle-btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 1px; }
 
-/* Zdroje dat pod AI analyzou */
 .data-sources {
   display: flex; align-items: flex-start; gap: 6px; flex-wrap: wrap;
   margin: 10px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--text-tertiary);
 }
 .data-sources svg { margin-top: 2px; flex-shrink: 0; }
 
-/* Rebricek AI + sutaz */
 .table-scroll { overflow-x: auto; }
 .lb-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .lb-table th {
@@ -865,23 +825,21 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
   border-radius: var(--radius-md); background: var(--bg-inset);
 }
 
-/* Overenie emailu po registracii */
 .verify-gate { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
 .verify-card { width: 100%; max-width: 420px; }
 .verify-card h2 { margin: 10px 0 6px; font-size: 19px; }
 .verify-icon {
   width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
-  background: var(--cyan-dim); color: var(--cyan);
+  background: var(--cyan-dim); color: var(--cyan-fg);
 }
 .verify-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 
-/* Vysvetlivky (i) */
 .infotip { position: relative; display: inline-flex; vertical-align: middle; margin-left: 4px; }
 .infotip-btn {
   background: none; border: none; padding: 2px; color: var(--text-tertiary); cursor: help;
   display: inline-flex; border-radius: 50%;
 }
-.infotip-btn:hover, .infotip-btn:focus-visible { color: var(--cyan); }
+.infotip-btn:hover, .infotip-btn:focus-visible { color: var(--cyan-fg); }
 .infotip-bubble {
   position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
   width: max-content; max-width: 260px; background: var(--bg-tooltip); border: 1px solid var(--border-strong);
@@ -889,32 +847,26 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
   border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); z-index: 60;
   text-transform: none; letter-spacing: normal; white-space: normal; text-align: left;
 }
-/* Hromadne mazanie historie */
 .bulk-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; min-height: 34px; }
 .bulk-select-all { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-secondary); cursor: pointer; }
 .selectable-row { display: flex; align-items: flex-start; gap: 10px; }
 .row-check { margin-top: 20px; flex-shrink: 0; width: 16px; height: 16px; cursor: pointer; }
 .selectable-row-body { flex: 1; min-width: 0; }
-/* RSI / MACD panely */
 .indicator-panel { margin-top: 10px; border-top: 1px solid var(--border-subtle); padding-top: 6px; }
 .indicator-title { font-size: 11.5px; font-weight: 600; color: var(--text-tertiary); }
-/* Velryby a on-chain */
 .onchain-item { padding: 12px 14px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-inset); }
 .onchain-item p { margin: 6px 0 0; }
-/* Klavesove skratky */
 .shortcut-list { list-style: none; padding: 0; margin: 0 0 18px; display: grid; gap: 8px; }
 .shortcut-list li { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--text-secondary); }
 .shortcut-list kbd {
   min-width: 26px; text-align: center; padding: 3px 7px; border-radius: 6px; font-family: var(--font-mono);
   font-size: 12px; background: var(--bg-inset); border: 1px solid var(--border-strong); color: var(--text-primary);
 }
-/* Dotykove zariadenia - vacsie ciele */
 @media (pointer: coarse) {
   .tab { min-height: 40px; }
   .btn-sm { min-height: 36px; }
   .infotip-btn { padding: 6px; }
 }
-/* Landing stranka */
 .landing { max-width: 1080px; margin: 0 auto; padding: 20px 20px 40px; position: relative; z-index: 1; }
 .landing-nav { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 40px; }
 .landing-brand { display: flex; align-items: center; gap: 10px; }
@@ -922,7 +874,7 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 .landing-lang { max-width: 140px; }
 .landing-hero { text-align: center; max-width: 760px; margin: 0 auto 48px; }
 .landing-eyebrow {
-  display: inline-block; font-size: 12px; font-weight: 700; color: var(--cyan); background: var(--cyan-dim);
+  display: inline-block; font-size: 12px; font-weight: 700; color: var(--cyan-fg); background: var(--cyan-dim);
   padding: 5px 10px; border-radius: 999px; margin-bottom: 16px;
 }
 .landing-hero h1 { font-size: clamp(28px, 5vw, 46px); line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 14px; }
@@ -931,15 +883,15 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 .landing-note { font-size: 12.5px; color: var(--text-tertiary); margin-top: 12px; }
 .landing-art { display: flex; justify-content: center; margin-top: 28px; }
 .landing-features { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 40px; }
-.landing-feature h3 { margin: 10px 0 6px; font-size: 15px; }
+.landing-feature h2 { margin: 10px 0 6px; font-size: 15px; }
 .landing-feature-icon {
   width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
-  background: var(--cyan-dim); color: var(--cyan);
+  background: var(--cyan-dim); color: var(--cyan-fg);
 }
 .landing-steps { max-width: 760px; margin: 0 auto 32px; }
 .landing-steps h2 { font-size: 20px; text-align: center; margin-bottom: 16px; }
 .landing-steps ol { display: grid; gap: 10px; padding-left: 20px; }
 .landing-honest { display: flex; gap: 14px; align-items: flex-start; max-width: 760px; margin: 0 auto 32px; }
-.landing-honest h3 { margin: 0 0 6px; font-size: 15px; }
+.landing-honest h2 { margin: 0 0 6px; font-size: 15px; }
 .landing-footer { text-align: center; font-size: 12.5px; color: var(--text-tertiary); }
 .landing-footer a { color: var(--text-secondary); }

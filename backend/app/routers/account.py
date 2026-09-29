@@ -1,11 +1,4 @@
-"""
-app/routers/account.py
-========================
-Sprava API klucov (Gemini/OpenAI/Anthropic/DeepSeek/Grok). Kluce sa
-sifruju cez AES-256 (Fernet) PRED zapisom do DB (app/security.py) a
-API nikdy nevracia plny plain-text kluc spat do UI - iba maskovany
-nahlad (napr. "sk-a...4a2b").
-"""
+"""Account API."""
 
 from __future__ import annotations
 
@@ -20,9 +13,7 @@ from app.config import (
     PROVIDER_KEY_LINKS, PROVIDERS, RATE_LIMIT_ACCOUNT_SENSITIVE, RATE_LIMIT_API_KEY_TEST,
 )
 from app.deps import get_current_user, get_db, get_decrypted_api_key
-from app.models import (
-    ApiKey, CommunityVote, EmailVerificationCode, ForecastEvaluation, ForecastHistory, PasswordResetToken, PortfolioHistory, PriceTip, User,
-)
+from app.models import ApiKey, User
 from app.rate_limit import rate_limit_by_user
 from app.schemas import (
     ApiKeyIn, ApiKeyStatus, ChangePasswordRequest, DeleteAccountRequest, TotpCodeRequest, TotpDisableRequest, UpdateEmailRequest,
@@ -31,6 +22,7 @@ from app.security import (
     create_access_token, decrypt_secret, encrypt_secret, generate_totp_secret, hash_password, mask_key, sanitize_text,
     totp_uri, verify_password, verify_totp,
 )
+from app.services.account_cleanup import delete_user_data, release_email_if_unverified
 from app.services.email_service import is_email_configured
 from app.services.verification import send_verification_code
 from app.services.ai_engine import test_api_key, validate_custom_base_url
@@ -61,14 +53,14 @@ def list_api_keys(user: User = Depends(get_current_user), db: Session = Depends(
 
 @router.get("/api-keys/links")
 def api_key_links() -> dict:
-    """Priame odkazy na vyvojarske portaly jednotlivych AI providerov,
-    pre tlacidlo 'Získať API kľúč' na Account stranke."""
     return PROVIDER_KEY_LINKS
 
 
 @router.post("/api-keys/{provider}/test", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_API_KEY_TEST))])
 def test_api_key_endpoint(provider: str, user: User = Depends(get_current_user),
                            db: Session = Depends(get_db)) -> dict:
+    if provider not in PROVIDERS.values():
+        raise HTTPException(status_code=400, detail="Neznamy AI provider.")
     api_key = get_decrypted_api_key(db, user.id, provider)
     if not api_key:
         return {"valid": False, "message": "Najprv ulož API kľúč pre tohto providera."}
@@ -79,21 +71,17 @@ def test_api_key_endpoint(provider: str, user: User = Depends(get_current_user),
 @router.put("/email", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
 def update_email(payload: UpdateEmailRequest, background_tasks: BackgroundTasks, user: User = Depends(get_current_user),
                   db: Session = Depends(get_db)) -> dict:
-    """Email sa pouziva na prihlasenie/reset hesla - musi byt jedinecny naprieč
-    vsetkymi uctami (inak by "zabudnute heslo" nevedelo spolahlivo najst
-    spravny ucet). Odkedy je email povinny pri registracii, tento endpoint
-    uz nedovoluje email VYMAZAT (poslat prazdny/null) - inak by si tym
-    pouzivatel sam zablokoval "Zabudnuté heslo" bez akehokolvek varovania."""
     email = sanitize_text(payload.email, max_length=255).lower() if payload.email else ""
     if not email or "@" not in email or "." not in email.split("@")[-1]:
         raise HTTPException(status_code=400, detail="Zadaj platnú emailovú adresu.")
     existing = db.query(User).filter(User.email == email, User.id != user.id).first()
     if existing is not None:
-        raise HTTPException(status_code=400, detail="Tento email už používa iný účet.")
+        if not (is_email_configured() and release_email_if_unverified(db, email, requester_id=user.id)):
+            raise HTTPException(status_code=400, detail="Tento email už používa iný účet.")
     changed = user.email != email
     user.email = email
     if changed and is_email_configured():
-        user.email_verified = False  # novy email treba overit
+        user.email_verified = False
     db.commit()
     if changed and user.email_verified is False:
         send_verification_code(db, user, background_tasks)
@@ -106,8 +94,6 @@ def change_password(payload: ChangePasswordRequest, response: Response, user: Us
     if not verify_password(payload.current_password, user.password_hash):
         raise HTTPException(status_code=400, detail="Aktuálne heslo nie je správne.")
     user.password_hash = hash_password(payload.new_password)
-    # Zmena hesla invaliduje vsetky doteraz vydane JWT (viz app/deps.py);
-    # aktualnemu zariadeniu hned vystavime novy cookie, aby ostalo prihlasene.
     user.token_version += 1
     db.commit()
     _reissue_cookie(response, user)
@@ -137,8 +123,6 @@ def upsert_api_key(payload: ApiKeyIn, user: User = Depends(get_current_user),
     key_value = payload.api_key.strip()
     secret_value = key_value
     if payload.provider == "custom":
-        # Okrem kluca aj adresa a model. Adresa sa overuje (https + verejny
-        # internet), inak by cez appku slo volat interne servery (SSRF).
         model = (payload.model or "").strip()
         if not model:
             raise HTTPException(status_code=400, detail="Zadaj názov modelu vlastného providera.")
@@ -173,15 +157,9 @@ def delete_api_key(provider: str, user: User = Depends(get_current_user), db: Se
 @router.post("/delete", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
 def delete_account(payload: DeleteAccountRequest, response: Response, user: User = Depends(get_current_user),
                    db: Session = Depends(get_db)) -> dict:
-    """GDPR - pravo na vymazanie: pouzivatel si zmaze ucet A VSETKY svoje data
-    sam, bez nutnosti niekoho kontaktovat. Vyzaduje heslo (ochrana pred
-    zneuzitim otvorenej relacie na cudzom pocitaci). Data sa mazu explicitne
-    po tabulkach - SQLite bez PRAGMA foreign_keys by kaskadu v DB nevykonal."""
     if not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=400, detail="Aktuálne heslo nie je správne.")
-    for model in (ApiKey, ForecastHistory, PortfolioHistory, CommunityVote, PasswordResetToken, ForecastEvaluation, PriceTip, EmailVerificationCode):
-        db.query(model).filter(model.user_id == user.id).delete(synchronize_session=False)
-    db.delete(user)
+    delete_user_data(db, user)
     db.commit()
     from app.config import AUTH_COOKIE_NAME
     response.delete_cookie(key=AUTH_COOKIE_NAME, path="/")
@@ -189,13 +167,8 @@ def delete_account(payload: DeleteAccountRequest, response: Response, user: User
 
 
 
-# ---------------------------------------------------------------------------
-# 2FA (TOTP)
-# ---------------------------------------------------------------------------
 @router.post("/2fa/setup", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
 def totp_setup(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
-    """Vygeneruje tajomstvo (zatial len "cakajuce") - 2FA sa zapne az po
-    overeni prveho kodu, aby sa pouzivatel omylom nezamkol."""
     if user.totp_enabled:
         raise HTTPException(status_code=400, detail="2FA už máš zapnuté.")
     secret = generate_totp_secret()

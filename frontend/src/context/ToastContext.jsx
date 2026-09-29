@@ -1,3 +1,5 @@
+/** Toast notifications. */
+
 import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { createContext, useCallback, useContext, useState } from "react";
 import { useLanguage } from "./LanguageContext";
@@ -13,8 +15,6 @@ export function ToastProvider({ children }) {
   const { lang } = useLanguage();
 
   const push = useCallback((message, type = "success") => {
-    // Chybove hlasky (technicke API/HTTP kody a pod.) sa prelozia na
-    // zrozumitelnu vetu pre bezneho pouzivatela, v aktualnom jazyku appky.
     const displayMessage = type === "error" ? humanizeError(message, lang) : message;
     const id = ++idCounter;
     setToasts((prev) => [...prev, { id, message: displayMessage, type }]);
@@ -29,9 +29,9 @@ export function ToastProvider({ children }) {
       <div className="toast-stack">
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.type}`}>
-            {t.type === "error" && <XCircle size={16} color="var(--crimson)" />}
-            {t.type === "warn" && <AlertTriangle size={16} color="var(--amber)" />}
-            {t.type === "success" && <CheckCircle2 size={16} color="var(--emerald)" />}
+            {t.type === "error" && <XCircle size={16} color="var(--crimson-fg)" />}
+            {t.type === "warn" && <AlertTriangle size={16} color="var(--amber-fg)" />}
+            {t.type === "success" && <CheckCircle2 size={16} color="var(--emerald-fg)" />}
             <span>{t.message}</span>
           </div>
         ))}

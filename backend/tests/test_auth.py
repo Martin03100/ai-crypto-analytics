@@ -1,4 +1,4 @@
-"""Testy pre app/routers/auth.py — registracia, prihlasenie, session, CSRF."""
+"""Authentication tests."""
 
 from tests.conftest import anon_csrf_headers, csrf_headers
 
@@ -20,7 +20,6 @@ def test_register_duplicate_username_rejected(registered):
 def test_register_password_too_short_is_validation_error(client):
     res = client.post("/api/auth/register", json={"username": "bob", "password": "short", "email": "bob@example.com"})
     assert res.status_code == 422
-    # Pydantic validacne chyby vracaju POLE objektov (viz frontend api.js extractDetailMessage)
     assert isinstance(res.json()["detail"], list)
 
 
@@ -87,9 +86,6 @@ def test_logout_invalidates_session(registered):
 
 
 def test_forgot_password_always_returns_generic_success(client):
-    """Anti-enumeration: aj pre neexistujuceho pouzivatela musi vratit
-    rovnaku uspesnu odpoved, aby sa cez tento endpoint nedalo zistit,
-    ktore ucty existuju."""
     res = client.post("/api/auth/forgot-password", json={"email": "nobody-here@example.com"},
                        headers=anon_csrf_headers(client))
     assert res.status_code == 200
@@ -97,8 +93,6 @@ def test_forgot_password_always_returns_generic_success(client):
 
 
 def test_forgot_password_looks_up_by_email_not_username(registered):
-    """Zabudnute heslo teraz pyta EMAIL (nie pouzivatelske meno) - over, ze
-    lookup podla emailu (nastaveneho pri registracii) realne funguje."""
     client, username, _password = registered
     client.post("/api/auth/logout", headers=csrf_headers(client))
     res = client.post("/api/auth/forgot-password", json={"email": "testuser1@example.com"},
@@ -111,8 +105,6 @@ def test_forgot_password_looks_up_by_email_not_username(registered):
 
 
 def test_full_reset_flow_request_verify_reset(registered):
-    """End-to-end: poziadaj o kod -> over kod -> nastav nove heslo -> priihlas
-    sa uz NOVYM heslom (stare uz nema fungovat)."""
     client, username, old_password = registered
     client.post("/api/auth/logout", headers=csrf_headers(client))
 
@@ -132,7 +124,7 @@ def test_full_reset_flow_request_verify_reset(registered):
     assert res.json()["success"] is True
 
     res = client.post("/api/auth/login", json={"username": username, "password": old_password})
-    assert res.status_code == 401  # stare heslo uz nefunguje
+    assert res.status_code == 401
 
     res = client.post("/api/auth/login", json={"username": username, "password": "BrandNewPass123"})
     assert res.status_code == 200
@@ -162,8 +154,6 @@ def test_reset_password_rejects_wrong_code(registered):
 
 
 def test_requesting_new_code_invalidates_the_previous_one(registered):
-    """Ak si pouzivatel vypyta kod dvakrat po sebe, ten PRVY uz nesmie
-    fungovat - platny je vzdy len ten najnovsi."""
     client, _username, _password = registered
     client.post("/api/auth/logout", headers=csrf_headers(client))
 
@@ -180,10 +170,6 @@ def test_requesting_new_code_invalidates_the_previous_one(registered):
 
 
 def test_forgot_password_never_leaks_reset_code_in_production(client, monkeypatch):
-    """Bezpecnostna regresia: dev_reset_code sa v produkcii NIKDY nesmie
-    vratit v API odpovedi, aj ked SMTP nie je nakonfigurovane - inak by
-    ktokolvek, kto pozna existujuci email, mohol cez tento endpoint ziskat
-    funkcny reset kod bez pristupu k tomu emailu."""
     monkeypatch.setattr("app.routers.auth.APP_ENV", "production")
     client.post("/api/auth/register", json={"username": "prodtest", "password": "GoodPass123", "email": "prodtest@example.com"})
     client.post("/api/auth/logout", headers=csrf_headers(client))
@@ -208,8 +194,6 @@ def test_mutating_request_with_csrf_token_succeeds(registered):
 
 
 def test_reset_password_blocks_brute_force_per_email(client):
-    """6-ciferny kod (1 000 000 moznosti) - po 5 zlych pokusoch pre rovnaky
-    email musi prist 429, aj keby utocnik stridal IP adresy."""
     for _ in range(5):
         res = client.post("/api/auth/reset-password",
                           json={"email": "obet@example.com", "code": "000000", "new_password": "noveheslo123"},

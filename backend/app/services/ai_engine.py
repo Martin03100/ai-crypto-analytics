@@ -1,19 +1,11 @@
-"""
-app/services/ai_engine.py
-===========================
-Automatizovana AI vrstva - 5 providerov (Gemini, OpenAI, Anthropic,
-DeepSeek, Grok). API kluc sa desifruje az tesne pred pouzitim
-(viz app/security.py::decrypt_secret) a nikdy sa nikam neloguje.
-Pri zlyhani (chybajuci/neplatny kluc, sietova chyba, nevalidny JSON)
-sa transparentne prepne na deterministicky mock, aby endpoint nikdy
-nevratil 500 kvoli vypadku externeho AI providera.
-"""
+"""AI engine."""
 
 from __future__ import annotations
 
 import ipaddress
 import json
 import logging
+import math
 import socket
 import statistics
 from concurrent.futures import ThreadPoolExecutor
@@ -24,15 +16,19 @@ from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 import requests
+import urllib3.exceptions
+from requests.adapters import HTTPAdapter
+from urllib3.connection import HTTPSConnection
+from urllib3.connectionpool import HTTPSConnectionPool
 
 from app.config import (
     ANTHROPIC_API_URL, ANTHROPIC_API_VERSION, ANTHROPIC_MODEL,
-    DEEPSEEK_API_URL, DEEPSEEK_MODEL, DEFAULT_COIN_IDS, GROK_API_URL, GROK_MODEL,
+    DEEPSEEK_API_URL, DEEPSEEK_MODEL, DEFAULT_COIN_IDS, GEMINI_MODEL, GROK_API_URL, GROK_MODEL, QUANT_PROVIDER,
     MOCK_BASE_PRICES, OPENAI_API_URL, OPENAI_MODEL,
     PROVIDER_TOKEN_PRICE_USD_PER_1K,
     REQUEST_TIMEOUT_SECONDS, SECTOR_CATEGORIES, TIME_HORIZONS,
 )
-from app.services import data_sources, market_data
+from app.services import data_sources, market_data, quant_engine
 
 logger = logging.getLogger("aca.ai")
 from app.services.validators import (
@@ -62,19 +58,6 @@ class AIEngineResult:
         }
 
 
-# ---------------------------------------------------------------------------
-# Retry & Exponential Backoff pre docasne vypadky provider API (napr. Gemini
-# 503 "model overloaded", 429 rate limit, siet. timeouty). Neopakuje sa pri
-# trvalych chybach (401 nespravny kluc a pod.) - tie sa vratia hned.
-#
-# DOLEZITE: Netlify (a podobne proxy pred FastAPI backendom) ma vlastny
-# tvrdy limit cca 30-40s na to, kym backend zacne posielat odpoved - ak to
-# nestihne, PROXY SAMA vrati 502 skor, nez FastAPI vobec stihne odpovedat
-# (bez ohladu na to, ci by AI provider nakoniec uspel). _MAX_RETRIES=1 a
-# REQUEST_TIMEOUT_SECONDS=12 su zamerne male, aby CELY najhorsi mozny
-# pripad (2 pokusy + 1 pauza) ostal bezpecne pod touto hranicou:
-# 12 + 1.5 + 12 = 25.5s, s rezervou cca 14s na sietovu/frontovu rezii.
-# ---------------------------------------------------------------------------
 _RETRYABLE_STATUS_CODES = {429, 502, 503, 504}
 _MAX_RETRIES = 1
 _BACKOFF_BASE_SECONDS = 1.5
@@ -82,8 +65,6 @@ _BACKOFF_BASE_SECONDS = 1.5
 
 def _post_with_retry(url: str, headers: Dict[str, str], payload: Dict[str, Any],
                       timeout: int) -> requests.Response:
-    """POST s exponencialnym backoffom pri 429/502/503/504 alebo sietovom
-    timeoute/vypadku spojenia. Pri poslednom pokuse necha vynimku prejst von."""
     last_exc: Optional[Exception] = None
     for attempt in range(_MAX_RETRIES + 1):
         try:
@@ -104,29 +85,9 @@ def _post_with_retry(url: str, headers: Dict[str, str], payload: Dict[str, Any],
     raise requests.exceptions.RequestException("Neznama chyba pri volani API.")
 
 
-# ---------------------------------------------------------------------------
-# Nizkourovnove volania providerov
-#
-# DOLEZITE (naklady/token spotreba): kazdy provider ma explicitne obmedzeny
-# vystup na _MAX_OUTPUT_TOKENS a nizku temperature (0.4). Odpovede su vzdy
-# kompaktny strukturovany JSON (zopar cenovych bodov + kratke zdovodnenie),
-# takze vyssi limit by len umoznil modelu zbytocne "vypisovat sa" - a teda
-# platit za tokeny, ktore appka aj tak zahodi pri parsovani. Rovnaky limit
-# naprieč vsetkymi providermi = predvidatelne naklady bez ohladu na to, ktory
-# si pouzivatel zvoli.
-# ---------------------------------------------------------------------------
 _MAX_OUTPUT_TOKENS = 1024
 _TEMPERATURE = 0.4
-# Kratky timeout pre "bonusove" volania na CoinGecko v _fetch_market_context()
-# (nie plny REQUEST_TIMEOUT_SECONDS) - viz podrobne vysvetlenie priamo pri
-# _fetch_market_context() nizsie.
 _MARKET_CONTEXT_TIMEOUT = 5
-# Gemini 3.x je "premyslajuci" model: do max_output_tokens sa ZAPOCITAVA aj
-# jeho vnutorne premyslanie. Pri limite 1024 a predvolenej (strednej) urovni
-# premyslania minul cely limit na premyslanie a vratil PRAZDNU odpoved -
-# appka potom spadla do ukazkovych dat s nezrozumitelnou chybou. Preto:
-# nizka uroven premyslania + vyssi strop (plati sa len za realne pouzite
-# tokeny, nie za strop, takze vyssi strop naklady nezvysuje).
 _GEMINI_MAX_OUTPUT_TOKENS = 4096
 
 
@@ -136,16 +97,9 @@ def _call_gemini(prompt: str, api_key: str) -> tuple[bool, str, Optional[str]]:
         try:
             from google import genai
             from google.genai import types
-            # DOLEZITE: bez explicitneho http_options timeoutu google-genai SDK
-            # pouziva svoj vlastny (nezdokumentovany, potencialne dlhy) default -
-            # v kombinacii s retry loopom nizsie to mohlo trvat tak dlho, ze
-            # Netlify proxy pred backendom sama vratila 502 skor, nez tento
-            # kod vobec stihol odpovedat (viz komentar pri _MAX_RETRIES vyssie).
             client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=REQUEST_TIMEOUT_SECONDS * 1000))
-            # BEZ temperature: pri Gemini 3.6 je podla Google zastarana a moze
-            # byt odmietnuta (HTTP 400).
             response = client.models.generate_content(
-                model="gemini-3.6-flash", contents=prompt,
+                model=GEMINI_MODEL, contents=prompt,
                 config=types.GenerateContentConfig(
                     max_output_tokens=_GEMINI_MAX_OUTPUT_TOKENS,
                     thinking_config=types.ThinkingConfig(thinking_level="low"),
@@ -155,9 +109,8 @@ def _call_gemini(prompt: str, api_key: str) -> tuple[bool, str, Optional[str]]:
             if not text.strip():
                 return False, "", "Gemini vratil prazdnu odpoved (limit vystupu bol vycerpany premyslanim modelu)."
             return True, text, None
-        except Exception as exc:  # noqa: BLE001 - musime zachytit vsetko, nikdy nepadnut
+        except Exception as exc:  # noqa: BLE001
             last_error = str(exc)
-            # Retry len na docasne vypadky (preťaženie/rate limit), nie napr. na neplatny kluc.
             is_retryable = any(marker in last_error.lower() for marker in ("503", "overloaded", "429", "rate limit", "unavailable", "timeout"))
             if is_retryable and attempt < _MAX_RETRIES:
                 time.sleep(_BACKOFF_BASE_SECONDS * (2 ** attempt))
@@ -167,7 +120,8 @@ def _call_gemini(prompt: str, api_key: str) -> tuple[bool, str, Optional[str]]:
 
 
 def _call_openai_compatible(url: str, model: str, prompt: str, api_key: str,
-                             extra_headers: Optional[Dict[str, str]] = None) -> tuple[bool, str, Optional[str]]:
+                             extra_headers: Optional[Dict[str, str]] = None,
+                             extra_body: Optional[Dict[str, Any]] = None) -> tuple[bool, str, Optional[str]]:
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     if extra_headers:
         headers.update(extra_headers)
@@ -175,6 +129,8 @@ def _call_openai_compatible(url: str, model: str, prompt: str, api_key: str,
         "model": model, "messages": [{"role": "user", "content": prompt}],
         "temperature": _TEMPERATURE, "max_tokens": _MAX_OUTPUT_TOKENS,
     }
+    if extra_body:
+        payload.update(extra_body)
     try:
         response = _post_with_retry(url, headers, payload, REQUEST_TIMEOUT_SECONDS)
         body = response.json()
@@ -210,7 +166,8 @@ def _call_ai_provider_raw(provider: str, prompt: str, api_key: str) -> tuple[boo
     if provider == "anthropic":
         return _call_anthropic(prompt, api_key)
     if provider == "deepseek":
-        return _call_openai_compatible(DEEPSEEK_API_URL, DEEPSEEK_MODEL, prompt, api_key)
+        return _call_openai_compatible(DEEPSEEK_API_URL, DEEPSEEK_MODEL, prompt, api_key,
+                                       extra_body={"thinking": {"type": "disabled"}})
     if provider == "grok":
         return _call_openai_compatible(GROK_API_URL, GROK_MODEL, prompt, api_key)
     if provider == "custom":
@@ -219,10 +176,6 @@ def _call_ai_provider_raw(provider: str, prompt: str, api_key: str) -> tuple[boo
 
 
 def validate_custom_base_url(url: str) -> Optional[str]:
-    """Ochrana proti SSRF: adresa vlastneho providera musi byt https a smerovat
-    na VEREJNY internet. Inak by cez appku slo posielat poziadavky na interne
-    servery hostingu (napr. 127.0.0.1, 10.x.x.x, 169.254.169.254 - metadata
-    cloudu). Vracia None, ak je adresa v poriadku, inak chybovu spravu."""
     try:
         parsed = urlparse((url or "").strip())
     except ValueError:
@@ -234,15 +187,47 @@ def validate_custom_base_url(url: str) -> Optional[str]:
     except (socket.gaierror, UnicodeError):
         return "Doménu adresy API vlastného providera sa nepodarilo nájsť."
     for info in infos:
-        if not ipaddress.ip_address(info[4][0]).is_global:
+        try:
+            is_public = ipaddress.ip_address(str(info[4][0]).split("%")[0]).is_global
+        except ValueError:
+            is_public = False
+        if not is_public:
             return "Adresa API vlastného providera musí smerovať na verejný internet, nie na internú sieť."
     return None
 
 
+def _is_public_ip(value: str) -> bool:
+    try:
+        return ipaddress.ip_address(str(value).split("%")[0]).is_global
+    except ValueError:
+        return False
+
+
+class _PublicOnlyHTTPSConnection(HTTPSConnection):
+    def _new_conn(self):
+        sock = super()._new_conn()
+        try:
+            peer = sock.getpeername()[0]
+        except OSError:
+            peer = ""
+        if not _is_public_ip(peer):
+            sock.close()
+            raise urllib3.exceptions.NewConnectionError(
+                self, "Adresa vlastného providera smeruje na internú sieť - spojenie bolo zrušené.")
+        return sock
+
+
+class _PublicOnlyPool(HTTPSConnectionPool):
+    ConnectionCls = _PublicOnlyHTTPSConnection
+
+
+class _PublicOnlyAdapter(HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        super().init_poolmanager(*args, **kwargs)
+        self.poolmanager.pool_classes_by_scheme = {**self.poolmanager.pool_classes_by_scheme, "https": _PublicOnlyPool}
+
+
 def _call_custom_provider(prompt: str, secret: str) -> tuple[bool, str, Optional[str]]:
-    """Lubovolne OpenAI-kompatibilne API (OpenRouter, Groq, Mistral, Together...).
-    Adresa sa overuje aj pri kazdom volani (nielen pri ulozeni) a presmerovania
-    sa nenasleduju - aby sa ochrana nedala obist zmenou DNS alebo redirectom."""
     try:
         config = json.loads(secret)
         base_url, model, key = config["base_url"], config["model"], config["key"]
@@ -251,8 +236,11 @@ def _call_custom_provider(prompt: str, secret: str) -> tuple[bool, str, Optional
     problem = validate_custom_base_url(base_url)
     if problem:
         return False, "", problem
+    session = requests.Session()
+    session.trust_env = False
+    session.mount("https://", _PublicOnlyAdapter())
     try:
-        response = requests.post(
+        response = session.post(
             base_url.rstrip("/") + "/chat/completions",
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             json={"model": model, "messages": [{"role": "user", "content": prompt}],
@@ -268,11 +256,10 @@ def _call_custom_provider(prompt: str, secret: str) -> tuple[bool, str, Optional
         return True, text, None
     except Exception as exc:  # noqa: BLE001
         return False, "", f"Vlastny provider chyba: {exc}"
+    finally:
+        session.close()
 
 
-# ---------------------------------------------------------------------------
-# Mock generatory (fallback)
-# ---------------------------------------------------------------------------
 def _generate_mock_forecast(coin: str, horizon: str, lang: str = "en") -> Dict[str, Any]:
     horizon_config = TIME_HORIZONS.get(horizon, {"points": 7, "unit": "den"})
     points = int(horizon_config["points"])
@@ -280,11 +267,11 @@ def _generate_mock_forecast(coin: str, horizon: str, lang: str = "en") -> Dict[s
     unit = unit_label(unit_key, lang)
     base_price = MOCK_BASE_PRICES.get(coin, 100.0)
 
-    random.seed(f"{coin}-{horizon}")
+    rng = random.Random(f"{coin}-{horizon}")
     prices: List[float] = []
     current = base_price
     for _ in range(points):
-        current = max(0.0001, current * (1 + random.uniform(-0.04, 0.045)))
+        current = max(0.0001, current * (1 + rng.uniform(-0.04, 0.045)))
         prices.append(round(current, 4))
 
     time_labels = [f"{unit} {i + 1}" for i in range(points)]
@@ -307,12 +294,11 @@ def _generate_mock_portfolio_analysis(holdings: List[Dict[str, Any]], lang: str 
     recommendations = []
     for item in holdings:
         coin = item.get("minca", "N/A")
-        random.seed(coin)
-        action = random.choice(actions)
+        action = random.Random(coin).choice(actions)
         recommendations.append({"minca": coin, "akcia": action, "dovod": mock_portfolio_reason(action, coin, lang)})
 
-    random.seed("sector-mock")
-    raw_weights = [random.uniform(5, 30) for _ in SECTOR_CATEGORIES]
+    sector_rng = random.Random("sector-mock")
+    raw_weights = [sector_rng.uniform(5, 30) for _ in SECTOR_CATEGORIES]
     total_weight = sum(raw_weights)
     sector_allocation = {s: round((w / total_weight) * 100, 1) for s, w in zip(SECTOR_CATEGORIES, raw_weights)}
 
@@ -329,17 +315,13 @@ def _generate_mock_news_summary(headlines: List[str], lang: str = "en") -> Dict[
     sentiments = ["Bullish", "Bearish", "Neutral"]
     news = []
     for i, title in enumerate(headlines):
-        random.seed(f"{title}-{i}")
-        news.append({"titulok": title, "sentiment": random.choice(sentiments)})
+        news.append({"titulok": title, "sentiment": random.Random(f"{title}-{i}").choice(sentiments)})
     return {
         "spravy": news,
         "trendy": MOCK_NEWS_TRENDS[normalize_lang(lang)],
     }
 
 
-# ---------------------------------------------------------------------------
-# Verejne funkcie volane z routerov
-# ---------------------------------------------------------------------------
 def _rsi(closes: List[float], period: int = 14) -> Optional[float]:
     if len(closes) < period + 1:
         return None
@@ -352,9 +334,6 @@ def _rsi(closes: List[float], period: int = 14) -> Optional[float]:
 
 
 def _summarize_history(symbol: str, data: Dict[str, List[List[float]]]) -> Optional[str]:
-    """Z 30d hodinovej historie vypocita kompaktny prehlad: zmeny 24h/7d/30d,
-    7d rozpatie, RSI(14), poziciu voci SMA7/SMA30, dennu volatilitu a trend
-    objemu. Pocita to KOD (presne), nie AI (ta by si cisla len odhadla)."""
     prices = data.get("prices") or []
     if len(prices) < 2:
         return None
@@ -401,17 +380,15 @@ def _summarize_history(symbol: str, data: Dict[str, List[List[float]]]) -> Optio
 
 
 def _await(future, deadline: float):
-    """Vysledok paralelnej ulohy, alebo None pri chybe/prekroceni casu."""
     if future is None:
         return None
     try:
         return future.result(timeout=max(0.1, deadline - time.monotonic()))
-    except Exception:  # noqa: BLE001 - timeout aj chyba zdroja = bez tychto dat
+    except Exception:  # noqa: BLE001
         return None
 
 
 def _append_common_context(lines: List[str], sources: List[str], futures: Dict[str, Any], deadline: float) -> None:
-    """Spolocne riadky pre predikciu aj portfolio: BTC, nalada, makro, spravy, svet."""
     btc = _await(futures.get("btc"), deadline)
     if btc and btc[0]:
         summary = _summarize_history("BTC (lider trhu)", btc[1])
@@ -433,12 +410,6 @@ def _append_common_context(lines: List[str], sources: List[str], futures: Dict[s
 
 
 def _build_market_context(coin: str) -> Tuple[Optional[str], List[str]]:
-    """Vsetky dostupne data pre AI predikciu jednej mince + zoznam pouzitych
-    zdrojov (zobrazi sa pouzivatelovi). Zdroje sa nacitavaju PARALELNE s
-    kratkym limitom (celkovo max ~_MARKET_CONTEXT_TIMEOUT+1 s), aby sa spolu
-    s AI volanim zmestili do ~40s limitu Netlify proxy. Podla typu mince
-    (meme / DeFi / L1) sa pridaju dalsie zdroje a instrukcia, na co sa
-    zamerat. Nikdy nevyhodi vynimku."""
     coin_id = DEFAULT_COIN_IDS.get(coin.upper())
     if not coin_id:
         return None, []
@@ -499,14 +470,10 @@ def _build_market_context(coin: str) -> Tuple[Optional[str], List[str]]:
 
 
 def _fetch_market_context(coin: str) -> Optional[str]:
-    """Len text kontextu (bez zoznamu zdrojov) - viz _build_market_context()."""
     return _build_market_context(coin)[0]
 
 
 def _build_portfolio_context(holdings: List[Dict[str, Any]]) -> Tuple[Optional[str], List[str]]:
-    """Realne data pre analyzu portfolia. PREDTYM AI dostala len nazvy mincí
-    a mnozstva - bez cien, trendov ci spraw, takze odporucania boli len odhad.
-    Hodnoty a vahy pozicii pocita KOD (presne), nie AI."""
     ids = [h.get("coin_id") or DEFAULT_COIN_IDS.get(str(h.get("minca", "")).upper()) for h in holdings]
     pool = ThreadPoolExecutor(max_workers=6)
     try:
@@ -561,16 +528,11 @@ def _build_portfolio_context(holdings: List[Dict[str, Any]]) -> Tuple[Optional[s
 
 def compute_forecast_accuracy(coin: str, timeframe: str, predicted_prices: List[float],
                                time_labels: List[str], created_at: datetime) -> Dict[str, Any]:
-    """Spatne porovna ulozenu predikciu so SKUTOCNYM vyvojom ceny odvtedy, aby
-    mal pouzivatel dokaz (nie len sluby), ci AI predikcie maju realnu
-    vypovednu hodnotu. Tri mozne stavy:
-    - "pending": horizont predikcie este neubehol (napr. 1-tyzdnova predikcia
-      stara len 2 dni) - realne data na porovnanie proste este neexistuju.
-    - "unavailable": minca nie je v DEFAULT_COIN_IDS (custom vyhladana minca)
-      alebo CoinGecko data nezohnal - graceful fallback, nikdy vynimka.
-    - "completed": realne porovnanie s vypocitanym % presnosti."""
     horizon_days_map = {"24h": 1, "1T": 7, "1M": 30, "1R": 365}
     horizon_days = horizon_days_map.get(timeframe, 7)
+    if (not isinstance(predicted_prices, list)
+            or not all(isinstance(p, (int, float)) and not isinstance(p, bool) and math.isfinite(p) for p in predicted_prices)):
+        predicted_prices = []
     created_at_utc = created_at if created_at.tzinfo else created_at.replace(tzinfo=timezone.utc)
     target_end = created_at_utc + timedelta(days=horizon_days)
     now = datetime.now(timezone.utc)
@@ -588,17 +550,18 @@ def compute_forecast_accuracy(coin: str, timeframe: str, predicted_prices: List[
         ok, chart, _ = market_data.get_market_chart_range(
             coin_id, "usd", int(created_at_utc.timestamp()), int(target_end.timestamp())
         )
-    except Exception:  # noqa: BLE001 - toto je bonusova funkcia, nikdy nesmie zhodit endpoint
+    except Exception:  # noqa: BLE001
         ok, chart = False, []
 
     if not ok or len(chart) < 2:
         return {**base, "status": "unavailable", "accuracy_pct": None, "actual_prices": []}
 
     n = len(predicted_prices)
+    if n == 0:
+        return {**base, "status": "unavailable", "accuracy_pct": None, "actual_prices": []}
     start_ms, end_ms = created_at_utc.timestamp() * 1000, target_end.timestamp() * 1000
     actual_prices: List[float] = []
     for i in range(n):
-        # bod i = cas vytvorenia + (i+1) krokov - rovnako ako casy v grafe
         target_ts = start_ms + (end_ms - start_ms) * (i + 1) / n
         closest = min(chart, key=lambda p: abs(p[0] - target_ts))
         actual_prices.append(closest[1])
@@ -611,9 +574,6 @@ def compute_forecast_accuracy(coin: str, timeframe: str, predicted_prices: List[
     mape_pct = (sum(errors) / len(errors)) * 100
     accuracy_pct = round(max(0.0, 100.0 - mape_pct), 1)
 
-    # Pri kryptomenach aj naivny odhad "cena sa nezmeni" casto dosiahne 95%+
-    # podla tejto metriky - samotne percento by teda pouzivatela zavadzalo.
-    # Preto porovnanie s tymto naivnym odhadom + ci predikcia trafila SMER.
     start_price = chart[0][1]
     baseline_errors = [abs(start_price - a) / a for a in actual_prices if a]
     baseline_pct = round(max(0.0, 100.0 - sum(baseline_errors) / len(baseline_errors) * 100), 1) if baseline_errors else None
@@ -623,6 +583,12 @@ def compute_forecast_accuracy(coin: str, timeframe: str, predicted_prices: List[
 
 
 def get_coin_forecast(provider: str, coin: str, horizon: str, api_key: Optional[str], lang: str = "en") -> AIEngineResult:
+    if provider == QUANT_PROVIDER:
+        ok, data, error = quant_engine.build_quant_forecast(coin, horizon, lang)
+        if not ok:
+            return AIEngineResult(False, None, False, error)
+        return AIEngineResult(True, data, False)
+
     if not api_key:
         return AIEngineResult(True, _generate_mock_forecast(coin, horizon, lang), True,
                                missing_api_key_message(lang))
@@ -634,18 +600,17 @@ def get_coin_forecast(provider: str, coin: str, horizon: str, api_key: Optional[
     if not success:
         return AIEngineResult(True, _generate_mock_forecast(coin, horizon, lang), True, call_error)
 
-    is_valid, parsed, validation_error = validate_forecast_payload(raw_text)
+    is_valid, parsed, validation_error = validate_forecast_payload(raw_text, expected_points=points)
     if not is_valid or parsed is None:
         return AIEngineResult(True, _generate_mock_forecast(coin, horizon, lang), True, validation_error)
 
     parsed["zdroje_dat"] = sources_used
-    # Presny cas vytvorenia + skutocna cena v tom case - graf z nich zobrazi
-    # realne casy (napr. 7:00 -> 7:00) a zaciatok oboch kriviek.
     parsed["vytvorene"] = datetime.now(timezone.utc).isoformat()
     if market_context:
         ok, history, _ = market_data.get_market_history(DEFAULT_COIN_IDS[coin.upper()], 30, _MARKET_CONTEXT_TIMEOUT)
         if ok and history.get("prices"):
             parsed["aktualna_cena"] = history["prices"][-1][1]
+            quant_engine.attach_uncertainty_band(parsed, history["prices"], horizon)
     return AIEngineResult(True, parsed, False)
 
 
@@ -718,12 +683,7 @@ def get_daily_digest(provider: str, fg_value: int, fg_classification: str,
     return AIEngineResult(True, parsed, False)
 
 
-# ---------------------------------------------------------------------------
-# Test platnosti API kluca (Account page — tlacidlo "Testovať")
-# ---------------------------------------------------------------------------
 def test_api_key(provider: str, api_key: str) -> tuple[bool, Optional[str]]:
-    """Vykona nizko-nakladove API volanie na overenie, ci je kluc platny
-    a funkcny. Vracia (ok, chybova_sprava)."""
     if not api_key or not api_key.strip():
         return False, "API kluc je prazdny."
     success, _text, error = call_ai_provider(provider, "Odpovedz jednym slovom: OK", api_key.strip())
@@ -732,11 +692,7 @@ def test_api_key(provider: str, api_key: str) -> tuple[bool, Optional[str]]:
     return True, None
 
 
-# ---------------------------------------------------------------------------
-# AI Chat asistent (plavajuce tlacidlo v aplikacii)
-# ---------------------------------------------------------------------------
 def _estimate_tokens(text: str) -> int:
-    """Hruby odhad poctu tokenov (~4 znaky/token), iba pre orientacny UI indikator."""
     return max(1, round(len(text) / 4))
 
 
@@ -746,17 +702,9 @@ def _estimate_cost_usd(provider: str, total_tokens: int) -> float:
 
 
 def estimate_forecast_cost(provider: str, coin: str, horizon: str) -> Dict[str, Any]:
-    """Odhad ceny PRED skutocnym volanim AI (pre potvrdzovacie okno na
-    frontende) - vypocitany na TOM ISTOM prompte, aky by sa realne poslal, aby
-    bol odhad vstupnych tokenov presny. market_context sa zamerne vynechava
-    (na rozdiel od skutocneho volania v get_coin_forecast) - je to len o pár
-    desiatok tokenov naviac a odhad tak nemusi cakat na sietovy dotaz na
-    CoinGecko, aby ostal pre pouzivatela okamzity."""
     points = int(TIME_HORIZONS.get(horizon, {"points": 7})["points"])
     prompt = build_forecast_prompt(coin, horizon, points, market_context=None)
-    input_tokens = _estimate_tokens(prompt) + 450  # + trhove data, doplnane az pri realnom volani
-    # Typicky vystup: kratke zdovodnenie + strukturalny JSON overhead, plus
-    # trocha naviac za kazdy dalsi datovy bod (cislo + casovy popisok).
+    input_tokens = _estimate_tokens(prompt) + 450
     expected_output_tokens = 150 + points * 12
     total_tokens = input_tokens + expected_output_tokens
     return {
@@ -768,10 +716,8 @@ def estimate_forecast_cost(provider: str, coin: str, horizon: str) -> Dict[str, 
 
 
 def estimate_portfolio_cost(provider: str, holdings: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Rovnaky princip ako estimate_forecast_cost(), pre Portfolio Advisor."""
     prompt = build_portfolio_prompt(holdings)
-    input_tokens = _estimate_tokens(prompt) + 150 + 60 * len(holdings)  # + trhove data, doplnane az pri realnom volani
-    # Vystup rastie s poctom pozicii (kazda ma vlastne "akcia" + "dovod").
+    input_tokens = _estimate_tokens(prompt) + 150 + 60 * len(holdings)
     expected_output_tokens = 150 + max(1, len(holdings)) * 45
     total_tokens = input_tokens + expected_output_tokens
     return {
@@ -815,16 +761,11 @@ def chat_with_ai(provider: str, messages: List[Dict[str, str]], api_key: Optiona
 
 
 def call_ai_provider(provider: str, prompt: str, api_key: str) -> tuple[bool, str, Optional[str]]:
-    """Obal okolo _call_ai_provider_raw(), ktory kazde zlyhanie zapise do
-    serverovych logov (Render -> Logs). Bez toho pouzivatel videl len
-    ukazkove data so vseobecnou chybou a skutocna pricina sa dala len hadat.
-    API kluc sa z chybovej spravy pre istotu vymaze, keby ho tam provider
-    niekedy vratil."""
     success, text, error = _call_ai_provider_raw(provider, prompt, api_key)
     if not success:
         safe_error = error or ""
         secrets_to_hide = [api_key] if api_key else []
-        try:  # vlastny provider: v api_key je JSON - skry aj samotny kluc v nom
+        try:
             secrets_to_hide.append(json.loads(api_key)["key"])
         except Exception:  # noqa: BLE001
             pass
@@ -832,4 +773,5 @@ def call_ai_provider(provider: str, prompt: str, api_key: str) -> tuple[bool, st
             if secret:
                 safe_error = safe_error.replace(secret, "***")
         logger.warning("AI provider '%s' zlyhal: %s", provider, safe_error[:500])
+        return success, text, safe_error
     return success, text, error

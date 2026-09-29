@@ -1,8 +1,4 @@
-"""app/routers/forecast.py — AI predikcia ceny + historia.
-
-Analyza sa NEUKLADA automaticky po vygenerovani - uzivatel ju musi
-explicitne ulozit tlacidlom "Uložiť analýzu" (POST /save), viz bod 4.
-"""
+"""Forecast API."""
 
 from __future__ import annotations
 
@@ -10,16 +6,19 @@ import json
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from sqlalchemy import case, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.config import PROVIDER_LABELS, RATE_LIMIT_AI_ENDPOINT
+from app.config import PROVIDER_LABELS, PROVIDERS, QUANT_LABEL, QUANT_PROVIDER, RATE_LIMIT_AI_ENDPOINT
 from app.deps import get_current_user, get_db, get_decrypted_api_key
 from app.models import ForecastEvaluation, ForecastHistory, PriceTip, User
 from app.rate_limit import rate_limit_by_user
+from app.security import sign_forecast, verify_forecast_signature
+from app.schemas import MAX_DB_ID
 from app.schemas import (
     AIResultOut, CostEstimateOut, ForecastAccuracyOut, ForecastHistoryOut, ForecastRequest, PaginatedForecastHistory, SaveForecastRequest, TipRequest, BulkDeleteRequest,
 )
@@ -28,11 +27,31 @@ from app.services.ai_engine import compute_forecast_accuracy, estimate_forecast_
 router = APIRouter(prefix="/api/forecast", tags=["forecast"])
 
 
+def _numeric_prices(value) -> List[float]:
+    import math
+    if not isinstance(value, list):
+        return []
+    if not all(isinstance(p, (int, float)) and not isinstance(p, bool) and math.isfinite(p) for p in value):
+        return []
+    return [float(p) for p in value]
+
+
+def _provider_label(provider: str) -> Optional[str]:
+    if provider == QUANT_PROVIDER:
+        return QUANT_LABEL
+    return PROVIDER_LABELS.get(provider) if provider in PROVIDERS.values() else None
+
+
 @router.post("", response_model=AIResultOut, dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
 def generate_forecast(payload: ForecastRequest, user: User = Depends(get_current_user),
                        db: Session = Depends(get_db)) -> AIResultOut:
-    api_key = get_decrypted_api_key(db, user.id, payload.provider)
+    if _provider_label(payload.provider) is None:
+        raise HTTPException(status_code=400, detail="Neznamy AI provider.")
+    api_key = None if payload.provider == QUANT_PROVIDER else get_decrypted_api_key(db, user.id, payload.provider)
     result = get_coin_forecast(payload.provider, payload.coin, payload.horizon, api_key, payload.lang)
+    if result.success and result.data and not result.is_mock:
+        result.data["podpis"] = sign_forecast(user.id, payload.provider, payload.coin, payload.horizon,
+                                              result.data["ceny"], str(result.data.get("vytvorene", "")))
     return AIResultOut(**result.as_dict())
 
 
@@ -40,10 +59,7 @@ def generate_forecast(payload: ForecastRequest, user: User = Depends(get_current
              dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
 def estimate_forecast_cost_endpoint(payload: ForecastRequest, user: User = Depends(get_current_user),
                                      db: Session = Depends(get_db)) -> CostEstimateOut:
-    """Odhad ceny PRED kliknutim na skutocne "Analyzovat" - frontend toto
-    zavola najprv a ukaze potvrdzovacie okno, aby pouzivatel vedel priblizny
-    naklad este predtym, nez sa realne minu tokeny."""
-    api_key = get_decrypted_api_key(db, user.id, payload.provider)
+    api_key = None if payload.provider == QUANT_PROVIDER else get_decrypted_api_key(db, user.id, payload.provider)
     if not api_key:
         return CostEstimateOut(is_mock=True)
     result = estimate_forecast_cost(payload.provider, payload.coin, payload.horizon)
@@ -53,9 +69,21 @@ def estimate_forecast_cost_endpoint(payload: ForecastRequest, user: User = Depen
 @router.post("/save", response_model=ForecastHistoryOut, status_code=201)
 def save_forecast(payload: SaveForecastRequest, user: User = Depends(get_current_user),
                    db: Session = Depends(get_db)) -> ForecastHistoryOut:
-    model_label = "mock" if payload.is_mock else PROVIDER_LABELS.get(payload.provider, payload.provider)
+    label = _provider_label(payload.provider)
+    if label is None:
+        raise HTTPException(status_code=400, detail="Neznamy AI provider.")
+    if payload.is_mock:
+        model_label = "mock"
+    else:
+        data = payload.forecast_data
+        prices, created = data.get("ceny"), data.get("vytvorene")
+        if (not isinstance(prices, list) or not isinstance(created, str)
+                or not verify_forecast_signature(data.get("podpis"), user.id, payload.provider, payload.coin,
+                                                 payload.horizon, prices, created)):
+            raise HTTPException(status_code=400, detail="Predikciu sa nepodarilo overiť. Vygeneruj ju znova a ulož ju bez úprav.")
+        model_label = label
     entry = ForecastHistory(
-        user_id=user.id, crypto_symbol=payload.coin, timeframe=payload.horizon,
+        user_id=user.id, crypto_symbol=payload.coin.upper(), timeframe=payload.horizon,
         model_used=model_label, forecast_json=json.dumps(payload.forecast_data, ensure_ascii=False),
     )
     db.add(entry)
@@ -68,7 +96,7 @@ def save_forecast(payload: SaveForecastRequest, user: User = Depends(get_current
 
 
 @router.delete("/history/{entry_id}")
-def delete_forecast(entry_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+def delete_forecast(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     row = db.query(ForecastHistory).filter(ForecastHistory.id == entry_id, ForecastHistory.user_id == user.id).first()
     if row is None:
         raise HTTPException(status_code=404, detail="Uložená analýza nebola nájdená.")
@@ -81,11 +109,8 @@ def delete_forecast(entry_id: int, user: User = Depends(get_current_user), db: S
 
 @router.get("/history/{entry_id}/accuracy", response_model=ForecastAccuracyOut,
             dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
-def get_forecast_accuracy(entry_id: int, user: User = Depends(get_current_user),
+def get_forecast_accuracy(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], user: User = Depends(get_current_user),
                            db: Session = Depends(get_db)) -> ForecastAccuracyOut:
-    """Spatne porovna ulozenu predikciu so skutocnym vyvojom ceny odvtedy
-    (viz ai_engine.py::compute_forecast_accuracy) - da pouzivatelovi realny
-    dokaz namiesto len sluby, ci AI predikcie maju vypovednu hodnotu."""
     row = db.query(ForecastHistory).filter(ForecastHistory.id == entry_id, ForecastHistory.user_id == user.id).first()
     if row is None:
         raise HTTPException(status_code=404, detail="Uložená analýza nebola nájdená.")
@@ -93,20 +118,12 @@ def get_forecast_accuracy(entry_id: int, user: User = Depends(get_current_user),
         forecast_data = json.loads(row.forecast_json)
     except json.JSONDecodeError:
         forecast_data = {}
-    predicted_prices = forecast_data.get("ceny", [])
-    time_labels = forecast_data.get("casove_body", [])
+    predicted_prices = _numeric_prices(forecast_data.get("ceny"))
+    time_labels = forecast_data.get("casove_body", []) if isinstance(forecast_data.get("casove_body"), list) else []
     if row.model_used == "mock":
-        # Ukazkove data su vygenerovane demonstracnym modelom (nie AI) - ich
-        # "presnost" by bola nezmyselne cislo, ktore by pouzivatela len
-        # zavadzalo. Radsej jasne povieme, ze sa presnost nesleduje.
         return ForecastAccuracyOut(status="mock", predicted_prices=predicted_prices, actual_prices=[],
                                    time_labels=time_labels, matures_at="")
-    created_at = row.created_at
-    if isinstance(forecast_data.get("vytvorene"), str):
-        try:
-            created_at = datetime.fromisoformat(forecast_data["vytvorene"])  # presny cas generovania
-        except ValueError:
-            pass
+    created_at = _created_at(row, forecast_data)
     result = compute_forecast_accuracy(row.crypto_symbol, row.timeframe, predicted_prices, time_labels, created_at)
     _record_evaluation(db, row, result)
     tip = db.query(PriceTip).filter(PriceTip.forecast_id == row.id, PriceTip.user_id == user.id).first()
@@ -122,7 +139,7 @@ def get_forecast_accuracy(entry_id: int, user: User = Depends(get_current_user),
 
 @router.get("/history", response_model=PaginatedForecastHistory)
 def get_history(symbol: Optional[str] = Query(default=None), days_back: int = Query(default=30, ge=1, le=365),
-                 page: int = Query(default=1, ge=1), page_size: int = Query(default=20, ge=1, le=100),
+                 page: int = Query(default=1, ge=1, le=100_000), page_size: int = Query(default=20, ge=1, le=100),
                  user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> PaginatedForecastHistory:
     date_from = datetime.now(timezone.utc) - timedelta(days=days_back)
     query = db.query(ForecastHistory).filter(
@@ -152,22 +169,21 @@ def get_history(symbol: Optional[str] = Query(default=None), days_back: int = Qu
     return PaginatedForecastHistory(items=items, total=total, page=page, page_size=page_size)
 
 
-# ---------------------------------------------------------------------------
-# Rebricek presnosti AI + sutaz "tvoj tip vs AI"
-# ---------------------------------------------------------------------------
 _TIP_WINDOW = timedelta(hours=2)
 _HORIZON_DAYS = {"24h": 1, "1T": 7, "1M": 30, "1R": 365}
 
 
 def _created_at(row: ForecastHistory, forecast_data: dict) -> datetime:
-    created = row.created_at
-    raw = forecast_data.get("vytvorene")
+    row_created = row.created_at if row.created_at.tzinfo else row.created_at.replace(tzinfo=timezone.utc)
+    raw = forecast_data.get("vytvorene") if isinstance(forecast_data, dict) else None
     if isinstance(raw, str):
         try:
-            created = datetime.fromisoformat(raw)
+            parsed = datetime.fromisoformat(raw)
         except ValueError:
-            pass
-    return created if created.tzinfo else created.replace(tzinfo=timezone.utc)
+            return row_created
+        parsed = parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+        return min(parsed, row_created)
+    return row_created
 
 
 def _record_evaluation(db: Session, row: ForecastHistory, result: dict) -> None:
@@ -192,9 +208,6 @@ def _settle_tip(tip, result: dict) -> None:
 
 
 def _evaluate_pending(db: Session, limit: int = 5, deadline_seconds: float = 8.0) -> None:
-    """Rebricek nema cron - pri kazdom zobrazeni vyhodnoti par dozretych, este
-    nevyhodnotenych predikcii (paralelne, s casovym limitom kvoli ~40s limitu
-    Netlify proxy). Co sa nestihne, dokonci sa pri dalsom zobrazeni."""
     candidates = (
         db.query(ForecastHistory)
         .filter(ForecastHistory.model_used != "mock", ForecastHistory.id.not_in(select(ForecastEvaluation.forecast_id)))
@@ -208,7 +221,7 @@ def _evaluate_pending(db: Session, limit: int = 5, deadline_seconds: float = 8.0
         except json.JSONDecodeError:
             continue
         created = _created_at(row, data)
-        if data.get("ceny") and now >= created + timedelta(days=_HORIZON_DAYS.get(row.timeframe, 7)):
+        if _numeric_prices(data.get("ceny")) and now >= created + timedelta(days=_HORIZON_DAYS.get(row.timeframe, 7)):
             ready.append((row, data, created))
         if len(ready) >= limit:
             break
@@ -217,7 +230,7 @@ def _evaluate_pending(db: Session, limit: int = 5, deadline_seconds: float = 8.0
     pool = ThreadPoolExecutor(max_workers=limit)
     try:
         jobs = [(row, pool.submit(compute_forecast_accuracy, row.crypto_symbol, row.timeframe,
-                                  data.get("ceny", []), data.get("casove_body", []), created))
+                                  _numeric_prices(data.get("ceny")), data.get("casove_body", []), created))
                 for row, data, created in ready]
         end = time.monotonic() + deadline_seconds
         for row, future in jobs:
@@ -233,7 +246,7 @@ def _evaluate_pending(db: Session, limit: int = 5, deadline_seconds: float = 8.0
 
 
 @router.post("/history/{entry_id}/tip", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
-def submit_tip(entry_id: int, payload: TipRequest, user: User = Depends(get_current_user),
+def submit_tip(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], payload: TipRequest, user: User = Depends(get_current_user),
                db: Session = Depends(get_db)) -> dict:
     row = db.query(ForecastHistory).filter(ForecastHistory.id == entry_id, ForecastHistory.user_id == user.id).first()
     if row is None:
@@ -242,49 +255,64 @@ def submit_tip(entry_id: int, payload: TipRequest, user: User = Depends(get_curr
         forecast_data = json.loads(row.forecast_json)
     except json.JSONDecodeError:
         forecast_data = {}
-    predicted = forecast_data.get("ceny") or []
+    predicted = _numeric_prices(forecast_data.get("ceny"))
     if row.model_used == "mock" or not predicted:
         raise HTTPException(status_code=400, detail="Na ukážkové dáta sa tipovať nedá.")
     if datetime.now(timezone.utc) - _created_at(row, forecast_data) > _TIP_WINDOW:
         raise HTTPException(status_code=400, detail="Tipovať sa dá len do 2 hodín od vytvorenia predikcie.")
     if db.query(PriceTip).filter(PriceTip.forecast_id == row.id).first():
         raise HTTPException(status_code=400, detail="Na túto predikciu si už tipoval.")
-    db.add(PriceTip(user_id=user.id, forecast_id=row.id, tip_price=payload.price, ai_price=float(predicted[-1])))
-    db.commit()
+    try:
+        ai_price = float(predicted[-1])
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Na túto predikciu sa tipovať nedá.")
+    db.add(PriceTip(user_id=user.id, forecast_id=row.id, tip_price=payload.price, ai_price=ai_price))
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Na túto predikciu si už tipoval.")
     return {"success": True}
+
+
+_MIN_SAMPLE = 5
+
+
+def _tip_summary(db: Session, user_id: Optional[int] = None) -> dict:
+    query = db.query(PriceTip.outcome, func.count()).filter(PriceTip.outcome.isnot(None))
+    if user_id is not None:
+        query = query.filter(PriceTip.user_id == user_id)
+    counts = dict(query.group_by(PriceTip.outcome).all())
+    wins, losses, ties = counts.get("win", 0), counts.get("loss", 0), counts.get("tie", 0)
+    return {"wins": wins, "losses": losses, "ties": ties, "total": wins + losses + ties}
 
 
 @router.get("/leaderboard", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
 def leaderboard(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
-    """Verejny rebricek AI providerov (zo VSETKYCH vyhodnotenych predikcii) +
-    vysledky sutaze. Obsahuje len suhrnne cisla - ziadne udaje o pouzivateloch."""
     _evaluate_pending(db)
-    stats: dict = {}
-    for ev in db.query(ForecastEvaluation).all():
-        s = stats.setdefault(ev.provider, {"count": 0, "hits": 0, "acc": 0.0, "beats": 0})
-        s["count"] += 1
-        s["hits"] += 1 if ev.direction_correct else 0
-        s["acc"] += ev.accuracy_pct
-        s["beats"] += 1 if ev.baseline_accuracy_pct is not None and ev.accuracy_pct > ev.baseline_accuracy_pct else 0
-    providers = sorted(
-        ({"provider": name, "evaluated": s["count"], "direction_hit_pct": round(s["hits"] / s["count"] * 100, 1),
-          "avg_accuracy_pct": round(s["acc"] / s["count"], 1), "beats_baseline_pct": round(s["beats"] / s["count"] * 100, 1)}
-         for name, s in stats.items()),
-        key=lambda p: (p["direction_hit_pct"], p["beats_baseline_pct"], p["avg_accuracy_pct"]), reverse=True,
+    beats_expr = case(
+        ((ForecastEvaluation.baseline_accuracy_pct.isnot(None))
+         & (ForecastEvaluation.accuracy_pct > ForecastEvaluation.baseline_accuracy_pct), 1), else_=0)
+    rows = (
+        db.query(
+            ForecastEvaluation.provider, func.count().label("n"),
+            func.sum(case((ForecastEvaluation.direction_correct == True, 1), else_=0)).label("hits"),  # noqa: E712
+            func.avg(ForecastEvaluation.accuracy_pct).label("acc"), func.sum(beats_expr).label("beats"),
+        ).group_by(ForecastEvaluation.provider).all()
     )
+    providers = [
+        {"provider": name, "evaluated": n, "direction_hit_pct": round((hits or 0) / n * 100, 1),
+         "avg_accuracy_pct": round(acc or 0.0, 1), "beats_baseline_pct": round((beats or 0) / n * 100, 1),
+         "low_sample": n < _MIN_SAMPLE}
+        for name, n, hits, acc, beats in rows
+    ]
+    providers.sort(key=lambda p: (not p["low_sample"], p["direction_hit_pct"], p["beats_baseline_pct"],
+                                  p["avg_accuracy_pct"]), reverse=True)
 
-    def summary(tips) -> dict:
-        wins = sum(1 for t in tips if t.outcome == "win")
-        losses = sum(1 for t in tips if t.outcome == "loss")
-        ties = sum(1 for t in tips if t.outcome == "tie")
-        return {"wins": wins, "losses": losses, "ties": ties, "total": wins + losses + ties}
-
-    settled = db.query(PriceTip).filter(PriceTip.outcome.isnot(None)).all()
     pending = db.query(PriceTip).filter(PriceTip.user_id == user.id, PriceTip.outcome.is_(None)).count()
     return {
-        "providers": providers,
-        "challenge": {"you": {**summary([t for t in settled if t.user_id == user.id]), "pending": pending},
-                      "everyone": summary(settled)},
+        "providers": providers, "min_sample": _MIN_SAMPLE,
+        "challenge": {"you": {**_tip_summary(db, user.id), "pending": pending}, "everyone": _tip_summary(db)},
     }
 
 
@@ -292,7 +320,6 @@ def leaderboard(user: User = Depends(get_current_user), db: Session = Depends(ge
 @router.post("/history/bulk-delete")
 def bulk_delete_forecasts(payload: BulkDeleteRequest, user: User = Depends(get_current_user),
                           db: Session = Depends(get_db)) -> dict:
-    """Zmaze viac ulozenych predikcii naraz - LEN vlastne (cudzie ID sa ticho ignoruju)."""
     ids = [row.id for row in db.query(ForecastHistory.id).filter(
         ForecastHistory.user_id == user.id, ForecastHistory.id.in_(payload.ids)).all()]
     if ids:

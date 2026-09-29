@@ -1,10 +1,8 @@
+/** Data sources list. */
+
 import { AlertTriangle, Database } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 
-/** Zdroje dat, z ktorych AI analyza vychadzala (backend posiela kluce,
- * napr. "hyperliquid" - tu sa prelozia do jazyka appky; starsie ulozene
- * analyzy maju texty, tie sa zobrazia tak, ako su) + kratke upozornenie,
- * ze nejde o financne poradenstvo. */
 export default function DataSources({ sources }) {
   const { t } = useLanguage();
   const label = (source) => {

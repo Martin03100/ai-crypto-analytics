@@ -1,3 +1,5 @@
+/** Card and metric components. */
+
 export function Card({ title, icon: Icon, glow, children, style, id }) {
   return (
     <div id={id} className={`card ${glow ? `glow-${glow}` : ""}`} style={style}>

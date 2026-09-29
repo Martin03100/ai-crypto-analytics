@@ -1,5 +1,4 @@
-"""Testy bezpecnostnych funkcii: 2FA (TOTP), overenie emailu, CAPTCHA,
-sifrovanie viazane na pouzivatela, upozornenie pri uzamknuti uctu."""
+"""2FA, email verification and captcha tests."""
 
 import base64
 
@@ -19,7 +18,7 @@ def test_per_user_encryption_is_bound_to_user_and_reads_legacy():
     cipher = security.encrypt_secret("sk-tajny", 1)
     assert cipher.startswith("v2:")
     assert security.decrypt_secret(cipher, 1) == "sk-tajny"
-    assert security.decrypt_secret(cipher, 2) is None  # cudzi ucet ho nedesifruje
+    assert security.decrypt_secret(cipher, 2) is None
     legacy = security.encrypt_secret("sk-stary")
     assert security.is_legacy_ciphertext(legacy) and security.decrypt_secret(legacy, 5) == "sk-stary"
 
@@ -78,7 +77,7 @@ def test_lockout_sends_warning_email(registered, monkeypatch):
     for _ in range(5):
         client.post("/api/auth/login", json={"username": username, "password": "zle-heslo"}, headers=anon_csrf_headers(client))
     import time
-    for _ in range(100):  # email sa posiela v samostatnom vlakne
+    for _ in range(100):
         if sent:
             break
         time.sleep(0.02)

@@ -1,3 +1,5 @@
+/** Loading skeletons. */
+
 export function SkeletonLines({ count = 3 }) {
   return (
     <div>

@@ -1,3 +1,5 @@
+/** Email verification screen. */
+
 import { Loader2, LogOut, MailCheck } from "lucide-react";
 import { useState } from "react";
 import { api } from "../api";
@@ -5,8 +7,6 @@ import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../context/ToastContext";
 
-/** Obrazovka po registracii: kym pouzivatel neoveri email kodom, appka mu
- * nepusti dalej (backend to vynucuje aj sam - viz app/deps.py). */
 export default function VerifyEmailGate() {
   const { t } = useLanguage();
   const { push } = useToast();

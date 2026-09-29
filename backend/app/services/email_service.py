@@ -1,23 +1,8 @@
-"""app/services/email_service.py — odosielanie emailov (napr. reset hesla).
-
-Dva mozne sposoby odoslania, v tomto poradi priority:
-
-1. Brevo HTTPS API (BREVO_API_KEY) — bezi cez port 443, ktory ziadny hosting
-   neblokuje. POUZIVAT TOTO na Render/Railway/Fly a inych bezplatnych PaaS
-   platformach: tie od konca roka 2025 na bezplatnom pláne blokuju VSETKY
-   odchadzajuce spojenia na klasicke SMTP porty (25/465/587) kvoli ochrane
-   pred spamom, takze priame SMTP z takehoto hostingu proste nikdy neprejde
-   (spojenie padne na timeout), bez ohladu na to, aky spravny je login/heslo.
-2. Klasicke SMTP (SMTP_* premenne) — funguje lokalne alebo na hostingu bez
-   tohto obmedzenia (platene instancie, VPS...).
-
-Ak nie je nastavene ani jedno (typicky lokalny vyvoj), sprava sa iba zaloguje
-na server - appka tym padom funguje aj bez emailovej infrastruktury (viz
-routers/auth.py — v development rezime sa kod vrati aj priamo v API odpovedi).
-"""
+"""Email service."""
 
 from __future__ import annotations
 
+import html
 import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -37,7 +22,6 @@ def is_smtp_configured() -> bool:
 
 
 def is_email_configured() -> bool:
-    """True ak je nastaveny ASPON jeden zo sposobov odoslania (Brevo alebo SMTP)."""
     return bool(BREVO_API_KEY) or is_smtp_configured()
 
 
@@ -57,7 +41,7 @@ def _send_via_brevo(to_address: str, subject: str, text_body: str, html_body: st
         )
         resp.raise_for_status()
         return True
-    except Exception as exc:  # noqa: BLE001 - odoslanie emailu nikdy nesmie zhodit request
+    except Exception as exc:  # noqa: BLE001
         logger.error("Odoslanie emailu cez Brevo API na %s zlyhalo: %s", to_address, exc)
         return False
 
@@ -78,14 +62,12 @@ def _send_via_smtp(to_address: str, subject: str, text_body: str, html_body: str
             server.login(SMTP_USER, SMTP_PASSWORD)
             server.sendmail(SMTP_FROM, [to_address], msg.as_string())
         return True
-    except Exception as exc:  # noqa: BLE001 - odoslanie emailu nikdy nesmie zhodit request
+    except Exception as exc:  # noqa: BLE001
         logger.error("Odoslanie emailu cez SMTP na %s zlyhalo: %s", to_address, exc)
         return False
 
 
 def send_email(to_address: str, subject: str, text_body: str, html_body: str | None = None) -> bool:
-    """Posle email cez Brevo API (ak je nastaveny BREVO_API_KEY), inak cez
-    klasicke SMTP (ak je nastavene), inak sa sprava iba zaloguje."""
     if BREVO_API_KEY:
         return _send_via_brevo(to_address, subject, text_body, html_body)
     if is_smtp_configured():
@@ -95,10 +77,6 @@ def send_email(to_address: str, subject: str, text_body: str, html_body: str | N
 
 
 def _email_shell(inner_html: str, preheader: str = "") -> str:
-    """Spolocna, jednoducha HTML kostra pre vsetky transakcne emaily appky —
-    svetle pozadie (nie tmavy 'obsidian glass' vzhlad appky samotnej), lebo
-    tmave emaily sa naprieč emailovymi klientmi (najma Outlook) renderuju
-    nespolahlivo. Cyan akcentova farba drzi konzistenciu s brandom appky."""
     return f"""\
 <!DOCTYPE html>
 <html lang="en">
@@ -129,18 +107,18 @@ def _email_shell(inner_html: str, preheader: str = "") -> str:
 
 
 def render_reset_password_email(username: str, code: str, expires_minutes: int) -> tuple[str, str]:
-    """Vrati (text_body, html_body) pre email s kodom na reset hesla."""
     text_body = (
         f"Ahoj {username},\n\nO obnovenie hesla si poziadal(a) ty? Ak ano, "
         f"zadaj tento kod v appke (platny {expires_minutes} minut):\n\n{code}\n\n"
         f"Ak si o reset nepoziadal(a), tento email jednoducho ignoruj — tvoj ucet je v poriadku."
     )
+    safe_username = html.escape(username)
     html_body = _email_shell(
         preheader=f"Tvoj kod na obnovenie hesla, platny {expires_minutes} minut.",
         inner_html=f"""
         <h1 style="margin:0 0 14px; font-size:19px; color:#0f172a;">Obnovenie hesla</h1>
         <p style="margin:0 0 22px; font-size:14px; line-height:1.6; color:#334155;">
-          Ahoj <strong>{username}</strong>, dostali sme žiadosť o obnovenie hesla k tvojmu účtu.
+          Ahoj <strong>{safe_username}</strong>, dostali sme žiadosť o obnovenie hesla k tvojmu účtu.
           Zadaj tento kód v aplikácii:
         </p>
         <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 22px; width:100%;">
@@ -165,10 +143,11 @@ def render_reset_password_email(username: str, code: str, expires_minutes: int) 
 def render_verification_email(username: str, code: str, expires_minutes: int) -> tuple[str, str]:
     text_body = (f"Ahoj {username},\n\nvitaj v AI Crypto Analytics! Na overenie emailu zadaj v appke tento kod "
                  f"(platny {expires_minutes} minut):\n\n{code}\n\nAk si sa neregistroval(a), tento email ignoruj.")
+    safe_username = html.escape(username)
     html_body = _email_shell(preheader=f"Tvoj overovaci kod, platny {expires_minutes} minut.", inner_html=f"""
         <h1 style="margin:0 0 14px; font-size:19px; color:#0f172a;">Over si email</h1>
         <p style="margin:0 0 22px; font-size:14px; line-height:1.6; color:#334155;">
-          Ahoj <strong>{username}</strong>, vitaj v AI Crypto Analytics! Na dokončenie registrácie zadaj v aplikácii tento kód:
+          Ahoj <strong>{safe_username}</strong>, vitaj v AI Crypto Analytics! Na dokončenie registrácie zadaj v aplikácii tento kód:
         </p>
         <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 22px; width:100%;">
           <tr><td align="center" style="background:#f1f5f9; border-radius:12px; padding:20px;">
@@ -183,10 +162,11 @@ def render_verification_email(username: str, code: str, expires_minutes: int) ->
 def render_lockout_email(username: str, minutes: int) -> tuple[str, str]:
     text_body = (f"Ahoj {username},\n\ntvoj ucet bol docasne uzamknuty na {minutes} minut po niekolkych "
                  f"neuspesnych pokusoch o prihlasenie. Ak si to nebol(a) ty, odporucame zmenit heslo a zapnut 2FA.")
+    safe_username = html.escape(username)
     html_body = _email_shell(preheader="Viacero neúspešných pokusov o prihlásenie.", inner_html=f"""
         <h1 style="margin:0 0 14px; font-size:19px; color:#0f172a;">Upozornenie na pokusy o prihlásenie</h1>
         <p style="margin:0 0 14px; font-size:14px; line-height:1.6; color:#334155;">
-          Ahoj <strong>{username}</strong>, tvoj účet bol dočasne uzamknutý na <strong>{minutes} minút</strong>
+          Ahoj <strong>{safe_username}</strong>, tvoj účet bol dočasne uzamknutý na <strong>{minutes} minút</strong>
           po niekoľkých neúspešných pokusoch o prihlásenie.
         </p>
         <p style="margin:0; font-size:14px; line-height:1.6; color:#334155;">

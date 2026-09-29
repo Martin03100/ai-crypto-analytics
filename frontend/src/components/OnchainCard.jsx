@@ -1,3 +1,5 @@
+/** On-chain activity card. */
+
 import { Waves } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../api";
@@ -6,7 +8,6 @@ import InfoTip from "./InfoTip";
 import { useLanguage } from "../context/LanguageContext";
 import { localeForLang } from "../i18n/locale";
 
-/** Velryby a on-chain aktivita (BTC, ETH, DOGE) z Blockchair. */
 export default function OnchainCard() {
   const { t, lang } = useLanguage();
   const [items, setItems] = useState(null);

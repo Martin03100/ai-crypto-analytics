@@ -1,10 +1,4 @@
-"""Testy pre app/routers/market.py — verejne endpointy a community hlasovanie.
-
-Fear&Greed/headlines/chart/coins-search volaju externe API (CoinGecko a
-pod.) — v testovacom prostredi nemusia byt tieto domeny dostupne. Vsetky
-tieto endpointy su navrhnute tak, aby PRI ZLYHANI externeho volania vratili
-200 s `is_mock: true` namiesto chyby, takze testy overuju len tento
-kontrakt (200 + ocakavany tvar odpovede), nie konkretny obsah dat."""
+"""Market API tests."""
 
 from tests.conftest import anon_csrf_headers, csrf_headers
 
@@ -16,8 +10,6 @@ def test_fear_greed_is_public_and_never_fails(client):
 
 
 def test_fear_greed_accepts_refresh_query_param(client):
-    """Manualne "Aktualizovat" tlacidlo na Dashboarde posiela ?refresh=true -
-    endpoint to musi prijat bez chyby (obchadza cache na strane servera)."""
     res = client.get("/api/market/fear-greed?refresh=true")
     assert res.status_code == 200
     assert "data" in res.json()
@@ -57,7 +49,6 @@ def test_vote_and_percentages_reflect_latest_vote_only(registered):
     res = client.get("/api/market/vote/mine")
     assert res.json()["sentiment_vote"] == "Bullish"
 
-    # Pouzivatel si to rozmysli - novy hlas ma nahradit ten stary v percentages.
     client.post("/api/market/vote", json={"sentiment_vote": "Bearish"}, headers=csrf_headers(client))
     res = client.get("/api/market/vote/percentages")
     body = res.json()

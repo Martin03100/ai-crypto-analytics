@@ -1,4 +1,4 @@
-"""Testy pre app/routers/account.py — API kluce, email, zmena hesla."""
+"""Account API tests."""
 
 from tests.conftest import csrf_headers
 
@@ -23,7 +23,7 @@ def test_save_and_delete_api_key(registered):
                       headers=csrf_headers(client))
     assert res.status_code == 200
     assert res.json()["connected"] is True
-    assert "fake-test-key-123" not in res.text  # nikdy nesmie vratit plny kluc naspat
+    assert "fake-test-key-123" not in res.text
 
     res = client.delete("/api/account/api-keys/gemini", headers=csrf_headers(client))
     assert res.status_code == 200
@@ -54,8 +54,6 @@ def test_update_email_valid_accepted(registered):
 
 
 def test_update_email_rejects_clearing_to_empty(registered):
-    """Odkedy je email povinny, nesmie sa dat vymazat cez toto API - inak by
-    si pouzivatel sam zablokoval "Zabudnuté heslo" bez akehokolvek varovania."""
     client, _username, _password = registered
     res = client.put("/api/account/email", json={"email": ""}, headers=csrf_headers(client))
     assert res.status_code == 400
@@ -64,9 +62,6 @@ def test_update_email_rejects_clearing_to_empty(registered):
 
 
 def test_update_email_rejects_duplicate_from_another_account(client):
-    """Ak si pouzivatel B zmeni email v Nastaveniach na taky, ktory uz ma
-    pouzivatel A, musi to zlyhat - inak by "zabudnute heslo" nevedelo
-    spolahlivo urcit spravny ucet pre dany email."""
     client.post("/api/auth/register", json={"username": "userA", "password": "GoodPass123", "email": "shared@example.com"})
     client.post("/api/auth/logout", headers=csrf_headers(client))
     client.post("/api/auth/register", json={"username": "userB", "password": "GoodPass123", "email": "userb@example.com"})
@@ -99,7 +94,6 @@ def test_logout_all_devices_invalidates_old_token(registered):
     client, _username, _password = registered
     res = client.post("/api/account/logout-all-devices", headers=csrf_headers(client))
     assert res.status_code == 200
-    # Klient dostal novy cookie hned v tejto odpovedi, takze este je prihlaseny.
     res = client.get("/api/auth/me")
     assert res.status_code == 200
 

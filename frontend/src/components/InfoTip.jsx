@@ -1,7 +1,8 @@
+/** Info tooltip. */
+
 import { Info } from "lucide-react";
 import { useId, useState } from "react";
 
-/** Mala ikonka (i) s vysvetlenim pojmu - na hover/focus (PC) aj tuknutie (mobil). */
 export default function InfoTip({ text }) {
   const [open, setOpen] = useState(false);
   const id = useId();

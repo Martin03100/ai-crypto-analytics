@@ -1,13 +1,19 @@
-"""app/schemas.py — Pydantic modely pre request/response validaciu."""
+"""API schemas."""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Literal, Optional
+from typing import Annotated, Any, Dict, List, Literal, Optional
 
+import json
 import math
+import re
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
+
+
+MAX_DB_ID = 2_147_483_647
+USERNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{3,32}$")
 
 
 class RegisterRequest(BaseModel):
@@ -34,9 +40,8 @@ class TokenResponse(BaseModel):
 
 
 class ApiKeyIn(BaseModel):
-    provider: str
-    api_key: str
-    # len pre vlastny (OpenAI-kompatibilny) provider
+    provider: str = Field(max_length=32)
+    api_key: str = Field(max_length=4096)
     base_url: Optional[str] = Field(default=None, max_length=300)
     model: Optional[str] = Field(default=None, max_length=120)
 
@@ -87,9 +92,9 @@ class ApiKeyStatus(BaseModel):
 
 
 class HoldingIn(BaseModel):
-    minca: str
-    mnozstvo: float
-    coin_id: Optional[str] = None  # voliteľné CoinGecko id pre custom mince
+    minca: str = Field(max_length=20)
+    mnozstvo: float = Field(le=1e15)
+    coin_id: Optional[str] = Field(default=None, max_length=100, pattern=r"^[a-z0-9][a-z0-9._-]*$")
 
     @field_validator("mnozstvo")
     @classmethod
@@ -110,18 +115,12 @@ class HoldingIn(BaseModel):
 
 
 class PortfolioRequest(BaseModel):
-    provider: str
-    # Horna hranica 30 mincí: chráni pred degenerovaným vstupom (AI analýza
-    # stovky pozícií by aj tak nebola prakticky čitateľná) A zároveň drží
-    # najhorší možný výstup AI odpovede predvídateľne pod _MAX_OUTPUT_TOKENS
-    # limitom v ai_engine.py, takže sa nikdy neoreže uprostred JSON-u.
+    provider: str = Field(max_length=32)
     holdings: List[HoldingIn] = Field(max_length=30)
     lang: str = "en"
 
 
 class ForecastRequest(BaseModel):
-    # Dlzky zodpovedaju stlpcom v DB - Postgres (Neon) by pri dlhsej hodnote
-    # vratil chybu 500 namiesto zrozumitelnej 422.
     provider: str = Field(max_length=32)
     coin: str = Field(min_length=1, max_length=16)
     horizon: Literal["24h", "1T", "1M", "1R"]
@@ -145,25 +144,20 @@ class ForecastHistoryOut(BaseModel):
 
     @field_serializer("created_at")
     def _utc_created_at(self, value: datetime) -> str:
-        # DB uklada UTC cas bez casoveho pasma - bez neho by ho prehliadac
-        # povazoval za lokalny cas (v Prahe posun o 1-2 hodiny).
         return (value if value.tzinfo else value.replace(tzinfo=timezone.utc)).isoformat()
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class ForecastAccuracyOut(BaseModel):
-    """status: "pending" (horizont este neubehol) | "unavailable" (data sa
-    nepodarilo zohnat) | "completed" (realne porovnanie hotove)."""
     status: str
     accuracy_pct: Optional[float] = None
     predicted_prices: List[float]
     actual_prices: List[float]
     time_labels: List[str]
     matures_at: str
-    direction_correct: Optional[bool] = None      # trafila predikcia smer (rast/pokles)?
-    baseline_accuracy_pct: Optional[float] = None  # presnost naivneho odhadu "cena sa nezmeni"
-    # sutaz "tvoj tip vs AI"
+    direction_correct: Optional[bool] = None
+    baseline_accuracy_pct: Optional[float] = None
     can_tip: bool = False
     tip_price: Optional[float] = None
     tip_outcome: Optional[str] = None
@@ -171,7 +165,7 @@ class ForecastAccuracyOut(BaseModel):
 
 
 class BulkDeleteRequest(BaseModel):
-    ids: List[int] = Field(min_length=1, max_length=100)
+    ids: List[Annotated[int, Field(ge=1, le=MAX_DB_ID)]] = Field(min_length=1, max_length=100)
 
 
 class TipRequest(BaseModel):
@@ -183,14 +177,24 @@ class DeleteAccountRequest(BaseModel):
 
 
 class CostEstimateOut(BaseModel):
-    """Odhad ceny PRED skutocnym volanim AI (potvrdzovacie okno na
-    frontende). is_mock=true znamena, ze pouzivatel nema pripojeny API kluc -
-    skutocne volanie by teda bolo zadarmo (mock rezim), odhad sa neratal."""
     is_mock: bool
     estimated_input_tokens: int = 0
     estimated_output_tokens: int = 0
     estimated_total_tokens: int = 0
     estimated_cost_usd: float = 0.0
+
+
+_MAX_SAVED_JSON_BYTES = 64 * 1024
+
+
+def _check_json_size(value: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        size = len(json.dumps(value, ensure_ascii=False))
+    except (TypeError, ValueError):
+        raise ValueError("Neplatné dáta.")
+    if size > _MAX_SAVED_JSON_BYTES:
+        raise ValueError("Ukladané dáta sú príliš veľké.")
+    return value
 
 
 class SaveForecastRequest(BaseModel):
@@ -200,12 +204,22 @@ class SaveForecastRequest(BaseModel):
     forecast_data: Dict[str, Any]
     is_mock: bool = False
 
+    @field_validator("forecast_data")
+    @classmethod
+    def _limit_size(cls, value: Dict[str, Any]) -> Dict[str, Any]:
+        return _check_json_size(value)
+
 
 class SavePortfolioRequest(BaseModel):
-    provider: str
+    provider: str = Field(max_length=32)
     holdings: List[HoldingIn] = Field(max_length=30)
     analysis_data: Dict[str, Any]
     is_mock: bool = False
+
+    @field_validator("analysis_data")
+    @classmethod
+    def _limit_size(cls, value: Dict[str, Any]) -> Dict[str, Any]:
+        return _check_json_size(value)
 
 
 class PortfolioHistoryOut(BaseModel):
@@ -217,16 +231,12 @@ class PortfolioHistoryOut(BaseModel):
 
     @field_serializer("created_at")
     def _utc_created_at(self, value: datetime) -> str:
-        # DB uklada UTC cas bez casoveho pasma - bez neho by ho prehliadac
-        # povazoval za lokalny cas (v Prahe posun o 1-2 hodiny).
         return (value if value.tzinfo else value.replace(tzinfo=timezone.utc)).isoformat()
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class PaginatedForecastHistory(BaseModel):
-    """Stranky historie predikcii namiesto jedneho neobmedzeneho zoznamu -
-    starsie zaznamy uz nie su navzdy "neviditelne" za pevnym .limit()."""
     items: List[ForecastHistoryOut]
     total: int
     page: int
@@ -245,8 +255,6 @@ class VoteRequest(BaseModel):
 
 
 class NewsSentimentRequest(BaseModel):
-    """Predtym surovy `dict` bez validacie - neobmedzeny zoznam titulkov by
-    vedel vytvorit obrovsky prompt (a zbytocne minut tokeny)."""
     provider: Optional[str] = None
     titles: List[str] = Field(default_factory=list, max_length=20)
     lang: str = "en"

@@ -1,4 +1,4 @@
-"""app/services/verification.py - odoslanie kodu na overenie emailu."""
+"""Email verification."""
 
 from __future__ import annotations
 
@@ -14,7 +14,6 @@ from app.services.email_service import render_verification_email, send_email
 
 
 def send_verification_code(db: Session, user: User, background_tasks: BackgroundTasks) -> None:
-    """Vytvori novy kod (stare zneplatni) a odosle ho emailom AZ PO odpovedi."""
     db.query(EmailVerificationCode).filter(EmailVerificationCode.user_id == user.id).delete(synchronize_session=False)
     code, code_hash = generate_reset_code()
     db.add(EmailVerificationCode(user_id=user.id, code_hash=code_hash,

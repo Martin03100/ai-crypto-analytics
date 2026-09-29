@@ -1,3 +1,5 @@
+/** Landing page. */
+
 import { ArrowRight, BarChart3, Brain, Database, ShieldCheck, Trophy, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import CandlestickArt from "../components/CandlestickArt";
@@ -12,13 +14,11 @@ const FEATURES = [
   { icon: Users, title: "landing.f4Title", text: "landing.f4Text" },
 ];
 
-/** Verejna uvodna stranka pre neprihlasenych - co appka robi, cim je ina a
- * co NIE je (nie je to burza ani financne poradenstvo). */
 export default function Landing() {
   const { t, lang, setLang } = useLanguage();
   usePageTitle("landing.pageTitle");
   return (
-    <div className="landing">
+    <main className="landing">
       <header className="landing-nav">
         <div className="landing-brand"><div className="brand-mark"><BarChart3 size={18} /></div><strong>AI Crypto Analytics</strong></div>
         <div className="landing-nav-actions">
@@ -45,7 +45,7 @@ export default function Landing() {
         {FEATURES.map(({ icon: Icon, title, text }) => (
           <div key={title} className="card landing-feature">
             <div className="landing-feature-icon"><Icon size={18} /></div>
-            <h3>{t(title)}</h3>
+            <h2>{t(title)}</h2>
             <p className="text-sub">{t(text)}</p>
           </div>
         ))}
@@ -63,7 +63,7 @@ export default function Landing() {
       <section className="card landing-honest">
         <ShieldCheck size={18} />
         <div>
-          <h3>{t("landing.honestTitle")}</h3>
+          <h2>{t("landing.honestTitle")}</h2>
           <p className="text-sub">{t("landing.honestText")}</p>
         </div>
       </section>
@@ -71,6 +71,6 @@ export default function Landing() {
       <footer className="landing-footer">
         <Link to="/privacy">{t("privacy.title")}</Link> · <Link to="/terms">{t("terms.title")}</Link>
       </footer>
-    </div>
+    </main>
   );
 }

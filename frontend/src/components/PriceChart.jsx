@@ -1,3 +1,5 @@
+/** Interactive price chart. */
+
 import { priceAxisDecimals } from "../utils/formatPrice";
 import { LineChart } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -6,7 +8,6 @@ import { macdSeries, rsiSeries } from "../utils/indicators";
 import InfoTip from "./InfoTip";
 
 const TOOLTIP_STYLE = { background: "var(--bg-tooltip)", border: "1px solid var(--border-strong)", borderRadius: 10, fontSize: 12, color: "var(--text-primary)" };
-// Na dotykovych zariadeniach vacsie "uchytky" na priblizenie casoveho rozsahu.
 const COARSE_POINTER = typeof window !== "undefined" && Boolean(window.matchMedia?.("(pointer: coarse)").matches);
 import { api } from "../api";
 import { Card } from "./Card";
@@ -64,8 +65,15 @@ export default function PriceChart() {
     const smaValues = showSma ? sma(values, Math.min(14, Math.floor(values.length / 3) || 1)) : [];
     const rsiValues = showRsi ? rsiSeries(values) : [];
     const macdValues = showMacd ? macdSeries(values) : [];
+    const loc = localeForLang(lang);
+    const tickLabel = (ts) => {
+      const d = new Date(ts);
+      if (timeframe === "1") return d.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" });
+      if (timeframe === "7") return d.toLocaleString(loc, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+      return d.toLocaleDateString(loc, { day: "2-digit", month: "2-digit" });
+    };
     return raw.map(([ts, price], i) => ({
-      t: new Date(ts).toLocaleDateString(localeForLang(lang), timeframe === "1" ? { hour: "2-digit", minute: "2-digit" } : { day: "2-digit", month: "2-digit" }),
+      t: tickLabel(ts),
       price,
       sma: showSma ? smaValues[i] : undefined,
       rsi: showRsi ? rsiValues[i] : undefined,
@@ -76,7 +84,7 @@ export default function PriceChart() {
   return (
     <Card title={t("chart.title")} icon={LineChart}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginBottom: 14 }}>
-        <select className="select" style={{ maxWidth: 140 }} value={coinId} onChange={(e) => setCoinId(e.target.value)}>
+        <select className="select" style={{ maxWidth: 140 }} aria-label={t("forecast.coinLabel")} value={coinId} onChange={(e) => setCoinId(e.target.value)}>
           {COINS.map((c) => <option key={c.id} value={c.id}>{c.symbol}</option>)}
         </select>
         <div className="tabs">
@@ -120,9 +128,9 @@ export default function PriceChart() {
                 contentStyle={{ background: "var(--bg-tooltip)", border: "1px solid var(--border-strong)", borderRadius: 10, fontSize: 12, color: "var(--text-primary)" }}
                 formatter={(v, name) => [formatAmount(v, Math.min(8, Math.max(2, priceAxisDecimals(chartData) + 1))), name === "sma" ? t("chart.smaLabel") : t("chart.priceLabel")]}
               />
-              <Area type="monotone" dataKey="price" stroke="var(--cyan)" strokeWidth={2} fill="url(#priceChartFill)" dot={false} />
-              {showSma && <Line type="monotone" dataKey="sma" stroke="var(--violet)" strokeWidth={1.5} dot={false} strokeDasharray="4 3" />}
-              <Brush dataKey="t" height={COARSE_POINTER ? 34 : 22} stroke="var(--cyan)" fill="var(--bg-inset)" travellerWidth={COARSE_POINTER ? 16 : 8} />
+              <Area type="monotone" dataKey="price" stroke="var(--cyan-fg)" strokeWidth={2} fill="url(#priceChartFill)" dot={false} />
+              {showSma && <Line type="monotone" dataKey="sma" stroke="var(--violet-fg)" strokeWidth={1.5} dot={false} strokeDasharray="4 3" />}
+              <Brush dataKey="t" height={COARSE_POINTER ? 34 : 22} stroke="var(--cyan-fg)" fill="var(--bg-inset)" travellerWidth={COARSE_POINTER ? 16 : 8} />
             </AreaChart>
           </ResponsiveContainer>
           {showRsi && (
@@ -133,10 +141,10 @@ export default function PriceChart() {
                   <CartesianGrid stroke="rgba(128,128,128,0.12)" vertical={false} />
                   <XAxis dataKey="t" hide />
                   <YAxis domain={[0, 100]} ticks={[30, 70]} width={84} fontSize={10.5} stroke="var(--text-tertiary)" tickLine={false} axisLine={false} />
-                  <ReferenceLine y={70} stroke="var(--crimson)" strokeDasharray="4 3" />
-                  <ReferenceLine y={30} stroke="var(--emerald)" strokeDasharray="4 3" />
+                  <ReferenceLine y={70} stroke="var(--crimson-fg)" strokeDasharray="4 3" />
+                  <ReferenceLine y={30} stroke="var(--emerald-fg)" strokeDasharray="4 3" />
                   <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [Number(v).toFixed(1), "RSI"]} />
-                  <Line type="monotone" dataKey="rsi" stroke="var(--violet)" strokeWidth={1.6} dot={false} connectNulls />
+                  <Line type="monotone" dataKey="rsi" stroke="var(--violet-fg)" strokeWidth={1.6} dot={false} connectNulls />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
@@ -152,8 +160,8 @@ export default function PriceChart() {
                   <ReferenceLine y={0} stroke="var(--border-strong)" />
                   <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v, name) => [Number(v).toPrecision(4), name]} />
                   <Bar dataKey="hist" name={t("chart.macdHist")} fill="var(--amber)" opacity={0.55} />
-                  <Line type="monotone" dataKey="macd" name="MACD" stroke="var(--cyan)" strokeWidth={1.6} dot={false} connectNulls />
-                  <Line type="monotone" dataKey="signal" name={t("chart.macdSignal")} stroke="var(--violet)" strokeWidth={1.4} dot={false} connectNulls strokeDasharray="4 3" />
+                  <Line type="monotone" dataKey="macd" name="MACD" stroke="var(--cyan-fg)" strokeWidth={1.6} dot={false} connectNulls />
+                  <Line type="monotone" dataKey="signal" name={t("chart.macdSignal")} stroke="var(--violet-fg)" strokeWidth={1.4} dot={false} connectNulls strokeDasharray="4 3" />
                 </ComposedChart>
               </ResponsiveContainer>
             </div>

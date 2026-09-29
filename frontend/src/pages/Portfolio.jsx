@@ -1,4 +1,6 @@
-import { Compass, Download, FileText, GraduationCap, Loader2, Plus, RefreshCw, Save, Search, Trash2, Wallet } from "lucide-react";
+/** Portfolio advisor page. */
+
+import { CheckCircle2, Compass, Download, FileText, GraduationCap, Loader2, Plus, RefreshCw, Save, Search, Trash2, Wallet } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { api } from "../api";
@@ -22,18 +24,13 @@ import { usePageTitle } from "../hooks/usePageTitle";
 
 const COINS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "DOT", "LINK"];
 const PIE_COLORS = ["#22d3ee", "#34d399", "#a78bfa", "#fbbf24", "#fb5a6a"];
-// Zhoduje sa s Field(max_length=30) na PortfolioRequest.holdings na backende
-// (app/schemas.py) - drzi to AI odpoved predvidatelne v ramci token limitu.
 const MAX_HOLDINGS = 30;
 
-// Mapovanie zakladnych symbolov na CoinGecko id (zhoduje sa s backend DEFAULT_COIN_IDS).
 const DEFAULT_COIN_IDS = {
   BTC: "bitcoin", ETH: "ethereum", SOL: "solana", BNB: "binancecoin", XRP: "ripple",
   ADA: "cardano", DOGE: "dogecoin", AVAX: "avalanche-2", DOT: "polkadot", LINK: "chainlink",
 };
 
-/** Parsuje vstup množstva: akceptuje čiarku aj bodku ako desatinný oddeľovač,
- * zamedzí záporným číslam, neplatným znakom a NaN. Vracia { value, error }. */
 function parseAmountInput(raw, t) {
   const cleaned = String(raw).trim().replace(",", ".");
   if (cleaned === "") return { value: 0, error: null };
@@ -50,9 +47,15 @@ function parseAmountInput(raw, t) {
   return { value: num, error: null };
 }
 
+let rowSeq = 0;
+function newRow(over = {}) {
+  rowSeq += 1;
+  return { id: rowSeq, minca: "BTC", mnozstvo: 1, coin_id: "bitcoin", amountText: "1", amountError: null, ...over };
+}
+
 export default function Portfolio() {
   const { push } = useToast();
-  const { vsCurrency, formatAmount } = useCurrency();
+  const { currency, vsCurrency, formatAmount } = useCurrency();
   const { t, lang } = useLanguage();
   const locale = localeForLang(lang);
   usePageTitle("portfolio.title");
@@ -60,9 +63,7 @@ export default function Portfolio() {
   const providersCtx = useProviders();
   const providers = providersCtx.providers;
   const [provider, setProvider] = useState(null);
-  const [holdings, setHoldings] = useState([{ minca: "BTC", mnozstvo: 1, coin_id: "bitcoin" }]);
-  const [amountInputs, setAmountInputs] = useState({ 0: "1" });
-  const [amountErrors, setAmountErrors] = useState({});
+  const [holdings, setHoldings] = useState(() => [newRow()]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -126,10 +127,10 @@ export default function Portfolio() {
   }
 
   function updateAmount(i, raw) {
-    setAmountInputs((prev) => ({ ...prev, [i]: raw }));
     const { value, error } = parseAmountInput(raw, t);
-    setAmountErrors((prev) => ({ ...prev, [i]: error }));
-    if (!error) updateHolding(i, "mnozstvo", value);
+    setHoldings((prev) => prev.map((h, idx) => (
+      idx === i ? { ...h, amountText: raw, amountError: error, ...(error ? {} : { mnozstvo: value }) } : h
+    )));
   }
 
   function selectPresetCoin(i, symbol) {
@@ -142,9 +143,7 @@ export default function Portfolio() {
       push(t("portfolio.maxHoldingsReached", { max: MAX_HOLDINGS }), "warn");
       return;
     }
-    const idx = holdings.length;
-    setHoldings((prev) => [...prev, { minca: "BTC", mnozstvo: 1, coin_id: "bitcoin" }]);
-    setAmountInputs((prev) => ({ ...prev, [idx]: "1" }));
+    setHoldings((prev) => [...prev, newRow()]);
   }
 
   function addCustomCoin(coin) {
@@ -152,22 +151,15 @@ export default function Portfolio() {
       push(t("portfolio.maxHoldingsReached", { max: MAX_HOLDINGS }), "warn");
       return;
     }
-    const idx = holdings.length;
-    setHoldings((prev) => [...prev, { minca: coin.symbol, mnozstvo: 1, coin_id: coin.id }]);
-    setAmountInputs((prev) => ({ ...prev, [idx]: "1" }));
+    setHoldings((prev) => [...prev, newRow({ minca: coin.symbol, coin_id: coin.id })]);
     push(t("portfolio.addCustomCoinToast", { name: coin.name, symbol: coin.symbol }), "success");
   }
 
   function removeRow(i) {
     setHoldings((prev) => prev.filter((_, idx) => idx !== i));
-    setAmountInputs((prev) => {
-      const next = { ...prev };
-      delete next[i];
-      return next;
-    });
   }
 
-  const hasAmountErrors = Object.values(amountErrors).some(Boolean);
+  const hasAmountErrors = holdings.some((h) => h.amountError);
 
   const holdingValues = holdings.map((h) => {
     const price = h.coin_id ? prices[h.coin_id]?.[vsCurrency] : null;
@@ -195,7 +187,6 @@ export default function Portfolio() {
     if (!provider || holdings.length === 0 || hasAmountErrors) return;
     const providerInfo = providers.find((p) => p.provider === provider);
     if (!providerInfo?.connected) {
-      // Demo/mock rezim - nic sa neplati, netreba potvrdzovacie okno.
       doAnalyze();
       return;
     }
@@ -205,8 +196,6 @@ export default function Portfolio() {
       const est = await api.estimatePortfolioCost(provider, cleanHoldings);
       setCostEstimate(est);
     } catch (err) {
-      // Odhad je len pomocny UI prvok - ak zlyha, radsej pokracuj rovno
-      // k skutocnej analyze, nez aby pouzivatel uviazol bez moznosti pokracovat.
       doAnalyze();
     } finally {
       setEstimating(false);
@@ -246,8 +235,9 @@ export default function Portfolio() {
   function exportJson() {
     const payload = {
       generated_at: new Date().toISOString(),
-      holdings: holdingValues.map((h) => ({ minca: h.minca, mnozstvo: h.mnozstvo, cena_usd: h.price, hodnota_usd: h.value })),
-      total_value_usd: totalValue,
+      mena: currency,
+      holdings: holdingValues.map((h) => ({ minca: h.minca, mnozstvo: h.mnozstvo, cena: h.price ?? null, hodnota: h.value ?? null })),
+      total_value: totalValue,
       ai_analyza: result?.data || null,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -259,11 +249,6 @@ export default function Portfolio() {
     URL.revokeObjectURL(url);
   }
 
-  /** Escapuje HTML-specialne znaky pred vlozenim do document.write() nizsie.
-   * NUTNE, lebo text z AI odpovede (odborna_analyza, dovod, akcia...) moze
-   * teoreticky obsahovat "<script>" a pod. — bez escapovania by sa spustil
-   * priamo v novom okne (XSS). Vsetky hodnoty vlozene do HTML sablony pod
-   * touto funkciou MUSIA prejst cez escapeHtml(). */
   function escapeHtml(value) {
     return String(value ?? "")
       .replace(/&/g, "&amp;")
@@ -285,7 +270,7 @@ export default function Portfolio() {
       </head><body>
       <h1>${escapeHtml(t("portfolio.printHeading"))}</h1>
       <p>${escapeHtml(t("portfolio.printGenerated", { date: new Date().toLocaleString(locale) }))}</p>
-      <table><thead><tr><th>${escapeHtml(t("portfolio.printCoin"))}</th><th>${escapeHtml(t("portfolio.printAmount"))}</th><th>${escapeHtml(t("portfolio.printPriceUsd"))}</th><th>${escapeHtml(t("portfolio.printValueUsd"))}</th></tr></thead><tbody>${rows}</tbody></table>
+      <table><thead><tr><th>${escapeHtml(t("portfolio.printCoin"))}</th><th>${escapeHtml(t("portfolio.printAmount"))}</th><th>${escapeHtml(t("portfolio.printPrice", { currency }))}</th><th>${escapeHtml(t("portfolio.printValue", { currency }))}</th></tr></thead><tbody>${rows}</tbody></table>
       <p><strong>${escapeHtml(t("portfolio.printTotalValue", { value: formatAmount(totalValue) }))}</strong></p>
       ${result?.data?.odborna_analyza ? `<h2>${escapeHtml(t("portfolio.printExpertAnalysis"))}</h2><p>${escapeHtml(result.data.odborna_analyza)}</p>` : ""}
       ${recs ? `<h2>${escapeHtml(t("portfolio.printRecommendations"))}</h2><ul>${recs}</ul>` : ""}
@@ -296,8 +281,8 @@ export default function Portfolio() {
     w.print();
   }
 
-  const sectorData = result?.data?.sektorova_alokacia && typeof result.data.sektorova_alokacia === "object"
-    ? Object.entries(result.data.sektorova_alokacia).map(([name, value]) => ({ name, value })).filter((item) => typeof item.value === "number")
+  const sectorData = result?.data?.sektorova_alokacia
+    ? Object.entries(result.data.sektorova_alokacia).map(([name, value]) => ({ name, value }))
     : [];
 
   return (
@@ -324,7 +309,7 @@ export default function Portfolio() {
         {holdings.map((h, i) => {
           const hv = holdingValues[i];
           return (
-            <div key={i} className="grid grid-2" style={{ marginBottom: 4, alignItems: "start" }}>
+            <div key={h.id} className="grid grid-2" style={{ marginBottom: 4, alignItems: "start" }}>
               <div className="field">
                 <label>{t("portfolio.coinLabelIndexed", { index: i + 1 })}</label>
                 <select className="select" value={COINS.includes(h.minca) ? h.minca : "custom"} onChange={(e) => selectPresetCoin(i, e.target.value)}>
@@ -337,11 +322,11 @@ export default function Portfolio() {
                   <label>{t("portfolio.amountLabel")}</label>
                   <input
                     className="input" type="text" inputMode="decimal" placeholder={t("portfolio.amountPlaceholder")}
-                    value={amountInputs[i] ?? String(h.mnozstvo)}
+                    value={h.amountText}
                     onChange={(e) => updateAmount(i, e.target.value)}
                   />
-                  {amountErrors[i] && <span style={{ color: "var(--crimson)", fontSize: 11.5 }}>{amountErrors[i]}</span>}
-                  {!amountErrors[i] && hv?.value != null && (
+                  {h.amountError && <span style={{ color: "var(--crimson-fg)", fontSize: 11.5 }}>{h.amountError}</span>}
+                  {!h.amountError && hv?.value != null && (
                     <span className="holding-value">{formatAmount(hv.price)} × {h.mnozstvo} = {formatAmount(hv.value)}</span>
                   )}
                 </div>
@@ -388,8 +373,8 @@ export default function Portfolio() {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
             {result.is_mock ? <MockBadge /> : <span />}
             <div style={{ display: "flex", gap: 8 }}>
-              <button className="btn btn-primary btn-sm" onClick={saveCurrentAnalysis} disabled={saving || saved}>
-                {saving ? <Loader2 size={13} className="spin" /> : <Save size={13} />} {saved ? t("common.savedShort") : saving ? t("common.saving") : t("common.saveAnalysis")}
+              <button className={`btn btn-sm ${saved ? "btn-success" : "btn-primary"}`} onClick={saveCurrentAnalysis} disabled={saving || saved}>
+                {saving ? <Loader2 size={13} className="spin" /> : saved ? <CheckCircle2 size={13} /> : <Save size={13} />} {saved ? t("common.savedShort") : saving ? t("common.saving") : t("common.saveAnalysis")}
               </button>
               <button className="btn btn-ghost btn-sm" onClick={exportJson}><Download size={13} /> {t("portfolio.exportJson")}</button>
               <button className="btn btn-ghost btn-sm" onClick={exportPdf}><FileText size={13} /> {t("portfolio.exportPdf")}</button>
@@ -481,7 +466,7 @@ export default function Portfolio() {
                   onChange={(e) => setSelectedIds(e.target.checked ? pfHistory.map((h) => h.id) : [])} /> {t("common.selectAll")}
               </label>
               {selectedIds.length > 0 && (
-                <button className="btn btn-ghost btn-sm" style={{ color: "var(--crimson)" }} onClick={bulkDeletePortfolio}>
+                <button className="btn btn-ghost btn-sm" style={{ color: "var(--crimson-fg)" }} onClick={bulkDeletePortfolio}>
                   <Trash2 size={13} /> {t("common.deleteSelected", { n: selectedIds.length })}
                 </button>
               )}

@@ -1,3 +1,5 @@
+/** Locale tests. */
+
 import { describe, expect, it } from "vitest";
 import { localeForLang } from "../i18n/locale";
 

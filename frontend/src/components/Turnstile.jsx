@@ -1,8 +1,7 @@
+/** Cloudflare Turnstile captcha. */
+
 import { useEffect, useRef } from "react";
 
-/** Cloudflare Turnstile (bezplatna CAPTCHA). Zobrazi sa len ak je na Netlify
- * nastavene VITE_TURNSTILE_SITE_KEY - inak komponent nic nevykresli. Token je
- * jednorazovy: rodic po kazdom pouziti zmeni `key`, cim sa widget obnovi. */
 const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 let scriptPromise;
 

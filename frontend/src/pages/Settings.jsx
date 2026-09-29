@@ -1,3 +1,5 @@
+/** Settings page. */
+
 import { AtSign, Compass, Info, Key, Languages, LogOut, Moon, ShieldCheck, Sun, Trash2, Wallet2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -56,8 +58,8 @@ export default function Settings() {
     }
     setSavingPassword(true);
     try {
-      const res = await api.changePassword(currentPassword, newPassword);
-      push(res.message, "success");
+      await api.changePassword(currentPassword, newPassword);
+      push(t("settings.passwordChanged"), "success");
       setCurrentPassword("");
       setNewPassword("");
     } catch (err) {
@@ -86,8 +88,8 @@ export default function Settings() {
   async function handleLogoutAllDevices() {
     setLoggingOutAll(true);
     try {
-      const res = await api.logoutAllDevices();
-      push(res.message, "success");
+      await api.logoutAllDevices();
+      push(t("settings.loggedOutAll"), "success");
     } catch (err) {
       push(err, "error");
     } finally {
@@ -187,7 +189,7 @@ export default function Settings() {
             <label>{t("settings.currentPassword")}</label>
             <PasswordInput value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} />
           </div>
-          <button className="btn btn-ghost btn-sm" style={{ color: "var(--crimson)" }} onClick={handleDeleteAccount} disabled={deleting || !deletePassword}>
+          <button className="btn btn-ghost btn-sm" style={{ color: "var(--crimson-fg)" }} onClick={handleDeleteAccount} disabled={deleting || !deletePassword}>
             <Trash2 size={14} /> {t("settings.deleteAccountButton")}
           </button>
         </Card>

@@ -1,7 +1,5 @@
-/** Cisto dekorativny, animovany "candlestick" graf pre branding panel na
- * prihlasovacej stranke. Ziadne realne data - len vizualny motiv, ktory
- * evokuje trading terminal. SVG (nie obrazok), takze funguje offline a bez
- * externych zavislosti. */
+/** Decorative candlestick graphic. */
+
 const CANDLES = [
   { x: 10, open: 60, close: 40, high: 68, low: 34 },
   { x: 34, open: 40, close: 52, high: 56, low: 36 },
@@ -25,7 +23,6 @@ export default function CandlestickArt() {
           <stop offset="100%" stopColor="#34d399" />
         </linearGradient>
       </defs>
-      {/* trend line spajajuca close hodnoty */}
       <polyline
         className="candle-trendline"
         fill="none"
@@ -35,7 +32,7 @@ export default function CandlestickArt() {
         points={CANDLES.map((c) => `${c.x},${90 - c.close}`).join(" ")}
       />
       {CANDLES.map((c, i) => {
-        const bullish = c.close < c.open; // v SVG suradniciach mensie y = vyssie = rast
+        const bullish = c.close < c.open;
         const color = bullish ? "#34d399" : "#fb5a6a";
         const top = 90 - Math.max(c.open, c.close);
         const height = Math.max(2, Math.abs(c.open - c.close));

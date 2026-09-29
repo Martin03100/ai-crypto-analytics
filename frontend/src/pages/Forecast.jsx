@@ -1,5 +1,8 @@
-import { Brain, ChevronDown, Copy, Loader2, RefreshCw, Rocket, Save, Sparkles, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+/** Forecast page. */
+
+import { Brain, CheckCircle2, ChevronDown, Copy, Loader2, RefreshCw, Rocket, Save, Sparkles, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   Area, AreaChart, CartesianGrid, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
@@ -28,30 +31,24 @@ const COINS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "DOT", 
 const HORIZONS = ["24h", "1T", "1M", "1R"];
 
 function ForecastChart({ data, t, actualPrices, createdAt, horizon, locale }) {
-  const prices = Array.isArray(data?.ceny) ? data.ceny : [];
-  const labels = Array.isArray(data?.casove_body) ? data.casove_body : [];
-  const n = prices.length;
+  const n = data.ceny.length;
+  const band = data.pasmo && Array.isArray(data.pasmo.dolne) && Array.isArray(data.pasmo.horne)
+    && data.pasmo.dolne.length === n && data.pasmo.horne.length === n ? data.pasmo : null;
   const hasActual = Array.isArray(actualPrices) && actualPrices.length === n;
-  if (n === 0) {
-    return <p className="text-sub">{t("forecast.noChartData")}</p>;
-  }
-  // Skutocne casy (od casu vytvorenia predikcie), nie popisky vymyslene AI.
   const points = buildTimePoints(data.vytvorene || createdAt, horizon, n);
   const startPrice = points && typeof data.aktualna_cena === "number" ? data.aktualna_cena : null;
-  const shortLabel = (i) => (points ? formatTimeShort(points[i], horizon, locale) : labels[i - 1]);
-  const fullLabel = (i) => (points ? formatTimeFull(points[i], locale) : labels[i - 1]);
+  const shortLabel = (i) => (points ? formatTimeShort(points[i], horizon, locale) : data.casove_body[i - 1]);
+  const fullLabel = (i) => (points ? formatTimeFull(points[i], locale) : data.casove_body[i - 1]);
 
   const chartData = [];
   if (startPrice !== null) {
-    // Bod 0 = skutocna cena v case vytvorenia - obe krivky zacinaju z rovnakeho miesta.
-    chartData.push({ t: shortLabel(0), full: `${fullLabel(0)} · ${t("forecast.startPoint")}`, price: startPrice, upper: startPrice, actual: hasActual ? startPrice : undefined });
+    chartData.push({ t: shortLabel(0), full: `${fullLabel(0)} · ${t("forecast.startPoint")}`, price: startPrice, band: band ? [startPrice, startPrice] : undefined, actual: hasActual ? startPrice : undefined });
   }
-  prices.forEach((price, idx) => {
-    chartData.push({ t: shortLabel(idx + 1), full: fullLabel(idx + 1), price, upper: +(price * 1.05).toFixed(8), actual: hasActual ? actualPrices[idx] : undefined });
+  data.ceny.forEach((price, idx) => {
+    chartData.push({ t: shortLabel(idx + 1), full: fullLabel(idx + 1), price, band: band ? [band.dolne[idx], band.horne[idx]] : undefined, actual: hasActual ? actualPrices[idx] : undefined });
   });
 
-  // Dynamicky rozsah osi Y (min/max +-5%), aby graf nezacinal od $0.
-  const values = chartData.flatMap((p) => [p.price, p.actual]).filter((v) => Number.isFinite(v));
+  const values = chartData.flatMap((p) => [p.price, p.actual, ...(p.band || [])]).filter((v) => Number.isFinite(v));
   const minPrice = Math.min(...values);
   const maxPrice = Math.max(...values);
   const padding = (maxPrice - minPrice) * 0.05 || maxPrice * 0.05 || 1;
@@ -63,6 +60,7 @@ function ForecastChart({ data, t, actualPrices, createdAt, horizon, locale }) {
   const summary = t("forecast.chartSummary", { from: formatPrice(first.price), to: formatPrice(last.price), start: first.full, end: last.full });
 
   return (
+    <>
     <div role="img" aria-label={summary}>
     <ResponsiveContainer width="100%" height={280}>
       <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
@@ -81,18 +79,22 @@ function ForecastChart({ data, t, actualPrices, createdAt, horizon, locale }) {
         <Tooltip
           contentStyle={{ background: "var(--bg-tooltip)", border: "1px solid var(--border-strong)", borderRadius: 10, fontSize: 12, color: "var(--text-primary)" }}
           labelStyle={{ color: "var(--text-secondary)" }}
-          formatter={(v, name) => [formatPrice(v), name === "price" ? t("forecast.legendPredicted") : name === "actual" ? t("forecast.legendActual") : name]}
+          formatter={(v, name) => (name === "band" && Array.isArray(v)
+            ? [`${formatPrice(v[0])} – ${formatPrice(v[1])}`, t("forecast.legendBand")]
+            : [formatPrice(v), name === "price" ? t("forecast.legendPredicted") : name === "actual" ? t("forecast.legendActual") : name])}
           labelFormatter={(label, payload) => t("forecast.timeTooltip", { label: payload?.[0]?.payload?.full || label })}
         />
-        {hasActual && <Legend formatter={(value) => (value === "price" ? t("forecast.legendPredicted") : t("forecast.legendActual"))} wrapperStyle={{ fontSize: 12 }} />}
-        <Area type="monotone" dataKey="upper" stroke="none" fill="url(#priceFill)" fillOpacity={0.4} isAnimationActive={false} legendType="none" />
-        <Area type="monotone" dataKey="price" stroke="var(--cyan)" strokeWidth={2.5} fill="url(#priceFill)" dot={{ r: 3, fill: "var(--cyan)" }} />
+        {hasActual && <Legend formatter={(value) => (value === "price" ? t("forecast.legendPredicted") : value === "band" ? t("forecast.legendBand") : t("forecast.legendActual"))} wrapperStyle={{ fontSize: 12 }} />}
+        {band && <Area type="monotone" dataKey="band" name="band" stroke="none" fill="var(--cyan)" fillOpacity={0.14} isAnimationActive={false} />}
+        <Area type="monotone" dataKey="price" stroke="var(--cyan-fg)" strokeWidth={2.5} fill="url(#priceFill)" dot={{ r: 3, fill: "var(--cyan-fg)" }} />
         {hasActual && (
-          <Line type="monotone" dataKey="actual" stroke="var(--amber)" strokeWidth={2.5} strokeDasharray="6 3" dot={{ r: 3.5, fill: "var(--amber)" }} />
+          <Line type="monotone" dataKey="actual" stroke="var(--amber-fg)" strokeWidth={2.5} strokeDasharray="6 3" dot={{ r: 3.5, fill: "var(--amber-fg)" }} />
         )}
       </AreaChart>
     </ResponsiveContainer>
     </div>
+    {band && <p className="text-sub" style={{ marginTop: 6 }}>{t("forecast.bandNote", { vol: data.denna_volatilita_pct ?? "—" })}</p>}
+    </>
   );
 }
 
@@ -210,12 +212,17 @@ function HistoryItem({ entry, onDelete }) {
 
 export default function Forecast() {
   const { push } = useToast();
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   usePageTitle("forecast.title");
   const { currency } = useCurrency();
   const [tab, setTab] = useState("new");
   const providersCtx = useProviders();
-  const providers = providersCtx.providers;
+  const providers = useMemo(
+    () => [...providersCtx.providers, { provider: "quant", label: t("provider.quantLabel"), connected: true }],
+    [providersCtx.providers, t]
+  );
+  const hasAiProvider = providersCtx.providers.some((p) => p.connected);
+  const canGenerate = providers.some((p) => p.connected);
   const [provider, setProvider] = useState(null);
   const [coin, setCoin] = useState("BTC");
   const [horizon, setHorizon] = useState("1T");
@@ -235,7 +242,7 @@ export default function Forecast() {
   const [estimating, setEstimating] = useState(false);
 
   useEffect(() => {
-    if (providersCtx.defaultProvider) setProvider(providersCtx.defaultProvider);
+    setProvider(providersCtx.defaultProvider || "quant");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [providersCtx.defaultProvider]);
 
@@ -289,8 +296,7 @@ export default function Forecast() {
   async function generate() {
     if (!provider) return;
     const providerInfo = providers.find((p) => p.provider === provider);
-    if (!providerInfo?.connected) {
-      // Demo/mock rezim - nic sa neplati, netreba potvrdzovacie okno.
+    if (provider === "quant" || !providerInfo?.connected) {
       doGenerate();
       return;
     }
@@ -299,8 +305,6 @@ export default function Forecast() {
       const est = await api.estimateForecastCost(provider, coin, horizon);
       setCostEstimate(est);
     } catch (err) {
-      // Odhad je len pomocny UI prvok - ak zlyha, radsej pokracuj rovno
-      // k skutocnej analyze, nez aby pouzivatel uviazol bez moznosti pokracovat.
       doGenerate();
     } finally {
       setEstimating(false);
@@ -314,7 +318,11 @@ export default function Forecast() {
     setSaved(false);
     try {
       const res = await api.generateForecast(provider, coin, horizon);
-      setResult({ ...res, generatedAt: new Date().toISOString(), horizon });
+      if (!res.success || !res.data) {
+        push(res.error_message ? humanizeError(res.error_message, lang) : t("errors.generic"), "error");
+        return;
+      }
+      setResult({ ...res, generatedAt: new Date().toISOString(), horizon, coin, provider });
       if (res.is_mock) push(res.error_message ? humanizeError(res.error_message, lang) : t("forecast.mockNotice"), "warn");
     } catch (err) {
       push(err, "error");
@@ -327,7 +335,7 @@ export default function Forecast() {
     if (!result?.data) return;
     setSaving(true);
     try {
-      await api.saveForecast(provider, coin, horizon, result.data, result.is_mock);
+      await api.saveForecast(result.provider, result.coin, result.horizon, result.data, result.is_mock);
       setSaved(true);
       push(t("common.saved"), "success");
     } catch (err) {
@@ -357,7 +365,7 @@ export default function Forecast() {
           <Card>
             <div className="grid grid-3">
               <ProviderSelect providers={providers} value={provider} onChange={setProvider} />
-              {providers.some((p) => p.connected) && (
+              {canGenerate && (
                 <>
                   <div className="field">
                     <label>{t("forecast.coinLabel")}</label>
@@ -375,7 +383,11 @@ export default function Forecast() {
                 </>
               )}
             </div>
-            {providers.some((p) => p.connected) && (
+            {!hasAiProvider && (() => {
+              const [before, after] = t("forecast.quantHint", { link: "\u0000" }).split("\u0000");
+              return <p className="text-sub" style={{ margin: "4px 0 10px" }}>{before}<Link to="/account" style={{ color: "var(--cyan-fg)" }}>{t("provider.connectLinkLabel")}</Link>{after}</p>;
+            })()}
+            {canGenerate && (
               <button className="btn btn-primary" onClick={generate} disabled={loading || estimating} style={{ marginTop: 4 }}>
                 {(loading || estimating) ? <Loader2 size={15} className="spin" /> : <Rocket size={15} />}
                 {loading ? t("forecast.generatingButton") : estimating ? t("costConfirm.estimating") : t("forecast.generateButton")}
@@ -393,13 +405,13 @@ export default function Forecast() {
 
           {!loading && result?.data && (
             <div style={{ marginTop: 20 }}>
-              <Card title={`${t("forecast.chartTitlePrefix")}: ${coin}`} icon={Sparkles} glow="cyan">
+              <Card title={`${t("forecast.chartTitlePrefix")}: ${result.coin}`} icon={Sparkles} glow="cyan">
                 {result.is_mock && <div style={{ marginBottom: 12 }}><MockBadge /></div>}
                 <ForecastChart data={result.data} t={t} createdAt={result.generatedAt} horizon={result.horizon} locale={localeForLang(lang)} />
                 {currency !== "USD" && <p className="text-sub" style={{ marginTop: 6 }}>{t("forecast.usdNote")}</p>}
               </Card>
               <div style={{ height: 16 }} />
-              <Card title={t("forecast.reasoningTitle")} icon={Brain}>
+              <Card title={t(result.provider === "quant" ? "forecast.reasoningTitleQuant" : "forecast.reasoningTitle")} icon={Brain}>
                 {(result.data.confidence_score !== undefined || result.data.risk_level) && (
                   <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
                     {result.data.confidence_score !== undefined && <><ConfidenceBadge score={result.data.confidence_score} /><InfoTip text={t("help.confidence")} /></>}
@@ -412,8 +424,8 @@ export default function Forecast() {
                 <DataSources sources={result.data.zdroje_dat} />
               </Card>
               <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end" }}>
-                <button className="btn btn-primary btn-sm" onClick={saveCurrentForecast} disabled={saving || saved}>
-                  {saving ? <Loader2 size={14} className="spin" /> : <Save size={14} />} {saved ? t("common.savedShort") : saving ? t("common.saving") : t("common.saveAnalysis")}
+                <button className={`btn btn-sm ${saved ? "btn-success" : "btn-primary"}`} onClick={saveCurrentForecast} disabled={saving || saved}>
+                  {saving ? <Loader2 size={14} className="spin" /> : saved ? <CheckCircle2 size={14} /> : <Save size={14} />} {saved ? t("common.savedShort") : saving ? t("common.saving") : t("common.saveAnalysis")}
                 </button>
               </div>
             </div>
@@ -441,7 +453,7 @@ export default function Forecast() {
                   onChange={(e) => setSelectedIds(e.target.checked ? history.map((h) => h.id) : [])} /> {t("common.selectAll")}
               </label>
               {selectedIds.length > 0 && (
-                <button className="btn btn-ghost btn-sm" style={{ color: "var(--crimson)" }} onClick={bulkDeleteForecasts}>
+                <button className="btn btn-ghost btn-sm" style={{ color: "var(--crimson-fg)" }} onClick={bulkDeleteForecasts}>
                   <Trash2 size={13} /> {t("common.deleteSelected", { n: selectedIds.length })}
                 </button>
               )}

@@ -1,3 +1,5 @@
+/** Display currency context. */
+
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 const CurrencyContext = createContext(null);
@@ -21,11 +23,6 @@ export function CurrencyProvider({ children }) {
     setCurrencyState(next);
   }, []);
 
-  /** Formátuje hodnotu v aktuálne zvolenej mene. Pre BTC sa zobrazuje so
-   * satoshi presnosťou (8 desatinných miest), pre fiat meny bežné 2. */
-  // `decimals` (volitelne) = presny pocet desatinnych miest - pouzite v grafoch,
-  // kde sa pocet riadi rozpatim hodnot (inak by male mince mali vsetky popisky
-  // osi rovnake, napr. "$0.45"). Bez neho sa pocet prisposobi velkosti hodnoty.
   const formatAmount = useCallback((value, decimals) => {
     if (value == null || Number.isNaN(value)) return "—";
     if (currency === "BTC") {

@@ -1,16 +1,7 @@
+/** Error boundary. */
+
 import { Component } from "react";
 
-/**
- * Error Boundary — bez neho by AKYKOLVEK neošetrený pád v React strome
- * (napr. neočakávaný tvar dát z API) spôsobil úplne bielu, prázdnu
- * stránku bez akéhokoľvek vysvetlenia. Toto zachytí taký pád a zobrazí
- * priateľský fallback namiesto toho.
- *
- * Zámerne NEPOUŽÍVA i18n systém (useLanguage/translate) — ak by problém
- * spôsobil práve tento systém, boundary by tým pádom sama spadla. Jazyk
- * preto číta priamo z localStorage (rovnaký kľúč ako LanguageContext) a
- * texty má vlastné, minimálne, aby fungovala nezávisle od zvyšku appky.
- */
 const FALLBACK_TEXT = {
   en: {
     title: "Something went wrong",

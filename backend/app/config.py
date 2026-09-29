@@ -1,10 +1,4 @@
-"""
-app/config.py
-==============
-Globalne nastavenia, konstanty, API endpointy a bezpecnostne parametre
-pre cely backend. Nic ine by nemalo obsahovat hardcoded providerov,
-URL alebo tabulkove nazvy - vsetko sa importuje odtialto.
-"""
+"""Application configuration."""
 
 from __future__ import annotations
 
@@ -12,48 +6,29 @@ import os
 from pathlib import Path
 from typing import Dict, Final, List
 
-# ---------------------------------------------------------------------------
-# Vseobecne
-# ---------------------------------------------------------------------------
 APP_TITLE: Final[str] = "AI Crypto Analytics"
 REQUEST_TIMEOUT_SECONDS: Final[int] = 12
 
 BASE_DIR: Final[Path] = Path(__file__).resolve().parent.parent
 DATA_DIR: Final[Path] = BASE_DIR / "data"
 DB_PATH: Final[Path] = DATA_DIR / "app.db"
-# V produkcii mozes nastavit DATABASE_URL (napr. na hostovanu Postgres DB -
-# Render/Neon/Supabase a pod.), aby data prezili restart/redeploy servera
-# (viac v DEPLOYMENT.md). Bez tejto env premennej appka pouziva lokalny
-# SQLite subor ako doteraz - spravanie pre lokalny vyvoj sa nemeni.
 DATABASE_URL: Final[str] = os.environ.get("DATABASE_URL", f"sqlite:///{DB_PATH}")
 
-# ---------------------------------------------------------------------------
-# Bezpecnost - JWT a sifrovanie API klucov (AES-256 / Fernet)
-# ---------------------------------------------------------------------------
-# V produkcii NAČÍTAŤ z env premennych. Fallback iba pre lokalny vyvoj.
 JWT_SECRET_KEY: Final[str] = os.environ.get("JWT_SECRET_KEY", "dev-secret-change-me-in-production")
 JWT_ALGORITHM: Final[str] = "HS256"
-JWT_EXPIRE_MINUTES: Final[int] = 60 * 24 * 7  # 7 dni
+PASSWORD_HASH_ROUNDS: Final[int] = int(os.environ.get("PASSWORD_HASH_ROUNDS", "310000"))
+JWT_EXPIRE_MINUTES: Final[int] = 60 * 24 * 7
 
-# ---------------------------------------------------------------------------
-# HttpOnly auth cookie (nahradzuje ulozenie JWT v localStorage kvoli XSS)
-# ---------------------------------------------------------------------------
 AUTH_COOKIE_NAME: Final[str] = "aca_session"
 AUTH_COOKIE_MAX_AGE_SECONDS: Final[int] = JWT_EXPIRE_MINUTES * 60
-# V produkcii (APP_ENV=production) sa cookie posiela iba cez HTTPS.
 APP_ENV: Final[str] = os.environ.get("APP_ENV", "development")
 AUTH_COOKIE_SECURE: Final[bool] = APP_ENV == "production"
 AUTH_COOKIE_SAMESITE: Final[str] = "lax"
 
-# Fernet kluc (32 url-safe base64 bytes) pre sifrovanie API klucov v DB.
-# V produkcii NAČÍTAŤ z env / secret manazera (napr. AWS KMS, Vault).
 API_KEY_ENCRYPTION_SECRET: Final[str] = os.environ.get(
     "API_KEY_ENCRYPTION_SECRET", "dev-fernet-key-change-me-in-production-32b"
 )
 
-# ---------------------------------------------------------------------------
-# AI provideri
-# ---------------------------------------------------------------------------
 PROVIDERS: Final[Dict[str, str]] = {
     "Gemini": "gemini",
     "OpenAI (ChatGPT)": "openai",
@@ -65,17 +40,17 @@ PROVIDERS: Final[Dict[str, str]] = {
 PROVIDER_LABELS: Final[Dict[str, str]] = {v: k for k, v in PROVIDERS.items()}
 PROVIDER_KEYS: Final[List[str]] = list(PROVIDERS.values())
 
-# ---------------------------------------------------------------------------
-# Kryptomeny
-# ---------------------------------------------------------------------------
+QUANT_PROVIDER: Final[str] = "quant"
+QUANT_LABEL: Final[str] = "Quant (free model)"
+
 SUPPORTED_COINS: Final[List[str]] = [
     "BTC", "ETH", "SOL", "BNB", "XRP",
     "ADA", "DOGE", "AVAX", "DOT", "LINK",
 ]
 
 MOCK_BASE_PRICES: Final[Dict[str, float]] = {
-    "BTC": 62_000.0, "ETH": 3_400.0, "SOL": 145.0, "BNB": 580.0, "XRP": 0.55,
-    "ADA": 0.45, "DOGE": 0.15, "AVAX": 28.0, "DOT": 6.5, "LINK": 14.0,
+    "BTC": 83_000.0, "ETH": 2_850.0, "SOL": 115.0, "BNB": 800.0, "XRP": 1.60,
+    "ADA": 0.36, "DOGE": 0.12, "AVAX": 12.0, "DOT": 1.15, "LINK": 12.0,
 }
 
 TIME_HORIZONS: Final[Dict[str, Dict[str, object]]] = {
@@ -87,16 +62,7 @@ TIME_HORIZONS: Final[Dict[str, Dict[str, object]]] = {
 
 SECTOR_CATEGORIES: Final[List[str]] = ["DeFi", "L1/L2", "AI", "Memes", "Other"]
 
-# ---------------------------------------------------------------------------
-# Externe API
-# ---------------------------------------------------------------------------
 FEAR_GREED_API_URL: Final[str] = "https://api.alternative.me/fng/"
-# Viacero zdrojov namiesto jedneho RSS feedu - diverzifikuje spravy naprieč
-# nezavislymi redakciami (nie len jeden pohlad). Instagram/Facebook nemaju
-# realny verejny sposob, ako z nich cerpat krypto obsah bez business API
-# schvalenia, a X/Twitter API je od zmeny vlastnika platene - ani jedno teda
-# nie je v tomto zozname. Reddit (r/CryptoCurrency) je pridany samostatne
-# nizsie (REDDIT_CRYPTO_URL), kedze pouziva iny format (JSON, nie RSS).
 CRYPTO_NEWS_RSS_URLS: Final[List[str]] = [
     "https://www.coindesk.com/arc/outboundfeeds/rss/",
     "https://cointelegraph.com/rss",
@@ -104,58 +70,38 @@ CRYPTO_NEWS_RSS_URLS: Final[List[str]] = [
 ]
 REDDIT_CRYPTO_URL: Final[str] = "https://www.reddit.com/r/CryptoCurrency/hot.json"
 
-GEMINI_API_URL_TEMPLATE: Final[str] = (
-    "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key={api_key}"
-)
+GEMINI_MODEL: Final[str] = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
 OPENAI_API_URL: Final[str] = "https://api.openai.com/v1/chat/completions"
-OPENAI_MODEL: Final[str] = "gpt-4o-mini"
+OPENAI_MODEL: Final[str] = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 ANTHROPIC_API_URL: Final[str] = "https://api.anthropic.com/v1/messages"
-ANTHROPIC_MODEL: Final[str] = "claude-3-5-haiku-20241022"
+ANTHROPIC_MODEL: Final[str] = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
 ANTHROPIC_API_VERSION: Final[str] = "2023-06-01"
 DEEPSEEK_API_URL: Final[str] = "https://api.deepseek.com/chat/completions"
-DEEPSEEK_MODEL: Final[str] = "deepseek-chat"
+DEEPSEEK_MODEL: Final[str] = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash")
 GROK_API_URL: Final[str] = "https://api.x.ai/v1/chat/completions"
-GROK_MODEL: Final[str] = "grok-2-latest"
+GROK_MODEL: Final[str] = os.environ.get("GROK_MODEL", "grok-4.3")
 
-# ---------------------------------------------------------------------------
-# CORS - povolene originy pre frontend dev server / produkciu
-# ---------------------------------------------------------------------------
 CORS_ORIGINS: Final[List[str]] = os.environ.get(
     "CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
 ).split(",")
 
-# ---------------------------------------------------------------------------
-# CoinGecko (live ceny + vyhladavanie mincí)
-# ---------------------------------------------------------------------------
 COINGECKO_SIMPLE_PRICE_URL: Final[str] = "https://api.coingecko.com/api/v3/simple/price"
 COINGECKO_SEARCH_URL: Final[str] = "https://api.coingecko.com/api/v3/search"
 COINGECKO_COINS_LIST_URL: Final[str] = "https://api.coingecko.com/api/v3/coins/list"
 PRICE_CACHE_TTL_SECONDS: Final[int] = 60
-# Volitelny BEZPLATNY CoinGecko "Demo" API kluc (coingecko.com -> Developer
-# Dashboard). Bez neho appka zdiela verejny limit s ostatnymi aplikaciami na
-# rovnakej IP adrese hostingu (Render) -> casto odmietnute requesty a AI
-# predikcie bez realnych trhovych dat. S klucom ma appka vlastny limit.
 COINGECKO_API_KEY: Final[str] = os.environ.get("COINGECKO_API_KEY", "")
-# Dalsie VOLITELNE bezplatne kluce pre bohatsie AI analyzy (viz
-# app/services/data_sources.py). Bez nich sa dany zdroj preskoci/obmedzi.
-FRED_API_KEY: Final[str] = os.environ.get("FRED_API_KEY", "")            # makro: Fed, inflacia, dolar, S&P 500
-GITHUB_TOKEN: Final[str] = os.environ.get("GITHUB_TOKEN", "")            # aktivita vyvojarov (vyssi limit)
-BLOCKCHAIR_API_KEY: Final[str] = os.environ.get("BLOCKCHAIR_API_KEY", "")  # on-chain + velryby (vyssi limit)
-# Cloudflare Turnstile CAPTCHA (zadarmo). Ak nie je nastaveny, CAPTCHA je vypnuta.
-# Musi byt nastaveny SPOLU s VITE_TURNSTILE_SITE_KEY na Netlify.
+FRED_API_KEY: Final[str] = os.environ.get("FRED_API_KEY", "")
+GITHUB_TOKEN: Final[str] = os.environ.get("GITHUB_TOKEN", "")
+BLOCKCHAIR_API_KEY: Final[str] = os.environ.get("BLOCKCHAIR_API_KEY", "")
 TURNSTILE_SECRET_KEY: Final[str] = os.environ.get("TURNSTILE_SECRET_KEY", "")
 EMAIL_VERIFICATION_CODE_MINUTES: Final[int] = 30
 
-# Mapovanie zakladnych symbolov na CoinGecko id (pre vyhladavaciu ponuku aj mock data).
 DEFAULT_COIN_IDS: Final[Dict[str, str]] = {
     "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana", "BNB": "binancecoin",
     "XRP": "ripple", "ADA": "cardano", "DOGE": "dogecoin", "AVAX": "avalanche-2",
     "DOT": "polkadot", "LINK": "chainlink",
 }
 
-# ---------------------------------------------------------------------------
-# Odkazy na ziskanie API klucov (Account page)
-# ---------------------------------------------------------------------------
 PROVIDER_KEY_LINKS: Final[Dict[str, str]] = {
     "gemini": "https://aistudio.google.com/app/apikey",
     "openai": "https://platform.openai.com/api-keys",
@@ -165,47 +111,30 @@ PROVIDER_KEY_LINKS: Final[Dict[str, str]] = {
     "custom": "https://openrouter.ai/keys",
 }
 
-# Priblizna cena za 1000 vystupnych tokenov (USD) - iba orientacny odhad pre UI.
 PROVIDER_TOKEN_PRICE_USD_PER_1K: Final[Dict[str, float]] = {
     "gemini": 0.0007,
     "openai": 0.0006,
     "anthropic": 0.001,
     "deepseek": 0.00028,
     "grok": 0.0005,
-    "custom": 0.0008,  # neznamy cennik - orientacny odhad
+    "custom": 0.0008,
 }
 
-# ---------------------------------------------------------------------------
-# Account lockout (brute-force ochrana pri prihlaseni)
-# ---------------------------------------------------------------------------
 MAX_FAILED_LOGIN_ATTEMPTS: Final[int] = 5
 ACCOUNT_LOCKOUT_MINUTES: Final[int] = 15
 
-# ---------------------------------------------------------------------------
-# Rate limiting (in-memory, per proces - pre viac-procesove nasadenie by
-# bolo treba zdielany store ako Redis, ale pre tuto appku staci)
-# ---------------------------------------------------------------------------
-RATE_LIMIT_LOGIN: Final[tuple] = (10, 60)          # 10 pokusov / 60s na IP
-RATE_LIMIT_AI_ENDPOINT: Final[tuple] = (20, 60)    # 20 AI volani / 60s na pouzivatela
+RATE_LIMIT_LOGIN: Final[tuple] = (10, 60)
+RATE_LIMIT_AI_ENDPOINT: Final[tuple] = (20, 60)
 RATE_LIMIT_CHAT: Final[tuple] = (30, 60)
-RATE_LIMIT_ACCOUNT_SENSITIVE: Final[tuple] = (5, 60)   # zmena hesla/emailu/odhlasenie vsade
-RATE_LIMIT_API_KEY_TEST: Final[tuple] = (10, 60)        # tlacidlo "Testovat" pri API klucoch
-RATE_LIMIT_VOTE: Final[tuple] = (10, 60)               # community sentiment hlasovanie
-RATE_LIMIT_MARKET_PUBLIC: Final[tuple] = (30, 60)      # verejne (neautentifikovane) market endpointy
-RATE_LIMIT_RESET_CODE: Final[tuple] = (8, 300)         # over/znovu-posli kod na reset hesla (brute-force ochrana)
+RATE_LIMIT_ACCOUNT_SENSITIVE: Final[tuple] = (5, 60)
+RATE_LIMIT_API_KEY_TEST: Final[tuple] = (10, 60)
+RATE_LIMIT_VOTE: Final[tuple] = (10, 60)
+RATE_LIMIT_MARKET_PUBLIC: Final[tuple] = (30, 60)
+RATE_LIMIT_RESET_CODE: Final[tuple] = (8, 300)
+RATE_LIMIT_MARKET_GLOBAL: Final[tuple] = (600, 60)
+TRUSTED_PROXY_HOPS: Final[int] = int(os.environ.get("TRUSTED_PROXY_HOPS", "0"))
 
-# ---------------------------------------------------------------------------
-# Password reset (funguje aj bez SMTP: v development rezime sa reset link
-# vrati priamo v API odpovedi + vypise do konzoly; v produkcii treba
-# nastavit SMTP_* premenne, inak sa link iba loguje na serveri).
-# ---------------------------------------------------------------------------
 PASSWORD_RESET_TOKEN_MINUTES: Final[int] = 15
-# Render (a viacero inych bezplatnych PaaS platforiem) od konca roka 2025
-# blokuje na bezplatnom pláne VSETKY odchadzajuce spojenia na SMTP porty
-# (25/465/587) kvoli ochrane pred spamom - priame SMTP tym padom z takehoto
-# hostingu proste nikdy neprejde, bez ohladu na spravnost udajov. BREVO_API_KEY
-# umoznuje poslat email cez ich HTTPS API (port 443) namiesto SMTP - to
-# blokovane nie je. Ak je nastaveny, ma prednost pred SMTP_* nizsie.
 BREVO_API_KEY: Final[str] = os.environ.get("BREVO_API_KEY", "")
 EMAIL_FROM: Final[str] = os.environ.get("EMAIL_FROM", "no-reply@ai-crypto-analytics.local")
 SMTP_HOST: Final[str] = os.environ.get("SMTP_HOST", "")
@@ -215,8 +144,33 @@ SMTP_PASSWORD: Final[str] = os.environ.get("SMTP_PASSWORD", "")
 SMTP_FROM: Final[str] = os.environ.get("SMTP_FROM", EMAIL_FROM)
 FRONTEND_URL: Final[str] = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
-# ---------------------------------------------------------------------------
-# CSRF (double-submit cookie)
-# ---------------------------------------------------------------------------
 CSRF_COOKIE_NAME: Final[str] = "aca_csrf"
 CSRF_HEADER_NAME: Final[str] = "X-CSRF-Token"
+
+
+_INSECURE_SECRETS = {
+    "replace-with-a-random-secret",
+    "replace-with-another-random-secret",
+    "dev-secret-change-me-in-production",
+    "dev-fernet-key-change-me-in-production-32b",
+    "zmen-ma-na-nahodny-64-znakovy-retazec",
+    "zmen-ma-na-iny-nahodny-retazec-pre-fernet",
+}
+
+
+def validate_production_config() -> None:
+    if APP_ENV != "production":
+        return
+    import logging
+    problems = []
+    for name, value in (("JWT_SECRET_KEY", JWT_SECRET_KEY), ("API_KEY_ENCRYPTION_SECRET", API_KEY_ENCRYPTION_SECRET)):
+        if value in _INSECURE_SECRETS or not value.strip():
+            problems.append(f"{name} ma predvolenu (verejne znamu) hodnotu - nastav nahodny retazec (aspon 32 znakov).")
+        elif len(value) < 32:
+            logging.getLogger("aca.config").warning(
+                "%s je kratsi nez 32 znakov - odporucame dlhsi nahodny retazec (pri API_KEY_ENCRYPTION_SECRET "
+                "vsak zmena znehodnoti ulozene API kluce pouzivatelov).", name)
+    if PASSWORD_HASH_ROUNDS < 100_000:
+        problems.append("PASSWORD_HASH_ROUNDS musi byt v produkcii aspon 100000.")
+    if problems:
+        raise RuntimeError("Nebezpecna konfiguracia produkcie: " + " ".join(problems))

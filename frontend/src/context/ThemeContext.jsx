@@ -1,3 +1,5 @@
+/** Theme context. */
+
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 const ThemeContext = createContext(null);

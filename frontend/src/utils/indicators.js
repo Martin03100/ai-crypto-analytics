@@ -1,4 +1,4 @@
-/** Technicke indikatory pre graf na stranke Trh. */
+/** Technical indicators. */
 
 export function emaSeries(values, period) {
   const k = 2 / (period + 1);
@@ -13,7 +13,6 @@ export function emaSeries(values, period) {
   return out;
 }
 
-/** RSI (Wilderovo vyhladenie): nad 70 = prekupeny, pod 30 = prepredany. */
 export function rsiSeries(values, period = 14) {
   const out = new Array(values.length).fill(null);
   if (values.length <= period) return out;
@@ -35,7 +34,6 @@ export function rsiSeries(values, period = 14) {
   return out;
 }
 
-/** MACD (12, 26, 9): linia MACD, signalna linia a histogram. */
 export function macdSeries(values, fast = 12, slow = 26, signal = 9) {
   const fastEma = emaSeries(values, fast);
   const slowEma = emaSeries(values, slow);

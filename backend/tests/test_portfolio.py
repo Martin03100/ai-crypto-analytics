@@ -1,4 +1,4 @@
-"""Testy pre app/routers/portfolio.py — AI analyza portfolia (mock rezim) a historia."""
+"""Portfolio API tests."""
 
 from tests.conftest import anon_csrf_headers, csrf_headers
 
@@ -21,9 +21,6 @@ def test_analyze_portfolio_without_api_key_returns_mock_data(registered):
 
 
 def test_analyze_portfolio_empty_holdings_reports_failure(registered):
-    """Prazdne portfolio nie je HTTP chyba (422) - je to platny request s
-    business-logickou odpovedou success:false, aby frontend vedel zobrazit
-    zrozumitelnu spravu namiesto generickej validacnej chyby."""
     client, _username, _password = registered
     res = client.post("/api/portfolio/analyze", json={"provider": "gemini", "holdings": []},
                        headers=csrf_headers(client))
@@ -64,8 +61,6 @@ def test_delete_nonexistent_portfolio_analysis_returns_404(registered):
 
 
 def test_portfolio_analyze_rejects_more_than_30_holdings(registered):
-    """Chrani pred degenerovanym vstupom a drzi najhorsi mozny AI vystup
-    predvidatelne pod token limitom (viz PortfolioRequest v app/schemas.py)."""
     client, _username, _password = registered
     holdings = [{"minca": f"COIN{i}", "mnozstvo": 1} for i in range(31)]
     res = client.post("/api/portfolio/analyze", json={"provider": "gemini", "holdings": holdings},

@@ -1,22 +1,14 @@
+/** Confirmation dialog context. */
+
 import { AlertTriangle } from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useLanguage } from "./LanguageContext";
 
 const ConfirmContext = createContext(null);
 
-/** Poskytuje `confirm(message, opts) => Promise<boolean>` — nahradza
- * neblokujuce window.confirm() vlastnym glassmorphism modalom v styli appky.
- * Pouzitie: const ok = await confirmDelete(t("forecast.deleteConfirm", {...}));
- *
- * Prístupnosť: modal drží fokus vnútri seba (focus trap) kým je otvorený,
- * po zatvorení fokus vráti na prvok, ktorý bol aktívny predtým (typicky
- * tlačidlo, čo modal otvorilo), reaguje na Escape a pri otvorení sa
- * automaticky sfokusuje na "Zrušiť" tlačidlo. Bez toho by sa pri ovládaní
- * klávesnicou (Tab) dalo z modalu "vypadnúť" do zvyšku vizuálne prekrytej
- * stránky. */
 export function ConfirmProvider({ children }) {
   const { t } = useLanguage();
-  const [state, setState] = useState(null); // { message, resolve, title, confirmLabel }
+  const [state, setState] = useState(null);
   const modalRef = useRef(null);
   const cancelBtnRef = useRef(null);
   const previouslyFocusedRef = useRef(null);
@@ -36,7 +28,6 @@ export function ConfirmProvider({ children }) {
   function handleChoice(result) {
     state?.resolve(result);
     setState(null);
-    // Vrat fokus tam, odkial sa modal otvoril (typicky tlacidlo "Odstranit").
     previouslyFocusedRef.current?.focus?.();
   }
 
@@ -51,7 +42,6 @@ export function ConfirmProvider({ children }) {
         return;
       }
       if (e.key !== "Tab" || !modalRef.current) return;
-      // Focus trap: Tab/Shift+Tab sa nedostane von z modalu.
       const focusable = modalRef.current.querySelectorAll(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
       );

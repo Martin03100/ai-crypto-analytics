@@ -1,27 +1,7 @@
-/**
- * errorMessages.js
- * ==================
- * Prekladá chybové hlášky na krátke, zrozumiteľné vety pre bežného
- * používateľa, v aktuálne zvolenom jazyku aplikácie (en/sk/cs). Nikdy
- * nezobrazuje surové technické výpisy (stacktrace, HTTP detaily,
- * knižničné výnimky) — vždy iba preložený, ľudský text z translations.js.
- *
- * Dva zdroje chýb sa spracúvajú odlišne:
- *  1) Backend HTTPException.detail — sú to už krátke, zrozumiteľné vety
- *     (viď app/routers/*.py), ale iba v slovenčine. Nižšie ich PRESNE
- *     rozpoznáme podľa charakteristického úryvku a nahradíme preloženou
- *     verziou vo zvolenom jazyku (vrátane interpolácie čísel: sekundy,
- *     minúty zámky účtu a pod.).
- *  2) Surové chyby od AI providerov (Gemini/OpenAI/Anthropic/...) — tie
- *     obsahujú technické anglické texty a HTTP kódy (napr. "429 Too Many
- *     Requests"), preto sa rozpoznávajú regexom nad kľúčovými slovami/kódmi.
- */
+/** API error translations. */
+
 import { translate } from "./translations";
 
-// --- 1) Presné vzory pre known backend HTTPException.detail hlášky ---------
-// `test` sa vyhodnocuje nad SUROVÝM textom z backendu (vždy slovenský zdroj,
-// bez ohľadu na aktuálny jazyk appky) a prípadné capture groups sa mapujú
-// na interpolačné parametre v `params`.
 const KNOWN_BACKEND_PATTERNS = [
   { test: /neplatn[eé] alebo expirovan[eé] prihl[aá]senie/i, key: "errors.sessionExpired" },
   { test: /pr[ií]li[sš] ve[lľ]a po[zž]iadaviek.*?o (\d+)s/i, key: "errors.rateLimited", params: (m) => ({ seconds: m[1] }) },
@@ -51,22 +31,18 @@ const KNOWN_BACKEND_PATTERNS = [
   { test: /tipova[tť] sa d[aá] len do 2 hod[ií]n/i, key: "errors.tipWindowClosed" },
   { test: /na t[uú]to predikciu si u[zž] tipoval/i, key: "errors.tipAlreadyExists" },
   { test: /vlastn[eé]ho providera|vlastn[yý] provider (nie je spr[aá]vne|vr[aá]til presmerovanie)/i, key: "errors.customProviderInvalid" },
-  // AI vratila prazdnu/orezanu/neplatnu odpoved (spravy z backend validatorov
-  // a prazdnej Gemini odpovede) - predtym koncili ako vseobecne "Nieco sa pokazilo".
   { test: /pr[aá]zdn[uú] odpove[dď]|nepodarilo na[jĵ]?[sš]t [zž]iadny json|naparsovan[yý] json|pol(e|ia) '[^']+'.*mus[ií]/i, key: "errors.aiInvalidResponse" },
   { test: /najprv ulo[zž] api kl[uú][cč] pre tohto providera/i, key: "errors.noKeyToTest" },
+  { test: /pou[zž][ií]vate[lľ]sk[eé] meno mus[ií] ma[tť] 3/i, key: "errors.usernameInvalid" },
+  { test: /predikciu sa nepodarilo overi[tť]/i, key: "errors.forecastUnverified" },
+  { test: /bezplatn[yý] model|nedostatok historick[yý]ch d[aá]t|trhov[eé] d[aá]ta moment[aá]lne|trhove data sa nepodarilo/i, key: "errors.quantUnavailable" },
 ];
 
-// --- 2) Technické vzory pre surové chyby od AI providerov / siete ----------
 const TECHNICAL_PATTERNS = [
   { test: /503|overloaded|service unavailable/i, key: "errors.providerOverloaded" },
   { test: /429|rate limit|too many requests/i, key: "errors.providerRateLimit" },
   { test: /401|unauthorized|invalid.?api.?key|incorrect api key/i, key: "errors.providerInvalidKey" },
   { test: /403|forbidden/i, key: "errors.providerForbidden" },
-  // Zamerne VYZADUJE aj nazov/domenu AI providera vedla "404"/"not found" -
-  // ina by tento vzor omylom chytil AJ generickú 404 z rozbiteho routingu
-  // (napr. zle nastaveny Netlify proxy k backendu), ktora s AI providerom
-  // vobec nesuvisi, a zavadzajuco by ju oznacil ako "chyba AI providera".
   { test: /(openai|anthropic|googleapis|gemini|deepseek|x\.ai|grok)[\s\S]{0,120}(404|not found)|(404|not found)[\s\S]{0,120}(openai|anthropic|googleapis|gemini|deepseek|x\.ai|grok)/i, key: "errors.providerNotFound" },
   { test: /timeout|timed out/i, key: "errors.timeout" },
   { test: /network|connection|econnrefused|failed to fetch/i, key: "errors.networkError" },
@@ -74,8 +50,6 @@ const TECHNICAL_PATTERNS = [
   { test: /500|internal server error/i, key: "errors.serverError" },
 ];
 
-/** Skusi rozpoznat chybu podla HTTP statusu (najspolahlivejsie, jazykovo
- * nezavisle). Vracia i18n kluc alebo null, ak status nie je jednoznacny. */
 function keyFromStatus(status) {
   switch (status) {
     case 401: return "errors.sessionExpired";
@@ -88,11 +62,6 @@ function keyFromStatus(status) {
   }
 }
 
-/**
- * humanizeError(error, lang) -> preložený, krátky text pre používateľa.
- * `error` môže byť Error objekt (s `.message`, voliteľne `.status`) alebo
- * obyčajný string (spätná kompatibilita).
- */
 export function humanizeError(error, lang = "en") {
   const rawMessage = typeof error === "string" ? error : error?.message;
   const status = typeof error === "object" && error !== null ? error.status : undefined;
@@ -113,12 +82,9 @@ export function humanizeError(error, lang = "en") {
     }
   }
 
-  // Ziadny textovy vzor sa nenasiel — skus aspon HTTP status kod.
   const statusKey = keyFromStatus(status);
   if (statusKey) return translate(statusKey, lang);
 
-  // Uplny fallback: appka nikdy nezobrazi surovy technicky text (napr.
-  // neznamu vynimku alebo JSON dump) - vzdy iba genericku prelozenu spravu.
   return translate("errors.generic", lang);
 }
 

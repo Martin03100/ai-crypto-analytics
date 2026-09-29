@@ -1,21 +1,18 @@
-"""app/routers/portfolio.py — AI analyza portfolia.
-
-Analyza sa NEUKLADA automaticky - uzivatel ju musi explicitne ulozit
-tlacidlom "Uložiť analýzu" (POST /save), rovnako ako pri predikciach.
-"""
+"""Portfolio API."""
 
 from __future__ import annotations
 
 import json
-from typing import List
+from typing import Annotated, List
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.orm import Session
 
 from app.deps import get_current_user, get_db, get_decrypted_api_key
 from app.models import PortfolioHistory, User
 from app.rate_limit import rate_limit_by_user
 from app.config import RATE_LIMIT_AI_ENDPOINT
+from app.schemas import MAX_DB_ID
 from app.schemas import (
     AIResultOut, BulkDeleteRequest, CostEstimateOut, PaginatedPortfolioHistory, PortfolioHistoryOut, PortfolioRequest, SavePortfolioRequest,
 )
@@ -37,7 +34,6 @@ def analyze_portfolio(payload: PortfolioRequest, user: User = Depends(get_curren
              dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
 def estimate_portfolio_cost_endpoint(payload: PortfolioRequest, user: User = Depends(get_current_user),
                                       db: Session = Depends(get_db)) -> CostEstimateOut:
-    """Odhad ceny PRED skutocnou analyzou - viz rovnaky endpoint vo forecast.py."""
     api_key = get_decrypted_api_key(db, user.id, payload.provider)
     if not api_key:
         return CostEstimateOut(is_mock=True)
@@ -65,7 +61,7 @@ def save_portfolio_analysis(payload: SavePortfolioRequest, user: User = Depends(
 
 
 @router.get("/history", response_model=PaginatedPortfolioHistory)
-def get_portfolio_history(page: int = Query(default=1, ge=1), page_size: int = Query(default=20, ge=1, le=100),
+def get_portfolio_history(page: int = Query(default=1, ge=1, le=100_000), page_size: int = Query(default=20, ge=1, le=100),
                            user: User = Depends(get_current_user),
                            db: Session = Depends(get_db)) -> PaginatedPortfolioHistory:
     base_query = db.query(PortfolioHistory).filter(PortfolioHistory.user_id == user.id)
@@ -91,7 +87,7 @@ def get_portfolio_history(page: int = Query(default=1, ge=1), page_size: int = Q
 
 
 @router.delete("/history/{entry_id}")
-def delete_portfolio_analysis(entry_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+def delete_portfolio_analysis(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     row = db.query(PortfolioHistory).filter(PortfolioHistory.id == entry_id, PortfolioHistory.user_id == user.id).first()
     if row is None:
         raise HTTPException(status_code=404, detail="Uložená analýza nebola nájdená.")
@@ -104,7 +100,6 @@ def delete_portfolio_analysis(entry_id: int, user: User = Depends(get_current_us
 @router.post("/history/bulk-delete")
 def bulk_delete_portfolio(payload: BulkDeleteRequest, user: User = Depends(get_current_user),
                           db: Session = Depends(get_db)) -> dict:
-    """Zmaze viac ulozenych analyz naraz - LEN vlastne (cudzie ID sa ticho ignoruju)."""
     deleted = db.query(PortfolioHistory).filter(
         PortfolioHistory.user_id == user.id, PortfolioHistory.id.in_(payload.ids)).delete(synchronize_session=False)
     db.commit()

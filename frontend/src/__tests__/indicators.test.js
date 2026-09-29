@@ -1,3 +1,5 @@
+/** Indicator tests. */
+
 import { describe, expect, it } from "vitest";
 import { emaSeries, macdSeries, rsiSeries } from "../utils/indicators";
 

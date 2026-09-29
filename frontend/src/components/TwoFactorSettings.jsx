@@ -1,3 +1,5 @@
+/** Two-factor authentication settings. */
+
 import { ShieldCheck } from "lucide-react";
 import QRCode from "qrcode";
 import { useState } from "react";
@@ -7,8 +9,6 @@ import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../context/ToastContext";
 import PasswordInput from "./PasswordInput";
 
-/** Zapnutie / vypnutie 2FA (TOTP) v Nastaveniach. 2FA sa aktivuje az po
- * overeni prveho kodu, aby sa pouzivatel omylom nezamkol mimo uctu. */
 export default function TwoFactorSettings() {
   const { t } = useLanguage();
   const { push } = useToast();

@@ -1,3 +1,5 @@
+/** Navigation sidebar. */
+
 import { LayoutDashboard, LineChart, LogOut, Settings as SettingsIcon, Sparkles, TrendingUp, User, Wallet, X } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -19,9 +21,6 @@ export default function Sidebar({ open, onClose }) {
 
   return (
     <>
-      {/* Stmavene pozadie za vysuvacim menu na mobile - klikom naň sa menu
-         zatvori (bezny UX vzor "tap outside to dismiss"). Na desktope sa
-         nikdy nezobrazi (sidebar tam je bezny stlpec, nie prekryvna vrstva). */}
       <button
         type="button"
         className={`sidebar-backdrop ${open ? "open" : ""}`}

@@ -1,11 +1,7 @@
-/* ==========================================================================
-   theme.css — AI Crypto Analytics 2026 design system
-   Obsidian / glass-cyber aesthetic. Every color, radius, and shadow used
-   anywhere in the app is a token defined here — no ad-hoc hex values.
-   ========================================================================== */
+/* Theme tokens and global styles. */
 
 :root {
-  /* --- surfaces (true OLED black, faint blue undertone) --- */
+  /* ---------- surfaces (true OLED black, faint blue undertone) ---------- */
   --bg-void: #030712;
   --bg-void-2: #060a16;
   --bg-card: rgba(18, 24, 38, 0.55);
@@ -15,7 +11,7 @@
   --border-subtle: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.16);
 
-  /* --- accents --- */
+  /* ---------- accents ---------- */
   --cyan: #22d3ee;
   --cyan-dim: rgba(34, 211, 238, 0.14);
   --emerald: #34d399;
@@ -23,38 +19,43 @@
   --crimson: #fb5a6a;
   --crimson-dim: rgba(251, 90, 106, 0.14);
   --amber: #fbbf24;
+  --cyan-fg: var(--cyan);
+  --emerald-fg: var(--emerald);
+  --crimson-fg: var(--crimson);
+  --amber-fg: var(--amber);
+  --violet-fg: var(--violet);
   --amber-dim: rgba(251, 191, 36, 0.14);
   --violet: #a78bfa;
   --violet-dim: rgba(167, 139, 250, 0.14);
 
-  /* --- aurora accent hues (mesh gradient blobs) --- */
+  /* ---------- aurora accent hues (mesh gradient blobs) ---------- */
   --aurora-violet: #7c3aed;
   --aurora-cyan: #0ea5e9;
   --aurora-mint: #10b981;
 
-  /* --- text --- */
+  /* ---------- text ---------- */
   --text-primary: #f3f5f9;
   --text-secondary: #99a2b8;
-  --text-tertiary: #626d82;
+  --text-tertiary: #818ba0;
 
-  /* --- type --- */
+  /* ---------- type ---------- */
   --font-sans: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", monospace;
 
-  /* --- geometry --- */
+  /* ---------- geometry ---------- */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 18px;
   --radius-pill: 999px;
 
-  /* --- motion --- */
+  /* ---------- motion ---------- */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --duration: 300ms;
 }
 
 * { box-sizing: border-box; }
 
-/* --- light mode: prepnute cez data-theme="light" na <html> (ThemeContext) --- */
+/* ---------- Light theme ---------- */
 :root[data-theme="light"] {
   --bg-void: #f4f6fa;
   --bg-void-2: #eceff5;
@@ -67,10 +68,25 @@
 
   --text-primary: #10151f;
   --text-secondary: #4b5468;
-  --text-tertiary: #7c8598;
+  --text-tertiary: #5f6a80;
+  --cyan-fg: #0b6b85;
+  --emerald-fg: #066a4d;
+  --crimson-fg: #be123c;
+  --amber-fg: #a04a07;
+  --violet-fg: #6d28d9;
 }
 :root[data-theme="light"] body { background: var(--bg-void); }
 :root[data-theme="light"] .aurora-layer { opacity: 0.35; filter: blur(90px) saturate(140%); }
+:root[data-theme="light"] .sidebar {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(240, 243, 249, 0.9));
+}
+@media (max-width: 860px) {
+  :root[data-theme="light"] .sidebar.open {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(240, 243, 249, 0.99));
+    box-shadow: 20px 0 60px -12px rgba(15, 23, 42, 0.25);
+  }
+  :root[data-theme="light"] .sidebar-backdrop.open { background: rgba(15, 23, 42, 0.35); }
+}
 :root[data-theme="light"] ::selection { background: var(--cyan-dim); color: var(--text-primary); }
 
 html, body, #root { height: 100%; }
@@ -86,11 +102,6 @@ body {
   overflow-x: hidden;
 }
 
-/* ==========================================================================
-   Ambient aurora mesh gradient — 3 slowly drifting neon blobs (violet/cyan/
-   mint) fixed behind all content. Pure CSS, GPU-friendly (transform/opacity
-   only), respects prefers-reduced-motion.
-   ========================================================================== */
 .aurora-layer {
   position: fixed;
   inset: 0;
@@ -140,14 +151,8 @@ body {
   100% { transform: translate(5%, -6%) scale(1.1); }
 }
 
-/* Everything else renders above the aurora layer */
 #root { position: relative; z-index: 1; }
 
-/* ==========================================================================
-   Tech grid overlay — jemna perspektivna mriezka (fintech/trading-terminal
-   feel), pod aurora vrstvou. Cisto CSS gradient (ziadne obrazky), takze
-   funguje offline a nema vahu suboru.
-   ========================================================================== */
 .grid-layer {
   position: fixed;
   inset: 0;
@@ -166,10 +171,6 @@ body {
     linear-gradient(90deg, rgba(15, 23, 42, 0.05) 1px, transparent 1px);
 }
 
-/* ==========================================================================
-   Grain / noise texture — jemna zrnitost cez SVG fractal noise filter,
-   pridava "premium" hmatatelnu texturu namiesto ploche hladkeho gradientu.
-   ========================================================================== */
 .grain-layer {
   position: fixed;
   inset: 0;
@@ -192,33 +193,29 @@ button { font-family: inherit; }
 
 .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
-/* --- reduced motion --- */
+/* ---------- Reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
 
-/* --- focus visibility --- */
+/* ---------- Focus visibility ---------- */
 :focus-visible {
   outline: 2px solid var(--cyan);
   outline-offset: 2px;
   border-radius: 4px;
 }
 
-/* Shared spin animation for loading spinners (Loader2 icon etc.) */
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin 0.8s linear infinite; }
 
-/* ---------- backdrop-filter fallback ---------- */
-/* Stare Safari/Android WebView bez podpory backdrop-filter by inak videli
-   priesvitne, tazko citatelne karty - tu im damy takmer nepriehladne pozadie
-   namiesto skla, aby appka zostala citatelna aj bez glassmorphism efektu. */
+/* ---------- Backdrop-filter fallback ---------- */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .card, .sidebar, .chat-drawer, .confirm-modal, .quick-link-card {
     background: var(--bg-void-2) !important;
   }
 }
 
-/* ---------- Plynuly prechod pri prepnuti Dark/Light ---------- */
+/* ---------- Theme switch transition ---------- */
 html {
   transition: background-color var(--duration) var(--ease);
 }

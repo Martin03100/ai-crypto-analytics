@@ -1,5 +1,7 @@
-import { Brain, CheckCircle2, LineChart, Loader2, PlayCircle, ShieldCheck, Sparkles } from "lucide-react";
-import { useState } from "react";
+/** Login and registration page. */
+
+import { AlertTriangle, Brain, CheckCircle2, LineChart, Loader2, PlayCircle, ShieldCheck, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api } from "../api";
 import CandlestickArt from "../components/CandlestickArt";
@@ -16,9 +18,6 @@ const LANG_SQUARES = [
   { code: "en", label: "ENG" },
 ];
 
-/** Tri male stvorceky (SK / CZ / ENG) v pravom dolnom rohu prihlasovacej
- * obrazovky. Vyber sa aplikuje okamzite (LanguageContext prekresli cely
- * strom) a zaroven sa hned uklada do localStorage (viz setLang). */
 function AuthLanguageSwitch() {
   const { lang, setLang } = useLanguage();
   return (
@@ -49,7 +48,14 @@ export default function Auth() {
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [error, setError] = useState("");
-  const [info, setInfo] = useState("");
+  const [info, setInfo] = useState(() => {
+    try {
+      return sessionStorage.getItem("aca_session_expired") === "1" ? "__expired__" : "";
+    } catch { return ""; }
+  });
+  useEffect(() => {
+    try { sessionStorage.removeItem("aca_session_expired"); } catch {  }
+  }, []);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [needTotp, setNeedTotp] = useState(false);
@@ -64,6 +70,7 @@ export default function Auth() {
   function clientValidate() {
     if (!username || !password) return t("auth.validationUsernameRequired");
     if (username.trim().length < 3) return t("auth.validationUsernameLength");
+    if (tab === "register" && !/^[A-Za-z0-9_.-]{3,32}$/.test(username.trim())) return t("auth.validationUsernameChars");
     if (password.length < 8) return t("auth.validationPasswordLength");
     if (tab === "register" && password !== confirm) return t("auth.validationPasswordMismatch");
     if (tab === "register" && (!email || !email.includes("@") || !email.split("@").pop().includes(".")))
@@ -95,8 +102,7 @@ export default function Auth() {
       }
       navigate("/forecast");
     } catch (err) {
-      // Ucet ma zapnute 2FA - zobraz pole na kod z overovacej aplikacie.
-      if (/6-miestny k[oó]d z overovacej aplik/i.test(err?.message || "")) setNeedTotp(true);
+      if (err?.code === "totp_required" || /6-miestny k[oó]d z overovacej aplik/i.test(err?.message || "")) setNeedTotp(true);
       setError(humanizeError(err, lang));
     } finally {
       setLoading(false);
@@ -107,7 +113,7 @@ export default function Auth() {
     const res = await api.forgotPassword(targetEmail, captchaToken);
     setCaptchaToken("");
     setCaptchaKey((k) => k + 1);
-    setInfo(res.message + (res.dev_reset_code ? t("auth.devResetCodeNote", { code: res.dev_reset_code }) : ""));
+    setInfo(t("auth.forgotSent") + (res.dev_reset_code ? t("auth.devResetCodeNote", { code: res.dev_reset_code }) : ""));
   }
 
   async function handleForgotPassword(e) {
@@ -173,8 +179,8 @@ export default function Auth() {
     }
     setLoading(true);
     try {
-      const res = await api.resetPassword(forgotEmail, code.trim(), newPassword);
-      setInfo(res.message);
+      await api.resetPassword(forgotEmail, code.trim(), newPassword);
+      setInfo(t("auth.passwordResetDone"));
       setTab("login");
     } catch (err) {
       setError(humanizeError(err, lang));
@@ -184,7 +190,7 @@ export default function Auth() {
   }
 
   return (
-    <div className="auth-shell">
+    <main className="auth-shell">
       <AuthLanguageSwitch />
       <div className="auth-brand-panel">
         <div className="auth-brand-glow" aria-hidden="true" />
@@ -223,7 +229,7 @@ export default function Auth() {
           )}
 
           {error && <div className="alert alert-error">{error}</div>}
-          {info && <div className="alert alert-success"><CheckCircle2 size={14} style={{ marginRight: 6 }} />{info}</div>}
+          {info && <div className={`alert ${info === "__expired__" ? "alert-warn" : "alert-success"}`}>{info === "__expired__" ? <AlertTriangle size={14} style={{ marginRight: 6 }} /> : <CheckCircle2 size={14} style={{ marginRight: 6 }} />}{info === "__expired__" ? t("auth.sessionExpiredNote") : info}</div>}
           {tab !== "login" && <Turnstile key={captchaKey} onToken={setCaptchaToken} />}
 
           {(tab === "login" || tab === "register") && (
@@ -338,6 +344,6 @@ export default function Auth() {
         </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

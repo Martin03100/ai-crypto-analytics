@@ -1,22 +1,23 @@
-"""app/routers/market.py — Fear&Greed, news sentiment, udalosti, community poll."""
+"""Market API."""
 
 from __future__ import annotations
 
 from typing import List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import (
-    RATE_LIMIT_AI_ENDPOINT, RATE_LIMIT_MARKET_PUBLIC, RATE_LIMIT_VOTE,
+    RATE_LIMIT_AI_ENDPOINT, RATE_LIMIT_MARKET_GLOBAL, RATE_LIMIT_MARKET_PUBLIC, RATE_LIMIT_VOTE,
 )
 from app.deps import get_current_user, get_db, get_decrypted_api_key
 from app.models import CommunityVote, User
-from app.rate_limit import rate_limit_by_ip, rate_limit_by_user
+from app.rate_limit import rate_limit_by_ip, rate_limit_by_user, rate_limit_global
 from app.schemas import AIResultOut, DailyDigestRequest, NewsSentimentRequest, VoteRequest
 from app.services.ai_engine import get_daily_digest, get_news_sentiment_summary
 from app.services.market_data import (
+    VALID_CHART_DAYS, VALID_VS_CURRENCIES, is_valid_coin_id,
     get_crypto_headlines, get_dummy_crypto_headlines, get_dummy_fear_greed_index,
     get_fear_greed_index, get_live_prices, get_market_chart, get_upcoming_market_events, search_coins,
 )
@@ -24,9 +25,17 @@ from app.services.market_data import (
 router = APIRouter(prefix="/api/market", tags=["market"])
 
 VALID_VOTES = ("Bullish", "Neutral", "Bearish")
+_PUBLIC_LIMITS = [Depends(rate_limit_by_ip(*RATE_LIMIT_MARKET_PUBLIC)), Depends(rate_limit_global("market", *RATE_LIMIT_MARKET_GLOBAL))]
 
 
-@router.get("/fear-greed", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_MARKET_PUBLIC))])
+def _check_vs_currency(value: str) -> str:
+    value = (value or "usd").lower()
+    if value not in VALID_VS_CURRENCIES:
+        raise HTTPException(status_code=400, detail="Nepodporovaná mena (usd, eur, czk, btc).")
+    return value
+
+
+@router.get("/fear-greed", dependencies=_PUBLIC_LIMITS)
 def fear_greed(refresh: bool = False) -> dict:
     success, data, error = get_fear_greed_index(force_refresh=refresh)
     if not success or data is None:
@@ -53,30 +62,32 @@ def news_sentiment(payload: NewsSentimentRequest, user: User = Depends(get_curre
     return AIResultOut(**result.as_dict())
 
 
-@router.get("/prices", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_MARKET_PUBLIC))])
+@router.get("/prices", dependencies=_PUBLIC_LIMITS)
 def prices(ids: str, vs_currency: str = "usd") -> dict:
-    """Live ceny z CoinGecko (cachovane 60s). `ids` je ciarkou oddeleny
-    zoznam CoinGecko id, napr. 'bitcoin,ethereum'. `vs_currency` urcuje
-    menu (usd/eur/czk/btc) podla zvolenej primarnej meny v Nastaveniach.
-    Rate-limitovane podla IP (nie je to autentifikovany endpoint) - inak by
-    mohol jeden pouzivatel spamom vycerpat bezplatny CoinGecko rate limit
-    a znefunkcnit ceny pre vsetkych ostatnych."""
-    coin_ids = [c.strip() for c in ids.split(",") if c.strip()][:50]  # ochrana pred zneuzitim CoinGecko limitu
+    vs_currency = _check_vs_currency(vs_currency)
+    coin_ids = [c.strip() for c in ids.split(",") if c.strip()][:50]
+    if not all(is_valid_coin_id(c) for c in coin_ids):
+        raise HTTPException(status_code=400, detail="Neplatné ID mince.")
     success, data, error = get_live_prices(coin_ids, vs_currency)
     if not success or data is None:
         return {"prices": {}, "is_mock": True, "error_message": error}
     return {"prices": data, "is_mock": False, "error_message": error}
 
 
-@router.get("/chart", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_MARKET_PUBLIC))])
+@router.get("/chart", dependencies=_PUBLIC_LIMITS)
 def chart(coin_id: str = "bitcoin", vs_currency: str = "usd", days: str = "7") -> dict:
-    """Historicke ceny pre interaktivny graf (zoom + prepinanie timeframu)."""
+    vs_currency = _check_vs_currency(vs_currency)
+    if not is_valid_coin_id(coin_id):
+        raise HTTPException(status_code=400, detail="Neplatné ID mince.")
+    if days not in VALID_CHART_DAYS:
+        raise HTTPException(status_code=400, detail="Nepodporované obdobie grafu.")
     success, data, error = get_market_chart(coin_id, vs_currency, days)
     return {"prices": data, "is_mock": not success, "error_message": error}
 
 
-@router.get("/coins/search", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_MARKET_PUBLIC))])
+@router.get("/coins/search", dependencies=_PUBLIC_LIMITS)
 def coins_search(q: str) -> dict:
+    q = (q or "")[:60]
     success, results, error = search_coins(q)
     return {"results": results, "error_message": error if not success else None}
 
@@ -84,7 +95,6 @@ def coins_search(q: str) -> dict:
 @router.post("/daily-digest", response_model=AIResultOut, dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
 def daily_digest(payload: DailyDigestRequest, user: User = Depends(get_current_user),
                   db: Session = Depends(get_db)) -> AIResultOut:
-    """Rychle AI zhrnutie trhu pre otvorenie appky (Daily Digest)."""
     api_key = get_decrypted_api_key(db, user.id, payload.provider)
     fg_success, fg_data, _ = get_fear_greed_index()
     fg_value = fg_data["value"] if fg_success and fg_data else 50
@@ -97,7 +107,7 @@ def daily_digest(payload: DailyDigestRequest, user: User = Depends(get_current_u
     return AIResultOut(**result.as_dict())
 
 
-@router.get("/events", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_MARKET_PUBLIC))])
+@router.get("/events", dependencies=_PUBLIC_LIMITS)
 def events(lang: str = "en") -> dict:
     return {"events": get_upcoming_market_events(lang)}
 
@@ -121,11 +131,6 @@ def my_vote(user: User = Depends(get_current_user), db: Session = Depends(get_db
 
 @router.get("/vote/percentages")
 def vote_percentages(db: Session = Depends(get_db)) -> dict:
-    """Percentualne rozlozenie POSLEDNEHO hlasu kazdeho pouzivatela.
-
-    Pocitane priamo v SQL (namiesto nacitania vsetkych riadkov CommunityVote
-    do pamate a spracovania v Pythone) - skaluje sa aj pri velkom pocte
-    hlasov, lebo databaza robi agregaciu, nie aplikacny server."""
     latest_per_user = (
         db.query(CommunityVote.user_id, func.max(CommunityVote.voted_at).label("max_voted_at"))
         .group_by(CommunityVote.user_id)
@@ -153,10 +158,8 @@ def vote_percentages(db: Session = Depends(get_db)) -> dict:
 
 
 
-@router.get("/onchain", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_MARKET_PUBLIC))])
+@router.get("/onchain", dependencies=_PUBLIC_LIMITS)
 def onchain_overview() -> dict:
-    """Karta "Velryby a on-chain" na stranke Trh (BTC, ETH, DOGE) - paralelne,
-    s limitom 6 s, aby pomaly zdroj nezdrzal stranku."""
     import time as _time
     from concurrent.futures import ThreadPoolExecutor
 

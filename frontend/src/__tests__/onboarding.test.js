@@ -1,10 +1,8 @@
+/** Onboarding tests. */
+
 import { describe, expect, it, beforeEach } from "vitest";
 import { hasSeenOnboarding, resetOnboarding } from "../components/OnboardingTour";
 
-// Testovacie prostredie bezi v Node (viz vite.config.js), nie jsdom, takze
-// localStorage tu z principu neexistuje - pre tento jeden subor si ho
-// nahradime jednoduchou pamatovou nahradou namiesto menenia zdielanej
-// konfiguracie testov (ktora by mohla ovplyvnit ostatne testy).
 function makeMemoryStorage() {
   let store = {};
   return {

@@ -1,3 +1,5 @@
+/** Error message tests. */
+
 import { describe, expect, it } from "vitest";
 import { humanizeError } from "../i18n/errorMessages";
 
@@ -16,7 +18,7 @@ describe("humanizeError()", () => {
     const raw = "Príliš veľa požiadaviek. Skús to znova o 42s.";
     const result = humanizeError(raw, "en");
     expect(result).toContain("42");
-    expect(result).not.toBe(raw); // must not leak the raw Slovak text to an EN user
+    expect(result).not.toBe(raw);
   });
 
   it("interpolates the lockout minutes from the account-locked message", () => {

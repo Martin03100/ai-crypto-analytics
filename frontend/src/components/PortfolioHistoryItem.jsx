@@ -1,3 +1,5 @@
+/** Saved portfolio analysis item. */
+
 import { ChevronDown, Copy, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { api } from "../api";
@@ -9,13 +11,6 @@ import { useLanguage } from "../context/LanguageContext";
 import { localeForLang } from "../i18n/locale";
 import { copyToClipboard } from "../utils/copyToClipboard";
 
-/** Jedna polozka v historii ulozenych portfolio analyz — rozbalitelna karta
- * s kopirovanim a mazanim (s potvrdzovacim dialogom). Vytiahnute z
- * Portfolio.jsx pre lepsiu citatelnost.
- *
- * Poznamka k i18n: `entry.holdings[].minca`, `entry.analysis_data.*` su
- * OBSAH VYGENEROVANY AI providerom (v jazyku, v akom bol prompt zadany) —
- * tento text sa NEPREKLADA klientom, iba staticke UI prvky okolo neho. */
 export default function PortfolioHistoryItem({ entry, onDelete }) {
   const { push } = useToast();
   const confirm = useConfirm();

@@ -1,6 +1,5 @@
-/** Skopiruje text do schranky. Pouziva navigator.clipboard (vyzaduje HTTPS
- * alebo localhost); ak zlyha/nie je dostupne, padne na fallback cez docasny
- * textarea + document.execCommand. Vracia Promise<boolean> (uspech). */
+/** Clipboard helper. */
+
 export async function copyToClipboard(text) {
   try {
     if (navigator.clipboard && window.isSecureContext) {
@@ -8,7 +7,6 @@ export async function copyToClipboard(text) {
       return true;
     }
   } catch {
-    // padni na fallback nizsie
   }
   try {
     const textarea = document.createElement("textarea");

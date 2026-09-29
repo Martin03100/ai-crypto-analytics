@@ -1,8 +1,4 @@
-"""app/services/captcha.py - Cloudflare Turnstile (bezplatna CAPTCHA).
-
-Vypnute, kym nie je nastaveny TURNSTILE_SECRET_KEY - appka tak funguje aj
-bez CAPTCHA (lokalny vyvoj, testy). Na produkcii chrani registraciu a
-"zabudnute heslo" pred botmi."""
+"""Captcha verification."""
 
 from __future__ import annotations
 
@@ -25,5 +21,5 @@ def verify_captcha(token: Optional[str], remote_ip: Optional[str] = None) -> boo
             timeout=5,
         )
         return bool(response.json().get("success"))
-    except Exception:  # noqa: BLE001 - pri vypadku overenia radsej odmietnut
+    except Exception:  # noqa: BLE001
         return False

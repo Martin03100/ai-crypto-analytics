@@ -1,18 +1,23 @@
+/** Daily market digest. */
+
 import { Sparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import { useAuth } from "../context/AuthContext";
 import { useProviders } from "../context/ProvidersContext";
 import { useLanguage } from "../context/LanguageContext";
 
 const STORAGE_KEY = "aca_daily_digest";
+const keyFor = (userId) => `${STORAGE_KEY}:${userId ?? "anon"}`;
 
 function todayKey() {
-  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  return new Date().toISOString().slice(0, 10);
 }
 
-function loadCached() {
+function loadCached(userId) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_KEY);
+    const raw = localStorage.getItem(keyFor(userId));
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     return parsed.date === todayKey() ? parsed : null;
@@ -23,6 +28,8 @@ function loadCached() {
 
 export default function DailyDigest() {
   const { t } = useLanguage();
+  const { user } = useAuth();
+  const userId = user?.id;
   const { defaultProvider, loading: providersLoading } = useProviders();
   const [digest, setDigest] = useState(null);
   const [dismissed, setDismissed] = useState(() => sessionStorage.getItem("aca_digest_dismissed") === "1");
@@ -30,12 +37,7 @@ export default function DailyDigest() {
 
   useEffect(() => {
     if (dismissed || providersLoading) return;
-    const cached = loadCached();
-    // Cachovany MOCK vysledok berieme ako platny iba ak pouzivatel STALE
-    // nema pripojeny ziaden AI provider. Inak by prehlad ostal "zaseknuty"
-    // v mock rezime cely den aj po tom, co si niekto medzitym pripoji
-    // skutocny API kluc (presne toto predtym robilo dojem, ze appka
-    // "ignoruje" novo pripojeny kluc).
+    const cached = loadCached(userId);
     const cacheIsStale = Boolean(cached?.isMock && defaultProvider);
     if (cached && !cacheIsStale) {
       setDigest(cached);
@@ -48,7 +50,7 @@ export default function DailyDigest() {
       .then((res) => {
         if (cancelled || !res.data) return;
         const payload = { date: todayKey(), data: res.data, isMock: res.is_mock };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        try { localStorage.setItem(keyFor(userId), JSON.stringify(payload)); } catch {  }
         setDigest(payload);
       })
       .catch(() => {})

@@ -1,12 +1,11 @@
+/** AI providers context. */
+
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { useAuth } from "./AuthContext";
 
 const ProvidersContext = createContext(null);
 
-/** Nacita zoznam AI providerov (Gemini/OpenAI/Anthropic/DeepSeek/Grok) a ich
- * stav pripojenia RAZ, zdiela ho medzi Forecast/Portfolio/Chat/Account/DailyDigest
- * namiesto toho, aby si kazda stranka volala /account/api-keys nezavisle. */
 export function ProvidersProvider({ children }) {
   const { user } = useAuth();
   const [providers, setProviders] = useState([]);

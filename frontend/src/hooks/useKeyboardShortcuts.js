@@ -1,10 +1,10 @@
+/** Keyboard shortcuts hook. */
+
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 export const SHORTCUT_ROUTES = { d: "/dashboard", f: "/forecast", p: "/portfolio", m: "/market", a: "/account", s: "/settings" };
 
-/** Klavesove skratky pre rychlu navigaciu. Ignoruju sa pri pisani do
- * formularov a pri kombinaciach s Ctrl/Cmd/Alt (tie patria prehliadacu). */
 export function useKeyboardShortcuts(onHelp) {
   const navigate = useNavigate();
   useEffect(() => {

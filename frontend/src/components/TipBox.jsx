@@ -1,3 +1,5 @@
+/** User-vs-AI price tip. */
+
 import { Trophy } from "lucide-react";
 import { useState } from "react";
 import { api } from "../api";
@@ -5,8 +7,6 @@ import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../context/ToastContext";
 import { formatPrice } from "../utils/formatPrice";
 
-/** Sutaz "tvoj tip vs AI" pri ulozenej predikcii: zadanie tipu (do 2 hodin
- * od vytvorenia predikcie), cakanie na vysledok, alebo vysledok suboja. */
 export default function TipBox({ entryId, accuracy, onTipped }) {
   const { t } = useLanguage();
   const { push } = useToast();

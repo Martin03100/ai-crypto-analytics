@@ -1,9 +1,9 @@
+/** Coin search picker. */
+
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { useLanguage } from "../context/LanguageContext";
 
-/** Debounced vyhladavanie ktorejkolvek mincy na CoinGecko (custom mince v
- * Portfolio Advisor). Vytiahnute z Portfolio.jsx pre lepsiu citatelnost. */
 export default function CoinSearchPicker({ onPick }) {
   const { t } = useLanguage();
   const [query, setQuery] = useState("");

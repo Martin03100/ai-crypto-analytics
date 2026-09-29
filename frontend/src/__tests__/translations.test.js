@@ -1,3 +1,5 @@
+/** Translation tests. */
+
 import { describe, expect, it } from "vitest";
 import { DEFAULT_LANG, translate } from "../i18n/translations";
 
@@ -27,8 +29,6 @@ describe("translate()", () => {
   });
 
   it("leaves an unmatched {placeholder} untouched instead of crashing", () => {
-    // badge.confidence expects {value} - if we forget to pass it, the app
-    // should still render *something* readable, not throw.
     expect(() => translate("badge.confidence", "en", {})).not.toThrow();
   });
 });

@@ -1,3 +1,5 @@
+/** App entry point. */
+
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
@@ -10,7 +12,10 @@ import { ToastProvider } from "./context/ToastContext";
 import { LanguageProvider } from "./context/LanguageContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { CurrencyProvider } from "./context/CurrencyContext";
+import { startLabelAssociation } from "./utils/a11yLabels";
 import "./styles/app.css";
+
+startLabelAssociation();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

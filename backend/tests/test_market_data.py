@@ -1,6 +1,4 @@
-"""Testy pre app/services/market_data.py — agregaciu sprav z viacerych
-zdrojov (get_crypto_headlines) a Reddit integraciu (get_reddit_crypto_posts).
-Kazdy zdroj musi byt izolovany - vypadok jedneho nesmie zhodit zvysne."""
+"""Market data service tests."""
 
 import sys
 import os
@@ -13,8 +11,6 @@ import pytest  # noqa: E402
 
 @pytest.fixture(autouse=True)
 def _clear_headlines_cache():
-    """get_crypto_headlines() cachuje vysledok - bez vycistenia by jeden test
-    dostal cachovany vysledok z predchadzajuceho testu."""
     market_data._headlines_cache._store.clear()
     yield
     market_data._headlines_cache._store.clear()
@@ -44,11 +40,8 @@ class _FakeResponse:
 
 
 def test_headlines_degrade_gracefully_when_one_rss_source_fails(monkeypatch):
-    """Ak jeden feed (napr. CoinTelegraph) padne, ostatne zdroje musia aj tak
-    vratit spravy - pouzivatel nesmie vidiet uplny vypadok kvoli jednemu
-    docasne nedostupnemu webu."""
     urls = market_data.CRYPTO_NEWS_RSS_URLS
-    assert len(urls) >= 2, "test predpoklada aspon 2 nakonfigurovane RSS zdroje"
+    assert len(urls) >= 2, "the test expects at least 2 configured RSS sources"
 
     def fake_get(url, timeout=None, headers=None):
         if url == urls[0]:
