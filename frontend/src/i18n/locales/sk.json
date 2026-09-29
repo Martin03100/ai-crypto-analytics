@@ -595,5 +595,17 @@
   "backtest.verdictNotCalibrated": "Pásmo neistoty nie je dobre kalibrované: skutočná cena v ňom bola v {value} % prípadov (cieľ 80 %).",
   "backtest.verdictBeatsNaive": "Model mal menšiu chybu ako naivná predikcia „cena sa nezmení“.",
   "backtest.verdictNoEdge": "Model nemá výrazne menšiu chybu ako naivná predikcia „cena sa nezmení“. Jeho hodnota je v odhade rozsahu (rizika), nie v predpovedi smeru.",
-  "backtest.verdictDirection": "Presnosť smeru okolo 50 % je pri kryptomenách bežná: krátkodobý vývoj ceny je z veľkej časti náhodný."
+  "backtest.verdictDirection": "Presnosť smeru okolo 50 % je pri kryptomenách bežná: krátkodobý vývoj ceny je z veľkej časti náhodný.",
+  "forecast.tabCompare": "Porovnanie modelov",
+  "compare.title": "Porovnanie modelov",
+  "compare.intro": "Vygeneruj predikciu tej istej mince a horizontu viacerými modelmi naraz a porovnaj ich na jednom grafe.",
+  "compare.providers": "Modely na porovnanie",
+  "compare.onlyQuant": "Na porovnanie s AI modelmi si najprv v „Účet & API kľúče“ pripoj aspoň jedného AI providera.",
+  "compare.costNote": "Pre {n} AI provider(ov) sa odošle po jednej požiadavke na ich API (môže byť spoplatnená podľa tvojho plánu).",
+  "compare.run": "Porovnať",
+  "compare.resultsTitle": "Porovnanie: {coin} · {horizon}",
+  "compare.chartLabel": "Graf porovnania predikcií viacerých modelov",
+  "compare.now": "teraz",
+  "compare.step": "Krok {n}",
+  "compare.nothingToChart": "Žiadny model nevrátil skutočnú predikciu, ktorú by bolo možné zobraziť v grafe."
 }

@@ -595,5 +595,17 @@
   "backtest.verdictNotCalibrated": "The uncertainty band is not well calibrated: the real price was inside it in {value}% of cases (target 80%).",
   "backtest.verdictBeatsNaive": "The model had a lower error than the naive \"price stays the same\" forecast.",
   "backtest.verdictNoEdge": "The model's error is not clearly lower than the naive \"price stays the same\" forecast. Its value is in estimating the range (risk), not in predicting direction.",
-  "backtest.verdictDirection": "Direction accuracy around 50% is normal for crypto: short-term price moves are largely random."
+  "backtest.verdictDirection": "Direction accuracy around 50% is normal for crypto: short-term price moves are largely random.",
+  "forecast.tabCompare": "Model comparison",
+  "compare.title": "Model comparison",
+  "compare.intro": "Generate a forecast for the same coin and horizon with several models at once and compare them on one chart.",
+  "compare.providers": "Models to compare",
+  "compare.onlyQuant": "To compare with AI models, first connect at least one AI provider in \"Account & API keys\".",
+  "compare.costNote": "One request will be sent to the API of each of the {n} AI provider(s) (it may be billed under your plan).",
+  "compare.run": "Compare",
+  "compare.resultsTitle": "Comparison: {coin} · {horizon}",
+  "compare.chartLabel": "Chart comparing forecasts from several models",
+  "compare.now": "now",
+  "compare.step": "Step {n}",
+  "compare.nothingToChart": "No model returned a real forecast that could be shown on the chart."
 }

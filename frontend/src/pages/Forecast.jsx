@@ -7,6 +7,7 @@ import { api } from "../api";
 import { AccuracyBadge, ConfidenceBadge, FallbackBadge, MockBadge, RiskBadge } from "../components/Badge";
 import { Card } from "../components/Card";
 import BacktestPanel from "../components/BacktestPanel";
+import ComparePanel from "../components/ComparePanel";
 import CostConfirmModal from "../components/CostConfirmModal";
 import DataSources from "../components/DataSources";
 import ForecastChart, { hasForecastSeries } from "../components/ForecastChart";
@@ -332,6 +333,7 @@ export default function Forecast() {
         <button className={`tab ${tab === "new" ? "active" : ""}`} onClick={() => setTab("new")}>{t("forecast.tabNew")}</button>
         <button className={`tab ${tab === "history" ? "active" : ""}`} onClick={() => setTab("history")}>{t("forecast.tabHistory")}</button>
         <button className={`tab ${tab === "leaderboard" ? "active" : ""}`} onClick={() => setTab("leaderboard")}>{t("forecast.tabLeaderboard")}</button>
+        <button className={`tab ${tab === "compare" ? "active" : ""}`} onClick={() => setTab("compare")}>{t("forecast.tabCompare")}</button>
         <button className={`tab ${tab === "backtest" ? "active" : ""}`} onClick={() => setTab("backtest")}>{t("forecast.tabBacktest")}</button>
       </div>
 
@@ -416,6 +418,7 @@ export default function Forecast() {
       )}
 
       {tab === "leaderboard" && <Leaderboard />}
+      {tab === "compare" && <ComparePanel />}
       {tab === "backtest" && <BacktestPanel />}
 
       {tab === "history" && (
