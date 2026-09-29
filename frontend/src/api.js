@@ -179,6 +179,7 @@ export const api = {
     request(`/forecast/backtest?coin=${encodeURIComponent(coin)}&horizon=${encodeURIComponent(horizon)}`).then(obj),
   shareForecast: (id) => request(`/forecast/history/${id}/share`, { method: "POST" }).then(obj),
   unshareForecast: (id) => request(`/forecast/history/${id}/share`, { method: "DELETE" }),
+  serviceStatus: () => request("/public/status").then((r) => withArrays(r, ["services"])),
   sharedForecast: (token) => request(`/public/forecasts/${encodeURIComponent(token)}`).then(obj),
   accountActivity: () => request("/account/activity").then((r) => withArrays(r, ["events"])),
 

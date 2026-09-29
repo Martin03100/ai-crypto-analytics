@@ -12,6 +12,7 @@ from app.config import RATE_LIMIT_MARKET_PUBLIC
 from app.deps import get_db
 from app.models import ForecastEvaluation, ForecastHistory
 from app.rate_limit import rate_limit_by_ip
+from app.services.status_check import collect_status
 
 router = APIRouter(prefix="/api/public", tags=["public"])
 
@@ -41,3 +42,9 @@ def shared_forecast(token: str = Path(min_length=16, max_length=64, pattern=r"^[
             "direction_correct": evaluation.direction_correct, "actual_final_price": evaluation.actual_final_price,
         },
     }
+
+
+@router.get("/status", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_MARKET_PUBLIC))])
+def service_status() -> dict:
+    # Cached for a minute, so hammering this endpoint cannot hammer the external services.
+    return collect_status()
