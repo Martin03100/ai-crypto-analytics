@@ -75,6 +75,33 @@ def test_onchain_whales_summary(monkeypatch):
     assert data_sources.onchain("solana") is None
 
 
+def test_onchain_stats_marks_failed_whale_lookup_as_unavailable(monkeypatch):
+    def fake_get(url, params=None, headers=None, timeout=None):
+        if url.endswith("/stats"):
+            return _Resp({"data": {"transactions_24h": 700000}})
+        return _Resp({"data": None, "context": {"code": 430}}, status=430)
+    monkeypatch.setattr(data_sources.requests, "get", fake_get)
+    stats = data_sources.onchain_stats("bitcoin")
+    assert stats["transactions_24h"] == 700000
+    assert stats["whales_available"] is False and "whale_count" not in stats
+
+
+def test_onchain_stats_distinguishes_no_whales_from_failure(monkeypatch):
+    def fake_get(url, params=None, headers=None, timeout=None):
+        if url.endswith("/stats"):
+            return _Resp({"data": {"transactions_24h": 19000}})
+        return _Resp({"data": []})
+    monkeypatch.setattr(data_sources.requests, "get", fake_get)
+    stats = data_sources.onchain_stats("dogecoin")
+    assert stats["whales_available"] is True and "whale_count" not in stats
+
+
+def test_onchain_stats_returns_none_when_everything_fails(monkeypatch):
+    monkeypatch.setattr(data_sources.requests, "get",
+                        lambda *a, **k: _Resp({}, status=500))
+    assert data_sources.onchain_stats("ethereum") is None
+
+
 def test_chain_tvl_uses_gecko_id(monkeypatch):
     history = [{"tvl": 100.0}] * 30 + [{"tvl": 110.0}] * 2
 

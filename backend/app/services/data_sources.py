@@ -164,6 +164,9 @@ def onchain_stats(coin_id: str) -> Optional[Dict[str, Any]]:
     whales = _get_json(f"https://api.blockchair.com/{chain}/transactions", _med_cache, f"bc-whales|{chain}",
                        params={"q": f"{field}({threshold}..)", "s": "time(desc)", "limit": 10, **key_param})
     rows = whales.get("data") if isinstance(whales, dict) else None
+    # None means the request failed (limit, timeout, blocked IP); [] means there really were no
+    # large transfers. The UI must not present a failed lookup as "no whale activity".
+    result["whales_available"] = isinstance(rows, list)
     if rows:
         values = [float(row.get(field) or 0) for row in rows]
         times = []
@@ -176,7 +179,8 @@ def onchain_stats(coin_id: str) -> Optional[Dict[str, Any]]:
             "whale_count": len(rows), "whale_total_usd": sum(values), "whale_max_usd": max(values),
             "whale_span_hours": round((datetime.now(timezone.utc) - min(times)).total_seconds() / 3600, 1) if times else None,
         })
-    return result if len(result) > 2 else None
+    has_data = any(k in result for k in ("transactions_24h", "mempool_transactions", "whale_count"))
+    return result if has_data else None
 
 
 def onchain(coin_id: str) -> Optional[str]:

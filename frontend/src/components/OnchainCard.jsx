@@ -32,7 +32,7 @@ export default function OnchainCard() {
                   count: it.whale_count, threshold: usd(it.whale_threshold_usd), total: usd(it.whale_total_usd),
                   max: usd(it.whale_max_usd), hours: it.whale_span_hours ?? "?",
                 })}</p>
-              ) : <p className="text-sub">{t("onchain.noWhales")}</p>}
+              ) : <p className="text-sub">{t(it.whales_available === false ? "onchain.whalesUnavailable" : "onchain.noWhales")}</p>}
             </div>
           ))}
         </div>
