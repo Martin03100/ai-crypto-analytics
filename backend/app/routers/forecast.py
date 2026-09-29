@@ -15,7 +15,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.config import PROVIDER_LABELS, PROVIDERS, QUANT_LABEL, QUANT_PROVIDER, RATE_LIMIT_AI_ENDPOINT
+from app.config import DEFAULT_COIN_IDS, PROVIDER_LABELS, PROVIDERS, QUANT_LABEL, QUANT_PROVIDER, RATE_LIMIT_AI_ENDPOINT
 from app.deps import get_current_user, get_db, get_decrypted_api_key
 from app.models import ForecastEvaluation, ForecastHistory, PriceTip, User
 from app.rate_limit import rate_limit_by_user
@@ -25,6 +25,7 @@ from app.schemas import (
     AIResultOut, CostEstimateOut, ForecastAccuracyOut, ForecastHistoryOut, ForecastRequest, PaginatedForecastHistory, SaveForecastRequest, TipRequest, BulkDeleteRequest,
 )
 from app.services import audit
+from app.services.backtest import BACKTEST_SETUP, run_backtest
 from app.services.ai_engine import compute_forecast_accuracy, estimate_forecast_cost, get_coin_forecast
 
 router = APIRouter(prefix="/api/forecast", tags=["forecast"])
@@ -59,6 +60,17 @@ def generate_forecast(payload: ForecastRequest, user: User = Depends(get_current
         result.data["podpis"] = sign_forecast(user.id, signed_provider, payload.coin, payload.horizon,
                                               result.data["ceny"], str(result.data.get("vytvorene", "")))
     return AIResultOut(**result.as_dict())
+
+
+@router.get("/backtest", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
+def backtest(coin: str = Query(min_length=2, max_length=10), horizon: str = Query(max_length=4),
+             user: User = Depends(get_current_user)) -> dict:
+    if coin.upper() not in DEFAULT_COIN_IDS or horizon not in BACKTEST_SETUP:
+        raise HTTPException(status_code=400, detail="Backtest podporuje základné mince a horizonty 24h, 1T a 1M.")
+    ok, data, error = run_backtest(coin, horizon)
+    if not ok:
+        raise HTTPException(status_code=503, detail=error)
+    return data
 
 
 @router.post("/estimate-cost", response_model=CostEstimateOut,

@@ -85,6 +85,25 @@ def attach_uncertainty_band(parsed: Dict[str, Any], prices: List[List[float]], h
     parsed["denna_volatilita_pct"] = round(sigma_h * math.sqrt(24) * 100, 2)
 
 
+def project_path(series: List[Tuple[float, float]], sigma_h: float, step_hours: float,
+                 points: int) -> Tuple[List[float], List[float], List[float]]:
+    """Median path and 80 % band for `points` steps of `step_hours` from the last observation.
+
+    Shared by the live forecast and the backtest, so the backtest measures exactly this model."""
+    spot = series[-1][1]
+    drift_h = _drift_per_hour(series)
+    prices, lows, highs = [], [], []
+    for i in range(1, points + 1):
+        h = step_hours * i
+        sigma_t = math.sqrt((sigma_h ** 2) * h + _JUMP_VARIANCE_FLOOR)
+        cap = _DRIFT_CAP_SIGMAS * sigma_t
+        mu = max(-cap, min(cap, drift_h * h))
+        prices.append(_fmt(spot * math.exp(mu)))
+        lows.append(_fmt(spot * math.exp(mu - Z_80 * sigma_t)))
+        highs.append(_fmt(spot * math.exp(mu + Z_80 * sigma_t)))
+    return prices, lows, highs
+
+
 def build_quant_forecast(coin: str, horizon: str, lang: str = "en") -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
     coin = (coin or "").upper()
     coin_id = DEFAULT_COIN_IDS.get(coin)
@@ -104,21 +123,11 @@ def build_quant_forecast(coin: str, horizon: str, lang: str = "en") -> Tuple[boo
         return False, None, "Nedostatok historickych dat na odhad volatility."
 
     spot = series[-1][1]
-    drift_h = _drift_per_hour(series)
     points = int(horizon_cfg["points"])
     step = STEP_HOURS[horizon]
     unit = unit_label(str(horizon_cfg["unit"]), lang)
-
-    prices, lows, highs, labels = [], [], [], []
-    for i in range(1, points + 1):
-        h = step * i
-        sigma_t = math.sqrt((sigma_h ** 2) * h + _JUMP_VARIANCE_FLOOR)
-        cap = _DRIFT_CAP_SIGMAS * sigma_t
-        mu = max(-cap, min(cap, drift_h * h))
-        prices.append(_fmt(spot * math.exp(mu)))
-        lows.append(_fmt(spot * math.exp(mu - Z_80 * sigma_t)))
-        highs.append(_fmt(spot * math.exp(mu + Z_80 * sigma_t)))
-        labels.append(f"{unit} {i}")
+    prices, lows, highs = project_path(series, sigma_h, step, points)
+    labels = [f"{unit} {i}" for i in range(1, points + 1)]
 
     sigma_day_pct = sigma_h * math.sqrt(24) * 100
     rel_width = (highs[-1] - lows[-1]) / prices[-1]
