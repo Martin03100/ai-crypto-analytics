@@ -8,6 +8,7 @@ import { ConfidenceBadge, FallbackBadge, MockBadge, RiskBadge } from "./Badge";
 import { Card } from "./Card";
 import { useLanguage } from "../context/LanguageContext";
 import { useProviders } from "../context/ProvidersContext";
+import { humanizeError } from "../i18n/errorMessages";
 import { COMPARE_COLORS, buildComparisonRows, changePct } from "../utils/compare";
 import { axisDecimals, formatPrice, formatUsd } from "../utils/formatPrice";
 
@@ -16,7 +17,7 @@ const HORIZONS = ["24h", "1T", "1M", "1R"];
 const MAX_PROVIDERS = COMPARE_COLORS.length;
 
 export default function ComparePanel() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const providersCtx = useProviders();
   const options = useMemo(() => [
     { provider: "quant", label: t("provider.quantLabel") },
@@ -42,7 +43,7 @@ export default function ComparePanel() {
       const requested = selected[idx];
       const label = options.find((o) => o.provider === requested)?.label || requested;
       if (s.status === "rejected" || !s.value?.success) {
-        return { key: requested, label, error: s.reason?.message || s.value?.error_message || t("errors.generic") };
+        return { key: requested, label, error: humanizeError(s.status === "rejected" ? s.reason : s.value?.error_message, lang) };
       }
       const res = s.value;
       return { key: requested, label, data: res.data, isMock: res.is_mock, fallback: Boolean(res.provider_used && res.provider_used !== requested) };

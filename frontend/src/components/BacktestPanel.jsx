@@ -9,6 +9,7 @@ import { api } from "../api";
 import { Card } from "./Card";
 import InfoTip from "./InfoTip";
 import { useLanguage } from "../context/LanguageContext";
+import { humanizeError } from "../i18n/errorMessages";
 import { localeForLang } from "../i18n/locale";
 import { axisDecimals, formatPrice, formatUsd } from "../utils/formatPrice";
 import { backtestVerdicts } from "../utils/backtest";
@@ -41,7 +42,7 @@ export default function BacktestPanel() {
       setResult(await api.backtest(coin, horizon));
     } catch (err) {
       setResult(null);
-      setError(err?.message || t("common.loadFailed"));
+      setError(humanizeError(err, lang, "backtest.failed"));
     } finally {
       setLoading(false);
     }
