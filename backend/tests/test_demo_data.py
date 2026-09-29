@@ -52,7 +52,7 @@ def test_forecasts_have_real_shape_band_and_are_not_flat_lines():
     from app.services import demo_data as d
     now = datetime.now(timezone.utc)
     spreads, count = [], 0
-    for model, coin, horizon, _ago, data in _all_forecasts(now):
+    for model, _coin, horizon, _ago, data in _all_forecasts(now):
         count += 1
         n = int(d.TIME_HORIZONS[horizon]["points"])
         assert len(data["ceny"]) == len(data["casove_body"]) == len(data["demo_actual"]) == n
@@ -65,11 +65,18 @@ def test_forecasts_have_real_shape_band_and_are_not_flat_lines():
 
 
 def test_forecast_generation_is_reproducible():
-    from app.services import demo_data as d
     now = datetime(2026, 9, 29, 12, 34, tzinfo=timezone.utc)
     first = [(m.key, c, h, data["ceny"]) for m, c, h, _a, data in _all_forecasts(now)]
     again = [(m.key, c, h, data["ceny"]) for m, c, h, _a, data in _all_forecasts(now)]
     assert first == again
+
+
+def test_real_provider_labels_can_never_be_mistaken_for_demo():
+    """Demo rows are recognised by the ' test' suffix; real labels are fixed on the server and must not use it."""
+    from app.config import PROVIDER_LABELS, QUANT_LABEL
+    from app.services.demo_data import is_demo_label
+    assert not any(is_demo_label(label) for label in [*PROVIDER_LABELS.values(), QUANT_LABEL, "mock"])
+    assert is_demo_label("Gemini test") and not is_demo_label(None) and not is_demo_label("")
 
 
 def test_reasoning_is_localized():

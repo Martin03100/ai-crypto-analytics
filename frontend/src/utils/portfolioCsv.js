@@ -49,7 +49,7 @@ function parseNumber(raw, delimiter) {
  * `reason` is an i18n key suffix: "symbol" | "amount" | "noColumns".
  */
 export function parsePortfolioCsv(text) {
-  const lines = String(text || "").replace(/^﻿/, "").split(/\r?\n/).map((l) => l.trim());
+  const lines = String(text || "").replace(/^\uFEFF/, "").split(/\r?\n/).map((l) => l.trim());
   const firstIdx = lines.findIndex((l) => l !== "");
   if (firstIdx === -1) return { holdings: [], errors: [] };
   const delimiter = detectDelimiter(lines[firstIdx]);

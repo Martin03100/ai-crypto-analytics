@@ -17,7 +17,8 @@ statistical model and real market data. Bachelor's thesis project (Software Deve
 - **Portfolio advisor** with CSV import (generic or exchange balance export).
 - **Market sentiment:** Fear & Greed index, news, on-chain whale activity, official FOMC/CPI calendar.
 - **Public share links** for forecasts, **account activity log**, **new-device sign-in alerts**, optional 2FA.
-- **Demo mode** that fills the history with real, retroactively generated forecasts for presentations.
+- **Demo mode** for presentations: one click fills the whole app with clearly labelled test data ("Gemini test", "Claude test", ...)
+  on synthetic prices - forecasts, evaluated accuracy, leaderboard, tips and portfolio analyses, visible only to the user who loaded it.
 
 ## Architecture
 
@@ -38,7 +39,7 @@ REST API (FastAPI, Render) ── rate limiting, validation, security headers, o
 | --- | --- | --- |
 | Backend | pytest | API, security (auth, CSRF, rate limits, lockout, 2FA), models, backtest on real BTC data, fallbacks |
 | Frontend | Vitest | API client, parsers (CSV), formatting, translations, pure UI logic |
-| End-to-end | Playwright | Sign-up / sign-in / activity log, CSV import, public pages, redirects, share links |
+| End-to-end | Playwright | Sign-up / sign-in / activity log, CSV import, demo data (history, leaderboard, portfolio, dashboard), model tabs, public pages, redirects |
 | CI | GitHub Actions | All of the above on every push and pull request |
 
 ## Running locally

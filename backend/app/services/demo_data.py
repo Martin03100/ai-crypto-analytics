@@ -233,7 +233,8 @@ def _forecast_plan() -> List[Tuple[DemoModel, str, str, int]]:
     """(model, coin, horizon, hours_ago): six matured and three pending forecasts per model."""
     plan: List[Tuple[DemoModel, str, str, int]] = []
     for m, model in enumerate(DEMO_MODELS):
-        coin = lambda k: COIN_ORDER[(m * 3 + k) % len(COIN_ORDER)]  # noqa: E731
+        def coin(k: int, offset: int = m * 3) -> str:
+            return COIN_ORDER[(offset + k) % len(COIN_ORDER)]
         plan += [
             (model, coin(0), "1T", 24 * 40 + m * 5),
             (model, coin(1), "1T", 24 * 29 + m * 7),
