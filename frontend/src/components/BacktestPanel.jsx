@@ -81,7 +81,7 @@ export default function BacktestPanel() {
       </Card>
 
       {result && (
-        <Card title={t("backtest.resultsTitle", { coin: result.coin, horizon: result.horizon })} style={{ marginTop: 16 }} glow="cyan">
+        <Card title={t("backtest.resultsTitle", { coin: result.coin, horizon: t(`forecast.horizon${result.horizon}`) })} style={{ marginTop: 16 }} glow="cyan">
           <p className="text-sub" style={{ marginBottom: 14 }}>
             {t("backtest.period", {
               from: new Date(result.period_start).toLocaleDateString(locale),

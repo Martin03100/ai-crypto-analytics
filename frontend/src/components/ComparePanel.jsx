@@ -27,6 +27,7 @@ export default function ComparePanel() {
   const [coin, setCoin] = useState("BTC");
   const [horizon, setHorizon] = useState("1T");
   const [results, setResults] = useState([]);
+  const [ranFor, setRanFor] = useState({ coin: "BTC", horizon: "1T" });
   const [loading, setLoading] = useState(false);
 
   function toggle(provider) {
@@ -37,6 +38,7 @@ export default function ComparePanel() {
   async function run() {
     setLoading(true);
     setResults([]);
+    setRanFor({ coin, horizon });
     // allSettled: one failing provider must not hide the others.
     const settled = await Promise.allSettled(selected.map((p) => api.generateForecast(p, coin, horizon)));
     setResults(settled.map((s, idx) => {
@@ -93,7 +95,7 @@ export default function ComparePanel() {
       </Card>
 
       {results.length > 0 && (
-        <Card title={t("compare.resultsTitle", { coin, horizon })} style={{ marginTop: 16 }} glow="cyan">
+        <Card title={t("compare.resultsTitle", { coin: ranFor.coin, horizon: t(`forecast.horizon${ranFor.horizon}`) })} style={{ marginTop: 16 }} glow="cyan">
           {rows.length > 0 ? (
             <div role="img" aria-label={t("compare.chartLabel")}>
               <ResponsiveContainer width="100%" height={300}>
