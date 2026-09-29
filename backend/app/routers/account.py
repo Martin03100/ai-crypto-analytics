@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
+from datetime import timezone
 from typing import List
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response
 from sqlalchemy.orm import Session
 
 from app.config import (
@@ -13,7 +14,7 @@ from app.config import (
     PROVIDER_KEY_LINKS, PROVIDERS, RATE_LIMIT_ACCOUNT_SENSITIVE, RATE_LIMIT_API_KEY_TEST,
 )
 from app.deps import get_current_user, get_db, get_decrypted_api_key
-from app.models import ApiKey, User
+from app.models import ApiKey, AuditEvent, User
 from app.rate_limit import rate_limit_by_user
 from app.schemas import (
     ApiKeyIn, ApiKeyStatus, ChangePasswordRequest, DeleteAccountRequest, TotpCodeRequest, TotpDisableRequest, UpdateEmailRequest,
@@ -22,6 +23,7 @@ from app.security import (
     create_access_token, decrypt_secret, encrypt_secret, generate_totp_secret, hash_password, mask_key, sanitize_text,
     totp_uri, verify_password, verify_totp,
 )
+from app.services import audit
 from app.services.account_cleanup import delete_user_data, release_email_if_unverified
 from app.services.email_service import is_email_configured
 from app.services.verification import send_verification_code
@@ -69,8 +71,8 @@ def test_api_key_endpoint(provider: str, user: User = Depends(get_current_user),
 
 
 @router.put("/email", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
-def update_email(payload: UpdateEmailRequest, background_tasks: BackgroundTasks, user: User = Depends(get_current_user),
-                  db: Session = Depends(get_db)) -> dict:
+def update_email(payload: UpdateEmailRequest, request: Request, background_tasks: BackgroundTasks,
+                  user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     email = sanitize_text(payload.email, max_length=255).lower() if payload.email else ""
     if not email or "@" not in email or "." not in email.split("@")[-1]:
         raise HTTPException(status_code=400, detail="Zadaj platnú emailovú adresu.")
@@ -82,6 +84,8 @@ def update_email(payload: UpdateEmailRequest, background_tasks: BackgroundTasks,
     user.email = email
     if changed and is_email_configured():
         user.email_verified = False
+    if changed:
+        audit.record(db, user.id, "email_changed", request)
     db.commit()
     if changed and user.email_verified is False:
         send_verification_code(db, user, background_tasks)
@@ -89,33 +93,38 @@ def update_email(payload: UpdateEmailRequest, background_tasks: BackgroundTasks,
 
 
 @router.post("/change-password", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
-def change_password(payload: ChangePasswordRequest, response: Response, user: User = Depends(get_current_user),
-                     db: Session = Depends(get_db)) -> dict:
+def change_password(payload: ChangePasswordRequest, response: Response, request: Request,
+                     user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     if not verify_password(payload.current_password, user.password_hash):
         raise HTTPException(status_code=400, detail="Aktuálne heslo nie je správne.")
     user.password_hash = hash_password(payload.new_password)
     user.token_version += 1
+    audit.record(db, user.id, "password_changed", request)
     db.commit()
     _reissue_cookie(response, user)
     return {"success": True, "message": "Heslo bolo úspešne zmenené."}
 
 
 @router.post("/logout-all-devices", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
-def logout_all_devices(response: Response, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+def logout_all_devices(response: Response, request: Request, user: User = Depends(get_current_user),
+                       db: Session = Depends(get_db)) -> dict:
     user.token_version += 1
+    audit.record(db, user.id, "logout_all", request)
     db.commit()
     _reissue_cookie(response, user)
     return {"success": True, "message": "Odhlásené zo všetkých ostatných zariadení."}
 
 
 @router.put("/api-keys", response_model=ApiKeyStatus, dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
-def upsert_api_key(payload: ApiKeyIn, user: User = Depends(get_current_user),
+def upsert_api_key(payload: ApiKeyIn, request: Request, user: User = Depends(get_current_user),
                     db: Session = Depends(get_db)) -> ApiKeyStatus:
     if payload.provider not in PROVIDERS.values():
         raise HTTPException(status_code=400, detail="Neznamy AI provider.")
 
     if not payload.api_key.strip():
-        db.query(ApiKey).filter(ApiKey.user_id == user.id, ApiKey.provider == payload.provider).delete()
+        deleted = db.query(ApiKey).filter(ApiKey.user_id == user.id, ApiKey.provider == payload.provider).delete()
+        if deleted:
+            audit.record(db, user.id, "api_key_deleted", request, payload.provider)
         db.commit()
         label = next(k for k, v in PROVIDERS.items() if v == payload.provider)
         return ApiKeyStatus(provider=payload.provider, label=label, connected=False, masked_preview=None)
@@ -140,6 +149,7 @@ def upsert_api_key(payload: ApiKeyIn, user: User = Depends(get_current_user),
     else:
         row.encrypted_key = encrypted
         row.key_suffix = suffix
+    audit.record(db, user.id, "api_key_saved", request, payload.provider)
     db.commit()
 
     label = next(k for k, v in PROVIDERS.items() if v == payload.provider)
@@ -148,8 +158,11 @@ def upsert_api_key(payload: ApiKeyIn, user: User = Depends(get_current_user),
 
 
 @router.delete("/api-keys/{provider}", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
-def delete_api_key(provider: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
-    db.query(ApiKey).filter(ApiKey.user_id == user.id, ApiKey.provider == provider).delete()
+def delete_api_key(provider: str, request: Request, user: User = Depends(get_current_user),
+                   db: Session = Depends(get_db)) -> dict:
+    deleted = db.query(ApiKey).filter(ApiKey.user_id == user.id, ApiKey.provider == provider).delete()
+    if deleted:
+        audit.record(db, user.id, "api_key_deleted", request, provider[:32])
     db.commit()
     return {"success": True}
 
@@ -178,19 +191,22 @@ def totp_setup(user: User = Depends(get_current_user), db: Session = Depends(get
 
 
 @router.post("/2fa/enable", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
-def totp_enable(payload: TotpCodeRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+def totp_enable(payload: TotpCodeRequest, request: Request, user: User = Depends(get_current_user),
+                db: Session = Depends(get_db)) -> dict:
     secret = decrypt_secret(user.totp_pending_secret or "", user.id)
     if not secret:
         raise HTTPException(status_code=400, detail="Najprv spusti nastavenie 2FA.")
     if not verify_totp(secret, payload.code):
         raise HTTPException(status_code=400, detail="Nesprávny kód z overovacej aplikácie (2FA).")
     user.totp_secret, user.totp_pending_secret, user.totp_enabled = user.totp_pending_secret, None, True
+    audit.record(db, user.id, "twofa_enabled", request)
     db.commit()
     return {"success": True, "totp_enabled": True}
 
 
 @router.post("/2fa/disable", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
-def totp_disable(payload: TotpDisableRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+def totp_disable(payload: TotpDisableRequest, request: Request, user: User = Depends(get_current_user),
+                 db: Session = Depends(get_db)) -> dict:
     if not user.totp_enabled:
         return {"success": True, "totp_enabled": False}
     if not verify_password(payload.password, user.password_hash):
@@ -199,5 +215,17 @@ def totp_disable(payload: TotpDisableRequest, user: User = Depends(get_current_u
     if not secret or not verify_totp(secret, payload.code):
         raise HTTPException(status_code=400, detail="Nesprávny kód z overovacej aplikácie (2FA).")
     user.totp_secret, user.totp_pending_secret, user.totp_enabled = None, None, False
+    audit.record(db, user.id, "twofa_disabled", request)
     db.commit()
     return {"success": True, "totp_enabled": False}
+
+
+@router.get("/activity")
+def account_activity(limit: int = Query(default=50, ge=1, le=200), user: User = Depends(get_current_user),
+                     db: Session = Depends(get_db)) -> dict:
+    rows = (db.query(AuditEvent).filter(AuditEvent.user_id == user.id)
+            .order_by(AuditEvent.created_at.desc(), AuditEvent.id.desc()).limit(limit).all())
+    return {"events": [{
+        "action": row.action, "ip": row.ip, "device": audit.describe_user_agent(row.user_agent),
+        "details": row.details, "created_at": row.created_at.replace(tzinfo=timezone.utc).isoformat() if row.created_at else None,
+    } for row in rows]}

@@ -926,3 +926,16 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 .landing-honest h2 { margin: 0 0 6px; font-size: 15px; }
 .landing-footer { text-align: center; font-size: 12.5px; color: var(--text-tertiary); }
 .landing-footer a { color: var(--text-secondary); }
+
+/* Account activity log */
+.activity-list { display: flex; flex-direction: column; }
+.activity-row { display: grid; grid-template-columns: 130px 1fr auto; gap: 12px; align-items: baseline;
+  padding: 9px 0; border-bottom: 1px solid var(--border-subtle); font-size: 13px; }
+.activity-row:last-child { border-bottom: none; }
+.activity-row.warn .activity-action { color: var(--amber-fg); }
+.activity-time { color: var(--text-tertiary); font-size: 12px; }
+.activity-device { font-size: 12px; text-align: right; }
+@media (max-width: 600px) {
+  .activity-row { grid-template-columns: 1fr; gap: 2px; }
+  .activity-device { text-align: left; }
+}

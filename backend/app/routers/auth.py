@@ -27,9 +27,12 @@ from app.security import (
     create_access_token, decrypt_secret, dummy_verify, generate_reset_code, hash_password, hash_reset_token,
     needs_rehash, sanitize_text, verify_password, verify_totp,
 )
+from app.services import audit
 from app.services.account_cleanup import release_email_if_unverified
 from app.services.captcha import verify_captcha
-from app.services.email_service import is_email_configured, render_lockout_email, render_reset_password_email, send_email
+from app.services.email_service import (
+    is_email_configured, render_lockout_email, render_new_login_email, render_reset_password_email, send_email,
+)
 from app.services.verification import send_verification_code
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -71,6 +74,8 @@ def register(payload: RegisterRequest, response: Response, request: Request, bac
                 email_verified=False if is_email_configured() else None)
     db.add(user)
     try:
+        db.flush()
+        audit.record(db, user.id, "register", request)
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -86,7 +91,7 @@ def register(payload: RegisterRequest, response: Response, request: Request, bac
 
 
 @router.post("/login", response_model=TokenResponse, dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_LOGIN))])
-def login(payload: LoginRequest, response: Response, background_tasks: BackgroundTasks,
+def login(payload: LoginRequest, response: Response, request: Request, background_tasks: BackgroundTasks,
           db: Session = Depends(get_db)) -> TokenResponse:
     username = sanitize_text(payload.username, max_length=64)
     user = db.query(User).filter(User.username == username).first()
@@ -108,7 +113,7 @@ def login(payload: LoginRequest, response: Response, background_tasks: Backgroun
         )
 
     if not verify_password(payload.password, user.password_hash):
-        _register_failed_attempt(db, user, now, background_tasks)
+        _register_failed_attempt(db, user, now, background_tasks, request)
         raise generic_error
 
     if user.totp_enabled:
@@ -117,14 +122,19 @@ def login(payload: LoginRequest, response: Response, background_tasks: Backgroun
                                 headers={"X-Error-Code": "totp_required"})
         secret = decrypt_secret(user.totp_secret or "", user.id)
         if not secret or not verify_totp(secret, payload.totp_code):
-            _register_failed_attempt(db, user, now, background_tasks)
+            _register_failed_attempt(db, user, now, background_tasks, request, details="2fa")
             raise HTTPException(status_code=401, detail="Nesprávny kód z overovacej aplikácie (2FA).")
 
     user.failed_login_attempts = 0
     user.locked_until = None
     if needs_rehash(user.password_hash):
         user.password_hash = hash_password(payload.password)
+    ip, user_agent = audit.client_info(request)
+    new_device = audit.is_new_device(db, user.id, user_agent)
+    audit.record(db, user.id, "login_success", request)
     db.commit()
+    if new_device and user.email and user.email_verified is not False and is_email_configured():
+        _send_new_login_alert(background_tasks, user, now, user_agent, ip)
 
     _set_auth_cookie(response, user)
     return TokenResponse(access_token=create_access_token(user.id, user.username, user.token_version),
@@ -209,7 +219,7 @@ def verify_reset_code(payload: VerifyResetCodeRequest, db: Session = Depends(get
 
 
 @router.post("/reset-password", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_RESET_CODE))])
-def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)) -> dict:
+def reset_password(payload: ResetPasswordRequest, request: Request, db: Session = Depends(get_db)) -> dict:
     email = sanitize_text(payload.email, max_length=255).lower()
     check_rate_limit(f"reset-code:{email}", 5, 900)
     user = db.query(User).filter(User.email == email).first()
@@ -223,19 +233,32 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
     user.failed_login_attempts = 0
     user.locked_until = None
     row.used = True
+    audit.record(db, user.id, "password_reset", request)
     db.commit()
 
     return {"success": True, "message": "Heslo bolo zmenené. Prihlás sa novým heslom."}
 
 
 
-def _register_failed_attempt(db: Session, user: User, now, background_tasks: BackgroundTasks) -> None:
+def _send_new_login_alert(background_tasks: BackgroundTasks, user: User, now: datetime,
+                          user_agent: str | None, ip: str | None) -> None:
+    when = now.strftime("%d.%m.%Y %H:%M UTC")
+    text_body, html_body = render_new_login_email(user.username, when, audit.describe_user_agent(user_agent), ip or "?")
+    background_tasks.add_task(send_email, user.email, "Nové prihlásenie do účtu — AI Crypto Analytics",
+                              text_body, html_body)
+
+
+def _register_failed_attempt(db: Session, user: User, now, background_tasks: BackgroundTasks,
+                             request: Request | None = None, details: str | None = None) -> None:
     user.failed_login_attempts += 1
     locked = False
     if user.failed_login_attempts >= MAX_FAILED_LOGIN_ATTEMPTS:
         user.locked_until = now + timedelta(minutes=ACCOUNT_LOCKOUT_MINUTES)
         user.failed_login_attempts = 0
         locked = True
+    audit.record(db, user.id, "login_failed", request, details)
+    if locked:
+        audit.record(db, user.id, "account_locked", request)
     db.commit()
     if locked and user.email and is_email_configured():
         text_body, html_body = render_lockout_email(user.username, ACCOUNT_LOCKOUT_MINUTES)

@@ -174,3 +174,27 @@ def render_lockout_email(username: str, minutes: int) -> tuple[str, str]:
         </p>
         """)
     return text_body, html_body
+
+
+def render_new_login_email(username: str, when: str, device: str, ip: str) -> tuple[str, str]:
+    text_body = (f"Ahoj {username},\n\ndo tvojho uctu sa niekto prihlasil z noveho zariadenia:\n"
+                 f"- cas: {when}\n- zariadenie: {device}\n- IP adresa: {ip}\n\n"
+                 f"Ak si to bol(a) ty, nemusis nic robit. Ak nie, okamzite si zmen heslo, v Nastaveniach "
+                 f"klikni na 'Odhlasit zo vsetkych zariadeni' a zapni 2FA.")
+    safe = {k: html.escape(v) for k, v in {"u": username, "w": when, "d": device, "i": ip}.items()}
+    html_body = _email_shell(preheader="Prihlásenie do tvojho účtu z nového zariadenia.", inner_html=f"""
+        <h1 style="margin:0 0 14px; font-size:19px; color:#0f172a;">Nové prihlásenie do účtu</h1>
+        <p style="margin:0 0 14px; font-size:14px; line-height:1.6; color:#334155;">
+          Ahoj <strong>{safe["u"]}</strong>, do tvojho účtu sa niekto prihlásil z nového zariadenia:
+        </p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 18px; font-size:13.5px; color:#334155;">
+          <tr><td style="padding:3px 14px 3px 0; color:#94a3b8;">Čas</td><td><strong>{safe["w"]}</strong></td></tr>
+          <tr><td style="padding:3px 14px 3px 0; color:#94a3b8;">Zariadenie</td><td><strong>{safe["d"]}</strong></td></tr>
+          <tr><td style="padding:3px 14px 3px 0; color:#94a3b8;">IP adresa</td><td><strong>{safe["i"]}</strong></td></tr>
+        </table>
+        <p style="margin:0; font-size:14px; line-height:1.6; color:#334155;">
+          Ak si to bol(a) ty, nemusíš nič robiť. Ak nie, okamžite si zmeň heslo, v Nastaveniach klikni na
+          „Odhlásiť zo všetkých zariadení“ a zapni dvojfaktorové overenie (2FA).
+        </p>
+        """)
+    return text_body, html_body

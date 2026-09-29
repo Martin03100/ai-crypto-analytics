@@ -3,6 +3,7 @@
 import { CheckCircle2, ExternalLink, KeyRound, Loader2, Save, Shield, Trash2, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import ActivityLog from "../components/ActivityLog";
 import { Card } from "../components/Card";
 import { SkeletonLines } from "../components/Skeleton";
 import { useAuth } from "../context/AuthContext";
@@ -162,6 +163,8 @@ export default function Account() {
           <p className="text-sub">{t("account.noProviderConnected")}</p>
         )}
       </Card>
+
+      <ActivityLog />
     </div>
   );
 }

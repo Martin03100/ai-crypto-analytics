@@ -175,6 +175,7 @@ export const api = {
   totpEnable: (code) => request("/account/2fa/enable", { method: "POST", body: { code } }),
   totpDisable: (password, code) => request("/account/2fa/disable", { method: "POST", body: { password, code } }),
   updateEmail: (email) => request("/account/email", { method: "PUT", body: { email } }),
+  accountActivity: () => request("/account/activity").then((r) => withArrays(r, ["events"])),
 
   generateForecast: (provider, coin, horizon) =>
     request("/forecast", { method: "POST", body: { provider, coin, horizon, lang: currentLang() }, timeoutMs: AI_TIMEOUT_MS }).then(aiResult),

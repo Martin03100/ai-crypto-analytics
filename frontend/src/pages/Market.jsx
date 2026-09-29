@@ -1,11 +1,12 @@
 /** Market sentiment page. */
 
-import { Calendar, Gauge, Newspaper, Vote, RefreshCw } from "lucide-react";
+import { Calendar, Gauge, Newspaper, Vote } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { MockBadge, SentimentBadge } from "../components/Badge";
 import { Card } from "../components/Card";
 import InfoTip from "../components/InfoTip";
+import LoadError from "../components/LoadError";
 import OnchainCard from "../components/OnchainCard";
 import PriceChart from "../components/PriceChart";
 import { SkeletonLines } from "../components/Skeleton";
@@ -31,16 +32,6 @@ function FearGreedGauge({ value, classification }) {
       <div style={{ height: 8, borderRadius: 999, background: "var(--bg-inset)", overflow: "hidden" }}>
         <div style={{ height: "100%", width: "100%", background: color, borderRadius: 999, transformOrigin: "left", transform: `scaleX(${pct / 100})`, transition: "transform 0.4s var(--ease)" }} />
       </div>
-    </div>
-  );
-}
-
-function LoadError({ onRetry }) {
-  const { t } = useLanguage();
-  return (
-    <div className="inline-error" role="alert">
-      <span>{t("common.loadFailed")}</span>
-      <button className="btn btn-ghost btn-sm" onClick={onRetry}><RefreshCw size={13} /> {t("common.retry")}</button>
     </div>
   );
 }
