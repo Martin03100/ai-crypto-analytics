@@ -20,8 +20,7 @@ export default function DemoDataCard() {
     setBusy("load");
     try {
       const res = await api.loadDemoData();
-      push(t("demo.loaded", { n: res.created }), "success");
-      if (res.missing_coins?.length) push(t("demo.partial", { coins: res.missing_coins.join(", ") }), "warn");
+      push(t("demo.loaded", { n: res.created, portfolios: res.portfolios ?? 0 }), "success");
       navigate("/forecast?tab=history");
     } catch (err) {
       push(err, "error");

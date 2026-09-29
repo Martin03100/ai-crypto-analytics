@@ -122,6 +122,8 @@ class ForecastEvaluation(Base):
     direction_correct: Mapped[bool] = mapped_column(Boolean, nullable=False)
     actual_final_price: Mapped[float] = mapped_column(Float, nullable=False)
     evaluated_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    # Evaluations of generated demo forecasts; visible only to the user who loaded the demo data.
+    is_demo: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=None)
 
 
 class PriceTip(Base):
@@ -134,6 +136,7 @@ class PriceTip(Base):
     ai_price: Mapped[float] = mapped_column(Float, nullable=False)
     outcome: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    is_demo: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=None)
 
 
 

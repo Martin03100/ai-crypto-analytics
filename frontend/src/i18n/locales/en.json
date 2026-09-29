@@ -642,15 +642,14 @@
   "status.service.deepseek": "DeepSeek",
   "status.service.grok": "xAI Grok",
   "demo.title": "Demo mode",
-  "demo.description": "For presentations: one click fills your history with real statistical-model forecasts made retroactively for past dates (each one only saw the prices known at that time). Older ones are already evaluated against real prices. Your own forecasts are left untouched. They never count towards the AI leaderboard and cannot be shared.",
+  "demo.description": "For presentations: one click fills the whole app with sample test data. The models \"Claude test\", \"Gemini test\", \"OpenAI test\", \"DeepSeek test\", \"Grok test\" and \"Custom model test\" get forecasts with realistic-looking charts, evaluated accuracy, an AI leaderboard, tips against the AI and portfolio analyses. Prices are synthetic (not the real market) and only you can see the data; it never reaches the shared leaderboard or sharing. Your own forecasts are left untouched.",
   "demo.load": "Load demo data",
   "demo.remove": "Remove demo data",
-  "demo.loaded": "Demo forecasts created: {n}.",
-  "demo.partial": "Market data was not available for these coins: {coins}.",
+  "demo.loaded": "Created {n} forecasts and {portfolios} portfolio analyses.",
   "demo.removeConfirm": "Remove all demo forecasts? Your own forecasts will stay.",
-  "demo.removed": "Demo forecasts removed: {n}.",
+  "demo.removed": "Demo records removed: {n}.",
   "demo.badge": "DEMO",
-  "demo.badgeHelp": "Forecast created retroactively by the statistical model in demo mode.",
+  "demo.badgeHelp": "Generated test data with synthetic prices.",
   "about.title": "About the project",
   "about.intro": "AI Crypto Analytics is a web app for cryptocurrency analysis that combines forecasts from language models (AI) with a transparent statistical model and real market data. It was built as a bachelor's thesis with a focus on honest accuracy evaluation, security and code quality.",
   "about.featuresTitle": "What the app does",
@@ -682,5 +681,7 @@
   "about.securityTitle": "Security",
   "about.security": "Hashed passwords, encrypted user API keys, HttpOnly cookie sign-in with CSRF protection, optional 2FA, rate limiting, temporary lockout after failed attempts, security HTTP headers (CSP) and an account activity log.",
   "about.authorTitle": "Author",
-  "about.author": "Martin Masaryk, bachelor's thesis in Software Development, Unicorn University, Prague."
+  "about.author": "Martin Masaryk, bachelor's thesis in Software Development, Unicorn University, Prague.",
+  "sources.demo_data": "Test data (synthetic prices)",
+  "leaderboard.demoNote": "Rows ending in \"test\" are generated demo data on synthetic prices. Only you can see them and they never mix with real model results."
 }

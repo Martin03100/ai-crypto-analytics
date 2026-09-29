@@ -62,6 +62,7 @@ export default function PortfolioHistoryItem({ entry, onDelete }) {
       >
         <span>
           {entry.holdings.map((h) => h.minca).join(", ")} · {entry.model_used} ·{" "}
+          {entry.analysis_data?.demo && <span className="badge badge-hold" style={{ marginRight: 6 }} title={t("demo.badgeHelp")}>{t("demo.badge")}</span>}
           <span className="text-sub">{new Date(entry.created_at).toLocaleString(locale)}</span>
         </span>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}>

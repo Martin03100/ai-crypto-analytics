@@ -575,20 +575,27 @@ def compute_forecast_accuracy(coin: str, timeframe: str, predicted_prices: List[
         closest = min(chart, key=lambda p: abs(p[0] - target_ts))
         actual_prices.append(closest[1])
 
-    errors = [abs(predicted_prices[i] - actual_prices[i]) / actual_prices[i]
-              for i in range(n) if actual_prices[i]]
-    if not errors:
+    scored = score_forecast(predicted_prices, actual_prices, chart[0][1])
+    if scored is None:
         return {**base, "status": "unavailable", "accuracy_pct": None, "actual_prices": actual_prices}
+    return {**base, "status": "completed", "actual_prices": actual_prices, **scored}
 
-    mape_pct = (sum(errors) / len(errors)) * 100
-    accuracy_pct = round(max(0.0, 100.0 - mape_pct), 1)
 
-    start_price = chart[0][1]
-    baseline_errors = [abs(start_price - a) / a for a in actual_prices if a]
+def score_forecast(predicted_prices: List[float], actual_prices: List[float],
+                   start_price: float) -> Optional[Dict[str, Any]]:
+    """Accuracy of a forecast against the real prices at the same points.
+
+    accuracy = 100 - mean absolute percentage error; the baseline is the naive forecast "the price stays
+    at the start price". Returns None when nothing can be compared."""
+    n = min(len(predicted_prices), len(actual_prices))
+    errors = [abs(predicted_prices[i] - actual_prices[i]) / actual_prices[i] for i in range(n) if actual_prices[i]]
+    if not errors:
+        return None
+    accuracy_pct = round(max(0.0, 100.0 - (sum(errors) / len(errors)) * 100), 1)
+    baseline_errors = [abs(start_price - a) / a for a in actual_prices[:n] if a]
     baseline_pct = round(max(0.0, 100.0 - sum(baseline_errors) / len(baseline_errors) * 100), 1) if baseline_errors else None
-    direction_correct = (predicted_prices[-1] >= start_price) == (actual_prices[-1] >= start_price)
-    return {**base, "status": "completed", "accuracy_pct": accuracy_pct, "actual_prices": actual_prices,
-            "baseline_accuracy_pct": baseline_pct, "direction_correct": direction_correct}
+    direction_correct = (predicted_prices[n - 1] >= start_price) == (actual_prices[n - 1] >= start_price)
+    return {"accuracy_pct": accuracy_pct, "baseline_accuracy_pct": baseline_pct, "direction_correct": direction_correct}
 
 
 def _forecast_fallback(coin: str, horizon: str, lang: str, reason: Optional[str]) -> AIEngineResult:

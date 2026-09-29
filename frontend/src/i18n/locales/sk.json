@@ -642,15 +642,14 @@
   "status.service.deepseek": "DeepSeek",
   "status.service.grok": "xAI Grok",
   "demo.title": "Demo režim",
-  "demo.description": "Na prezentáciu: jedným klikom naplníš históriu skutočnými predikciami štatistického modelu vytvorenými spätne k minulým dátumom (model pri každej videl iba vtedy známe ceny). Staršie sú už vyhodnotené voči reálnym cenám. Tvoje vlastné predikcie zostanú nedotknuté. Do rebríčka AI sa nezapočítavajú a nedajú sa zdieľať.",
+  "demo.description": "Na prezentáciu: jedným klikom sa v celej aplikácii objavia vzorové testovacie dáta. Modely „Claude test“, „Gemini test“, „OpenAI test“, „DeepSeek test“, „Grok test“ a „Custom model test“ dostanú predikcie s reálne vyzerajúcimi grafmi, vyhodnotenou presnosťou, rebríčkom AI, tipmi proti AI a analýzami portfólia. Ceny sú syntetické (nejde o skutočný trh) a dáta vidíš iba ty; do spoločného rebríčka ani do zdieľania sa nedostanú. Tvoje vlastné predikcie ostanú nedotknuté.",
   "demo.load": "Načítať demo dáta",
   "demo.remove": "Odstrániť demo dáta",
-  "demo.loaded": "Vytvorených demo predikcií: {n}.",
-  "demo.partial": "Pre tieto mince neboli dostupné trhové dáta: {coins}.",
+  "demo.loaded": "Vytvorené: {n} predikcií a {portfolios} analýz portfólia.",
   "demo.removeConfirm": "Odstrániť všetky demo predikcie? Tvoje vlastné predikcie zostanú.",
-  "demo.removed": "Odstránených demo predikcií: {n}.",
+  "demo.removed": "Odstránené demo záznamy: {n}.",
   "demo.badge": "DEMO",
-  "demo.badgeHelp": "Predikcia vytvorená spätne v demo režime zo štatistického modelu.",
+  "demo.badgeHelp": "Vygenerované testovacie dáta so syntetickými cenami.",
   "about.title": "O projekte",
   "about.intro": "AI Crypto Analytics je webová aplikácia na analýzu kryptomien, ktorá kombinuje predikcie jazykových modelov (AI) s transparentným štatistickým modelom a reálnymi trhovými dátami. Vznikla ako bakalárska práca a dôraz kladie na poctivé vyhodnocovanie presnosti, bezpečnosť a kvalitu kódu.",
   "about.featuresTitle": "Čo aplikácia robí",
@@ -682,5 +681,7 @@
   "about.securityTitle": "Bezpečnosť",
   "about.security": "Heslá sú hashované, API kľúče používateľov šifrované, prihlásenie cez HttpOnly cookie s CSRF ochranou, voliteľné 2FA, rate limiting, dočasné uzamknutie účtu po neúspešných pokusoch, bezpečnostné HTTP hlavičky (CSP) a záznam aktivity účtu.",
   "about.authorTitle": "Autor",
-  "about.author": "Martin Masaryk, bakalárska práca v odbore Softvérový vývoj, Unicorn University, Praha."
+  "about.author": "Martin Masaryk, bakalárska práca v odbore Softvérový vývoj, Unicorn University, Praha.",
+  "sources.demo_data": "Testovacie dáta (syntetické ceny)",
+  "leaderboard.demoNote": "Riadky s koncovkou „test“ sú vygenerované demo dáta zo syntetických cien. Vidíš ich iba ty a nemiešajú sa s výsledkami skutočných modelov."
 }

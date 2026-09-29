@@ -11,7 +11,7 @@ from typing import Annotated, List, Optional
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -26,7 +26,7 @@ from app.schemas import (
 )
 from app.services import audit
 from app.services.backtest import BACKTEST_SETUP, run_backtest
-from app.services.demo_data import DEMO_JSON_MARKER, is_demo_json
+from app.services.demo_data import DEMO_LABEL_LIKE, demo_accuracy, is_demo_label
 from app.services.ai_engine import compute_forecast_accuracy, estimate_forecast_cost, get_coin_forecast
 
 router = APIRouter(prefix="/api/forecast", tags=["forecast"])
@@ -139,8 +139,8 @@ def share_forecast(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], request: 
     row = _own_forecast(db, user, entry_id)
     if row.model_used == "mock":
         raise HTTPException(status_code=400, detail="Ukážkové dáta sa nedajú zdieľať, nie sú to skutočná predikcia.")
-    if is_demo_json(row.forecast_json):
-        raise HTTPException(status_code=400, detail="Demo predikcie sa nedajú zdieľať, boli vytvorené spätne.")
+    if is_demo_label(row.model_used):
+        raise HTTPException(status_code=400, detail="Demo predikcie sa nedajú zdieľať, sú to vygenerované testovacie dáta.")
     if not row.share_token:
         row.share_token = secrets.token_urlsafe(24)
         audit.record(db, user.id, "share_created", request, f"{row.crypto_symbol} {row.timeframe}")
@@ -178,7 +178,10 @@ def get_forecast_accuracy(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], us
         return ForecastAccuracyOut(status="mock", predicted_prices=predicted_prices, actual_prices=[],
                                    time_labels=time_labels, matures_at="")
     created_at = _created_at(row, forecast_data)
-    result = compute_forecast_accuracy(row.crypto_symbol, row.timeframe, predicted_prices, time_labels, created_at)
+    if is_demo_label(row.model_used):   # generated data: scored from its stored synthetic outcome, no network
+        result = demo_accuracy(forecast_data, created_at, row.timeframe)
+    else:
+        result = compute_forecast_accuracy(row.crypto_symbol, row.timeframe, predicted_prices, time_labels, created_at)
     _record_evaluation(db, row, result)
     tip = db.query(PriceTip).filter(PriceTip.forecast_id == row.id, PriceTip.user_id == user.id).first()
     _settle_tip(tip, result)
@@ -246,8 +249,6 @@ def _created_at(row: ForecastHistory, forecast_data: dict) -> datetime:
 def _record_evaluation(db: Session, row: ForecastHistory, result: dict) -> None:
     if result.get("status") != "completed" or not result.get("actual_prices"):
         return
-    if is_demo_json(row.forecast_json):  # made after the fact: never part of the shared leaderboard
-        return
     if db.query(ForecastEvaluation).filter(ForecastEvaluation.forecast_id == row.id).first():
         return
     db.add(ForecastEvaluation(
@@ -255,6 +256,7 @@ def _record_evaluation(db: Session, row: ForecastHistory, result: dict) -> None:
         timeframe=row.timeframe, accuracy_pct=result["accuracy_pct"],
         baseline_accuracy_pct=result.get("baseline_accuracy_pct"),
         direction_correct=bool(result.get("direction_correct")), actual_final_price=result["actual_prices"][-1],
+        is_demo=True if is_demo_label(row.model_used) else None,
     ))
 
 
@@ -278,7 +280,7 @@ def _evaluate_pending(db: Session, limit: int = 5, deadline_seconds: float = 8.0
     candidates = (
         db.query(ForecastHistory)
         .filter(ForecastHistory.model_used != "mock", ForecastHistory.id.not_in(select(ForecastEvaluation.forecast_id)),
-                ForecastHistory.forecast_json.notlike(f"%{DEMO_JSON_MARKER}%"))
+                ForecastHistory.model_used.notlike(DEMO_LABEL_LIKE))
         .order_by(ForecastHistory.created_at.asc()).limit(50).all()
     )
     now = datetime.now(timezone.utc)
@@ -338,7 +340,8 @@ def submit_tip(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], payload: TipR
         ai_price = float(predicted[-1])
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="Na túto predikciu sa tipovať nedá.") from None
-    db.add(PriceTip(user_id=user.id, forecast_id=row.id, tip_price=payload.price, ai_price=ai_price))
+    db.add(PriceTip(user_id=user.id, forecast_id=row.id, tip_price=payload.price, ai_price=ai_price,
+                    is_demo=True if is_demo_label(row.model_used) else None))
     try:
         db.commit()
     except IntegrityError:
@@ -354,6 +357,8 @@ def _tip_summary(db: Session, user_id: Optional[int] = None) -> dict:
     query = db.query(PriceTip.outcome, func.count()).filter(PriceTip.outcome.isnot(None))
     if user_id is not None:
         query = query.filter(PriceTip.user_id == user_id)
+    else:  # the community figure never includes generated demo tips
+        query = query.filter(PriceTip.is_demo.isnot(True))
     counts = dict(query.group_by(PriceTip.outcome).all())
     wins, losses, ties = counts.get("win", 0), counts.get("loss", 0), counts.get("tie", 0)
     return {"wins": wins, "losses": losses, "ties": ties, "total": wins + losses + ties}
@@ -370,7 +375,8 @@ def leaderboard(user: User = Depends(get_current_user), db: Session = Depends(ge
             ForecastEvaluation.provider, func.count().label("n"),
             func.sum(case((ForecastEvaluation.direction_correct == True, 1), else_=0)).label("hits"),  # noqa: E712
             func.avg(ForecastEvaluation.accuracy_pct).label("acc"), func.sum(beats_expr).label("beats"),
-        ).group_by(ForecastEvaluation.provider).all()
+        ).filter(or_(ForecastEvaluation.is_demo.isnot(True), ForecastEvaluation.user_id == user.id))
+        .group_by(ForecastEvaluation.provider).all()
     )
     providers = [
         {"provider": name, "evaluated": n, "direction_hit_pct": round((hits or 0) / n * 100, 1),

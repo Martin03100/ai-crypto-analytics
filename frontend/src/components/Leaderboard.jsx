@@ -22,6 +22,7 @@ export default function Leaderboard() {
   const label = (name) => (name === CUSTOM_LABEL ? t("provider.customLabel") : name === QUANT_LABEL ? t("provider.quantLabel") : name);
   const trophyIndex = data.providers.findIndex((p) => !p.low_sample && p.evaluated >= (data.min_sample ?? 5));
   const hasQuant = data.providers.some((p) => p.provider === QUANT_LABEL);
+  const hasDemo = data.providers.some((p) => p.provider.endsWith(" test"));
   const everyone = data.challenge?.everyone;
 
   return (
@@ -29,6 +30,7 @@ export default function Leaderboard() {
       <Card title={t("leaderboard.title")} icon={Trophy}>
         <p className="text-sub" style={{ marginBottom: 12 }}>{t("leaderboard.desc")}</p>
         {hasQuant && <p className="text-sub" style={{ marginBottom: 12 }}>{t("leaderboard.quantNote")}</p>}
+        {hasDemo && <p className="text-sub" style={{ marginBottom: 12 }}>{t("leaderboard.demoNote")}</p>}
         {data.providers.length === 0 ? (
           <p className="text-sub">{t("leaderboard.empty")}</p>
         ) : (

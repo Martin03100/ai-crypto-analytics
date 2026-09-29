@@ -235,17 +235,15 @@ def account_activity(limit: int = Query(default=50, ge=1, le=200), user: User = 
 @router.post("/demo-data", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
 def load_demo_data(request: Request, lang: str = Query(default="en", max_length=5),
                    user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
-    created, missing = create_demo_data(db, user.id, lang)
-    if created == 0:
-        db.rollback()
-        raise HTTPException(status_code=503, detail="Demo dáta sa nepodarilo vytvoriť, trhové dáta momentálne nie sú dostupné.")
-    audit.record(db, user.id, "demo_data_loaded", request, f"{created} forecasts")
+    created = create_demo_data(db, user.id, lang)
+    audit.record(db, user.id, "demo_data_loaded", request,
+                 f"{created['forecasts']} forecasts, {created['portfolios']} portfolios")
     db.commit()
-    return {"created": created, "missing_coins": missing}
+    return {"created": created["forecasts"], **{k: v for k, v in created.items() if k != "forecasts"}}
 
 
 @router.delete("/demo-data")
 def delete_demo_data(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     removed = remove_demo_data(db, user.id)
     db.commit()
-    return {"removed": removed}
+    return {"removed": removed["forecasts"] + removed["portfolios"], **removed}
