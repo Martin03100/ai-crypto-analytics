@@ -181,6 +181,8 @@ export const api = {
   unshareForecast: (id) => request(`/forecast/history/${id}/share`, { method: "DELETE" }),
   serviceStatus: () => request("/public/status").then((r) => withArrays(r, ["services"])),
   sharedForecast: (token) => request(`/public/forecasts/${encodeURIComponent(token)}`).then(obj),
+  loadDemoData: () => request(`/account/demo-data?lang=${currentLang()}`, { method: "POST", timeoutMs: AI_TIMEOUT_MS }).then(obj),
+  removeDemoData: () => request("/account/demo-data", { method: "DELETE" }).then(obj),
   accountActivity: () => request("/account/activity").then((r) => withArrays(r, ["events"])),
 
   generateForecast: (provider, coin, horizon) =>

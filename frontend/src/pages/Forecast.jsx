@@ -2,7 +2,7 @@
 
 import { Brain, CheckCircle2, ChevronDown, Copy, Link2, Loader2, RefreshCw, Rocket, Save, Share2, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { AccuracyBadge, ConfidenceBadge, FallbackBadge, MockBadge, RiskBadge } from "../components/Badge";
 import { Card } from "../components/Card";
@@ -117,6 +117,7 @@ function HistoryItem({ entry, onDelete }) {
       >
         <span>
           <strong>{entry.crypto_symbol}</strong> · {entry.timeframe} · {entry.model_used} ·{" "}
+          {entry.forecast_data?.demo && <span className="badge badge-hold" style={{ marginRight: 6 }} title={t("demo.badgeHelp")}>{t("demo.badge")}</span>}
           <span className="text-sub">{new Date(entry.created_at).toLocaleString(locale)}</span>
         </span>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -185,7 +186,8 @@ export default function Forecast() {
   const { t, lang } = useLanguage();
   usePageTitle("forecast.title");
   const { currency } = useCurrency();
-  const [tab, setTab] = useState("new");
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState(() => (["history", "leaderboard", "compare", "backtest"].includes(searchParams.get("tab")) ? searchParams.get("tab") : "new"));
   const providersCtx = useProviders();
   const providers = useMemo(
     () => [...providersCtx.providers, { provider: "quant", label: t("provider.quantLabel"), connected: true }],

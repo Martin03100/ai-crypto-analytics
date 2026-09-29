@@ -24,6 +24,7 @@ from app.security import (
     totp_uri, verify_password, verify_totp,
 )
 from app.services import audit
+from app.services.demo_data import create_demo_data, remove_demo_data
 from app.services.account_cleanup import delete_user_data, release_email_if_unverified
 from app.services.email_service import is_email_configured
 from app.services.verification import send_verification_code
@@ -229,3 +230,22 @@ def account_activity(limit: int = Query(default=50, ge=1, le=200), user: User = 
         "action": row.action, "ip": row.ip, "device": audit.describe_user_agent(row.user_agent),
         "details": row.details, "created_at": row.created_at.replace(tzinfo=timezone.utc).isoformat() if row.created_at else None,
     } for row in rows]}
+
+
+@router.post("/demo-data", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
+def load_demo_data(request: Request, lang: str = Query(default="en", max_length=5),
+                   user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    created, missing = create_demo_data(db, user.id, lang)
+    if created == 0:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Demo dáta sa nepodarilo vytvoriť, trhové dáta momentálne nie sú dostupné.")
+    audit.record(db, user.id, "demo_data_loaded", request, f"{created} forecasts")
+    db.commit()
+    return {"created": created, "missing_coins": missing}
+
+
+@router.delete("/demo-data")
+def delete_demo_data(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    removed = remove_demo_data(db, user.id)
+    db.commit()
+    return {"removed": removed}
