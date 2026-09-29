@@ -27,6 +27,7 @@ import { copyToClipboard } from "../utils/copyToClipboard";
 import { axisDecimals, buildTimePoints, formatPrice, formatTimeFull, formatTimeShort, formatUsd } from "../utils/formatPrice";
 import { usePageTitle } from "../hooks/usePageTitle";
 import { stripMockTag } from "../utils/mockText";
+import { formatTechDetail } from "../utils/techDetail";
 
 const COINS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "DOT", "LINK"];
 const HORIZONS = ["24h", "1T", "1M", "1R"];
@@ -416,7 +417,7 @@ export default function Forecast() {
                 {result.is_mock && result.error_message && (
                   <details className="tech-detail">
                     <summary>{t("forecast.technicalDetail")}</summary>
-                    <code>{String(result.error_message).slice(0, 400)}</code>
+                    <code>{formatTechDetail(result.error_message)}</code>
                   </details>
                 )}
                 <ForecastChart data={result.data} t={t} createdAt={result.generatedAt} horizon={result.horizon} locale={localeForLang(lang)} />
