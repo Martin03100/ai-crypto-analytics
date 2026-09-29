@@ -31,7 +31,7 @@ const KNOWN_BACKEND_PATTERNS = [
   { test: /tipova[tť] sa d[aá] len do 2 hod[ií]n/i, key: "errors.tipWindowClosed" },
   { test: /na t[uú]to predikciu si u[zž] tipoval/i, key: "errors.tipAlreadyExists" },
   { test: /vlastn[eé]ho providera|vlastn[yý] provider (nie je spr[aá]vne|vr[aá]til presmerovanie)/i, key: "errors.customProviderInvalid" },
-  { test: /pr[aá]zdn[uú] odpove[dď]|nepodarilo na[jĵ]?[sš]t [zž]iadny json|naparsovan[yý] json|pol(e|ia) '[^']+'.*mus[ií]/i, key: "errors.aiInvalidResponse" },
+  { test: /pr[aá]zdn[uú] odpove[dď]|nepodarilo na[jĵ]?[sš]t [zž]iadny json|naparsovan[yý] json|chyba pri parsovan[ií] json|ch[yý]baj[uú]ce k[lľ][uú][cč]e|pol(e|ia) '[^']+'.*(mus[ií]|smie)|ai vr[aá]tila \d+ bodov|odpor[uú][cč]anie \d+|sektor '[^']+' nem[aá]/i, key: "errors.aiInvalidResponse" },
   { test: /najprv ulo[zž] api kl[uú][cč] pre tohto providera/i, key: "errors.noKeyToTest" },
   { test: /pou[zž][ií]vate[lľ]sk[eé] meno mus[ií] ma[tť] 3/i, key: "errors.usernameInvalid" },
   { test: /predikciu sa nepodarilo overi[tť]/i, key: "errors.forecastUnverified" },
@@ -39,6 +39,8 @@ const KNOWN_BACKEND_PATTERNS = [
 ];
 
 const TECHNICAL_PATTERNS = [
+  { test: /api[ _-]?key[ _-]?(not valid|invalid)|api_key_invalid|permission_denied|invalid x-api-key|authentication/i, key: "errors.providerInvalidKey" },
+  { test: /name resolution|getaddrinfo|nodename nor servname|max retries exceeded|proxyerror/i, key: "errors.networkError" },
   { test: /503|overloaded|service unavailable/i, key: "errors.providerOverloaded" },
   { test: /429|rate limit|too many requests/i, key: "errors.providerRateLimit" },
   { test: /401|unauthorized|invalid.?api.?key|incorrect api key/i, key: "errors.providerInvalidKey" },
@@ -48,6 +50,7 @@ const TECHNICAL_PATTERNS = [
   { test: /network|connection|econnrefused|failed to fetch/i, key: "errors.networkError" },
   { test: /insufficient_quota|quota|billing/i, key: "errors.providerQuota" },
   { test: /500|internal server error/i, key: "errors.serverError" },
+  { test: /invalid_argument|bad request|\b400\b/i, key: "errors.providerBadRequest" },
 ];
 
 function keyFromStatus(status) {
@@ -62,11 +65,14 @@ function keyFromStatus(status) {
   }
 }
 
-export function humanizeError(error, lang = "en") {
+/**
+ * @param fallbackKey translation used when nothing more specific matches (default: the generic message)
+ */
+export function humanizeError(error, lang = "en", fallbackKey = "errors.generic") {
   const rawMessage = typeof error === "string" ? error : error?.message;
   const status = typeof error === "object" && error !== null ? error.status : undefined;
 
-  if (!rawMessage) return translate("errors.generic", lang);
+  if (!rawMessage) return translate(fallbackKey, lang);
 
   for (const pattern of KNOWN_BACKEND_PATTERNS) {
     const match = rawMessage.match(pattern.test);
@@ -85,7 +91,7 @@ export function humanizeError(error, lang = "en") {
   const statusKey = keyFromStatus(status);
   if (statusKey) return translate(statusKey, lang);
 
-  return translate("errors.generic", lang);
+  return translate(fallbackKey, lang);
 }
 
 export default humanizeError;

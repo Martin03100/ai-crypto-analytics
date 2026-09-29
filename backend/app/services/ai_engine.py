@@ -93,17 +93,19 @@ _GEMINI_MAX_OUTPUT_TOKENS = 4096
 
 def _call_gemini(prompt: str, api_key: str) -> tuple[bool, str, Optional[str]]:
     last_error = ""
-    for attempt in range(_MAX_RETRIES + 1):
+    use_thinking_config = True
+    for attempt in range(_MAX_RETRIES + 2):
+        if attempt > _MAX_RETRIES and use_thinking_config:
+            break
         try:
             from google import genai
             from google.genai import types
             client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=AI_REQUEST_TIMEOUT_SECONDS * 1000))
+            config_kwargs: Dict[str, Any] = {"max_output_tokens": _GEMINI_MAX_OUTPUT_TOKENS}
+            if use_thinking_config:
+                config_kwargs["thinking_config"] = types.ThinkingConfig(thinking_level="low")
             response = client.models.generate_content(
-                model=GEMINI_MODEL, contents=prompt,
-                config=types.GenerateContentConfig(
-                    max_output_tokens=_GEMINI_MAX_OUTPUT_TOKENS,
-                    thinking_config=types.ThinkingConfig(thinking_level="low"),
-                ),
+                model=GEMINI_MODEL, contents=prompt, config=types.GenerateContentConfig(**config_kwargs),
             )
             text = response.text or ""
             if not text.strip():
@@ -111,6 +113,10 @@ def _call_gemini(prompt: str, api_key: str) -> tuple[bool, str, Optional[str]]:
             return True, text, None
         except Exception as exc:  # noqa: BLE001
             last_error = str(exc)
+            if use_thinking_config and "thinking" in last_error.lower():
+                # Models without thinking-level support reject the option; retry once without it.
+                use_thinking_config = False
+                continue
             is_retryable = any(marker in last_error.lower() for marker in ("503", "overloaded", "429", "rate limit", "unavailable", "timeout"))
             if is_retryable and attempt < _MAX_RETRIES:
                 time.sleep(_BACKOFF_BASE_SECONDS * (2 ** attempt))

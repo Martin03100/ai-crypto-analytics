@@ -134,3 +134,77 @@ def test_duplicate_evaluation_commit_is_ignored(registered, monkeypatch):
     monkeypatch.setattr(Session, "commit", original_commit)
     assert res.status_code == 200
     assert res.json()["status"] == "completed"
+
+
+# ---------- lenient AI forecast validation ----------
+
+import json as _json
+
+from app.services.validators import validate_forecast_payload
+
+
+def _forecast(**over):
+    base = {"ceny": [100.0, 101.0, 102.0, 103.0], "casove_body": ["a", "b", "c", "d"],
+            "odovodnenie": "test", "confidence_score": 70, "risk_level": "Medium"}
+    base.update(over)
+    return _json.dumps(base)
+
+
+def test_forecast_accepts_numeric_strings_and_aliases():
+    ok, data, err = validate_forecast_payload(
+        _forecast(ceny=["100", "$101.5", "3 102,40", 103], confidence_score="72%", risk_level="vysoké"), 4)
+    assert ok, err
+    assert data["ceny"] == [100.0, 101.5, 3102.4, 103.0]
+    assert data["confidence_score"] == 72.0 and data["risk_level"] == "High"
+
+
+def test_forecast_resamples_slightly_short_series_and_fixes_labels():
+    ok, data, err = validate_forecast_payload(_forecast(ceny=[100.0, 110.0, 120.0], casove_body=["x"]), 5)
+    assert ok, err
+    assert len(data["ceny"]) == 5 and data["ceny"][0] == 100.0 and data["ceny"][-1] == 120.0
+    assert len(data["casove_body"]) == 5
+
+
+def test_forecast_still_rejects_far_too_few_points():
+    ok, _, err = validate_forecast_payload(_forecast(ceny=[100.0, 101.0], casove_body=["a", "b"]), 24)
+    assert not ok and "bodov" in err
+
+
+def test_forecast_tolerates_trailing_commas():
+    raw = '{"ceny": [1, 2, 3,], "casove_body": ["a","b","c",], "odovodnenie": "x", "confidence_score": 0.8, "risk_level": "low",}'
+    ok, data, err = validate_forecast_payload(raw, 3)
+    assert ok, err
+    assert data["confidence_score"] == 80.0 and data["risk_level"] == "Low"
+
+
+def test_gemini_retries_without_thinking_config(monkeypatch):
+    import sys
+    import types as pytypes
+    from app.services import ai_engine
+
+    calls = []
+
+    class _Models:
+        def generate_content(self, model, contents, config):
+            calls.append(config)
+            if config.get("thinking_config") is not None:
+                raise RuntimeError("400 INVALID_ARGUMENT: Thinking level is not supported for this model.")
+            return pytypes.SimpleNamespace(text='{"ok": 1}')
+
+    class _Client:
+        def __init__(self, **kwargs):
+            self.models = _Models()
+
+    fake_types = pytypes.SimpleNamespace(
+        HttpOptions=lambda **k: k, ThinkingConfig=lambda **k: k, GenerateContentConfig=lambda **k: k)
+    genai_mod = pytypes.ModuleType("google.genai")
+    genai_mod.Client = _Client
+    genai_mod.types = fake_types
+    google_mod = pytypes.ModuleType("google")
+    google_mod.genai = genai_mod
+    monkeypatch.setitem(sys.modules, "google", google_mod)
+    monkeypatch.setitem(sys.modules, "google.genai", genai_mod)
+    monkeypatch.setitem(sys.modules, "google.genai.types", fake_types)
+    ok, text, err = ai_engine._call_gemini("prompt", "key")
+    assert ok, err
+    assert len(calls) == 2 and "thinking_config" not in calls[1]

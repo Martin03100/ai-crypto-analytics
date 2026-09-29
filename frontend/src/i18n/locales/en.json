@@ -535,5 +535,8 @@
   "verify.title": "Verify your email",
   "common.retry": "Try again",
   "dashboard.fearGreedError": "Couldn't load the Fear & Greed Index.",
-  "common.loadFailed": "Couldn't load this data."
+  "common.loadFailed": "Couldn't load this data.",
+  "errors.aiFallback": "The AI provider couldn't produce a result this time, so demo data is shown. Try again in a moment.",
+  "errors.providerBadRequest": "The AI provider rejected the request. Check the model settings or try another provider.",
+  "forecast.technicalDetail": "Technical detail"
 }

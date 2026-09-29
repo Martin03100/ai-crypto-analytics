@@ -535,5 +535,8 @@
   "verify.title": "Ověř si email",
   "common.retry": "Zkusit znovu",
   "dashboard.fearGreedError": "Index strachu a chamtivosti se nepodařilo načíst.",
-  "common.loadFailed": "Tato data se nepodařilo načíst."
+  "common.loadFailed": "Tato data se nepodařilo načíst.",
+  "errors.aiFallback": "AI provider tentokrát nevrátil výsledek, proto se zobrazují ukázková data. Zkus to za chvíli znovu.",
+  "errors.providerBadRequest": "AI provider odmítl požadavek. Zkontroluj nastavení modelu nebo zkus jiného providera.",
+  "forecast.technicalDetail": "Technický detail"
 }

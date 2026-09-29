@@ -44,6 +44,13 @@ GLOBAL_CONTEXT_INSTRUCTION = (
 
 _JSON_BLOCK_PATTERN = re.compile(r"\{.*\}", re.DOTALL)
 _MARKDOWN_FENCE_PATTERN = re.compile(r"```(?:json)?", re.IGNORECASE)
+_TRAILING_COMMA_PATTERN = re.compile(r",\s*([\]}])")
+_RISK_ALIASES = {
+    "low": "Low", "nizke": "Low", "nízke": "Low", "nizky": "Low", "nízky": "Low", "nízké": "Low", "nízký": "Low",
+    "medium": "Medium", "stredne": "Medium", "stredné": "Medium", "stredny": "Medium", "stredný": "Medium",
+    "střední": "Medium", "moderate": "Medium",
+    "high": "High", "vysoke": "High", "vysoké": "High", "vysoky": "High", "vysoký": "High",
+}
 
 
 def strip_markdown_fences(raw_text: str) -> str:
@@ -66,11 +73,15 @@ def safe_json_loads(raw_text: str) -> Tuple[bool, Optional[Dict[str, Any]], Opti
         return False, None, "V odpovedi sa nepodarilo najst ziadny JSON objekt."
     try:
         data = json.loads(candidate)
-        if not isinstance(data, dict):
-            return False, None, "Naparsovany JSON nie je objekt (dict)."
-        return True, data, None
     except json.JSONDecodeError as exc:
-        return False, None, f"Chyba pri parsovani JSON: {exc}"
+        # Models often leave trailing commas ("[1, 2,]"); that alone should not waste a paid call.
+        try:
+            data = json.loads(_TRAILING_COMMA_PATTERN.sub(r"\1", candidate))
+        except json.JSONDecodeError:
+            return False, None, f"Chyba pri parsovani JSON: {exc}"
+    if not isinstance(data, dict):
+        return False, None, "Naparsovany JSON nie je objekt (dict)."
+    return True, data, None
 
 
 def _missing_keys(data: Dict[str, Any], required: Tuple[str, ...]) -> List[str]:
@@ -82,6 +93,37 @@ def _is_price(value: Any) -> bool:
             and math.isfinite(value) and value > 0)
 
 
+def _to_number(value: Any) -> Any:
+    """Accepts numbers sent as strings ("3 512,40", "$3512.4") — a frequent LLM habit."""
+    if isinstance(value, str):
+        cleaned = value.strip().replace("$", "").replace("\u00a0", "").replace(" ", "")
+        if cleaned.count(",") == 1 and "." not in cleaned:
+            cleaned = cleaned.replace(",", ".")
+        cleaned = cleaned.replace(",", "")
+        try:
+            return float(cleaned)
+        except ValueError:
+            return value
+    return value
+
+
+def _resample(values: List[float], target: int) -> List[float]:
+    """Linear interpolation of a price path to exactly `target` points."""
+    if len(values) == target:
+        return list(values)
+    if len(values) == 1:
+        return [values[0]] * target
+    step = (len(values) - 1) / (target - 1) if target > 1 else 0
+    out = []
+    for i in range(target):
+        pos = i * step
+        lo = int(math.floor(pos))
+        hi = min(lo + 1, len(values) - 1)
+        frac = pos - lo
+        out.append(values[lo] + (values[hi] - values[lo]) * frac)
+    return out
+
+
 def validate_forecast_payload(raw_text: str, expected_points: Optional[int] = None) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
     success, data, error = safe_json_loads(raw_text)
     if not success or data is None:
@@ -91,27 +133,37 @@ def validate_forecast_payload(raw_text: str, expected_points: Optional[int] = No
         return False, None, f"Chybajuce kluce: {', '.join(missing)}"
     if not isinstance(data.get("ceny"), list) or not data["ceny"]:
         return False, None, "Pole 'ceny' musi byt neprazdny zoznam cisel."
+    data["ceny"] = [_to_number(p) for p in data["ceny"]]
     if not all(_is_price(p) for p in data["ceny"]):
         return False, None, "Pole 'ceny' smie obsahovat iba kladne, konecne cisla."
     if not isinstance(data.get("casove_body"), list) or not data["casove_body"]:
         return False, None, "Pole 'casove_body' musi byt neprazdny zoznam."
-    if len(data["ceny"]) != len(data["casove_body"]):
-        return False, None, "Polia 'ceny' a 'casove_body' musia mat rovnaku dlzku."
-    if expected_points is not None:
-        if len(data["ceny"]) < expected_points:
-            return False, None, f"AI vratila {len(data['ceny'])} bodov namiesto {expected_points}."
-        data["ceny"] = [float(p) for p in data["ceny"][:expected_points]]
-        data["casove_body"] = data["casove_body"][:expected_points]
-    else:
-        data["ceny"] = [float(p) for p in data["ceny"]]
+    prices = [float(p) for p in data["ceny"]]
+    labels = [str(label) for label in data["casove_body"]]
+    target = expected_points or len(prices)
+    if len(prices) < max(2, (target + 1) // 2):
+        # Far too few points to be a real forecast for this horizon.
+        return False, None, f"AI vratila {len(prices)} bodov namiesto {target}."
+    if len(prices) != target:
+        prices = _resample(prices[:target] if len(prices) > target else prices, target)
+    if len(labels) != target:
+        # The UI derives timestamps from the horizon; labels only need the right count.
+        labels = labels[:target] if len(labels) > target else [f"#{i}" for i in range(1, target + 1)]
+    data["ceny"] = [round(p, 8) for p in prices]
+    data["casove_body"] = labels
     if not isinstance(data.get("odovodnenie"), str) or not data["odovodnenie"].strip():
         return False, None, "Pole 'odovodnenie' musi byt neprazdny text."
-    score = data.get("confidence_score")
-    if not isinstance(score, (int, float)) or isinstance(score, bool) or not (0 <= float(score) <= 100):
+    score = _to_number(str(data.get("confidence_score")).rstrip("%")) if isinstance(data.get("confidence_score"), str) else data.get("confidence_score")
+    if isinstance(score, (int, float)) and not isinstance(score, bool) and 0 < float(score) < 1:
+        score = float(score) * 100  # 0.72 meant as 72 %
+    if not isinstance(score, (int, float)) or isinstance(score, bool) or not math.isfinite(score) or not (0 <= float(score) <= 100):
         return False, None, "Pole 'confidence_score' musi byt cislo 0-100."
+    data["confidence_score"] = round(float(score), 1)
     risk = data.get("risk_level")
+    risk = _RISK_ALIASES.get(risk.strip().lower(), risk) if isinstance(risk, str) else risk
     if risk not in VALID_RISK_LEVELS:
         return False, None, f"Pole 'risk_level' musi byt jedno z: {', '.join(VALID_RISK_LEVELS)}."
+    data["risk_level"] = risk
     return True, data, None
 
 

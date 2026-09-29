@@ -113,3 +113,20 @@ describe("humanizeError", () => {
     expect(msg).toMatch(/free model/i);
   });
 });
+
+describe("AI failure messages", () => {
+  it.each([
+    ["AI vratila 23 bodov namiesto 24.", /invalid response/i],
+    ["Chyba pri parsovani JSON: Expecting value", /invalid response/i],
+    ["Gemini API chyba: 400 INVALID_ARGUMENT. API key not valid. Please pass a valid API key.", /API key/i],
+    ["Gemini API chyba: 400 INVALID_ARGUMENT. Thinking level is not supported", /rejected the request/i],
+    ["Gemini API chyba: [Errno -3] Temporary failure in name resolution", /connect/i],
+  ])("maps %s", (raw, expected) => {
+    expect(humanizeError(raw, "en")).toMatch(expected);
+  });
+
+  it("uses the demo-data fallback instead of the generic message", () => {
+    expect(humanizeError("some brand new provider error", "en", "errors.aiFallback")).toMatch(/demo data/i);
+    expect(humanizeError("some brand new provider error", "en")).toMatch(/something went wrong/i);
+  });
+});

@@ -111,7 +111,7 @@ export default function Market() {
         return;
       }
       setNewsResult(res);
-      if (res.is_mock) push(res.error_message ? humanizeError(res.error_message, lang) : t("market.mockNotice"), "warn");
+      if (res.is_mock) push(res.error_message ? humanizeError(res.error_message, lang, "errors.aiFallback") : t("market.mockNotice"), "warn");
     } catch (err) {
       push(err, "error");
     } finally {

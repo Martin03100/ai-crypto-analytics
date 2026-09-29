@@ -520,6 +520,10 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
 .vote-dot-emerald { background: var(--emerald); }
 .vote-dot-crimson { background: var(--crimson); }
 .vote-dot-muted { background: var(--text-tertiary); }
+.tech-detail { margin: -4px 0 12px; font-size: 12px; color: var(--text-tertiary); }
+.tech-detail summary { cursor: pointer; width: fit-content; }
+.tech-detail code { display: block; margin-top: 6px; padding: 8px 10px; border-radius: var(--radius-sm);
+  background: var(--bg-inset); font-family: var(--font-mono); white-space: pre-wrap; word-break: break-word; }
 .text-sub { color: var(--text-secondary); font-size: 13px; }
 .checklist-item {
   display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; font-size: 13.5px;

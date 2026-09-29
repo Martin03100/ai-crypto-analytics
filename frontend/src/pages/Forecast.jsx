@@ -329,7 +329,7 @@ export default function Forecast() {
         return;
       }
       setResult({ ...res, generatedAt: new Date().toISOString(), horizon, coin, provider });
-      if (res.is_mock) push(res.error_message ? humanizeError(res.error_message, lang) : t("forecast.mockNotice"), "warn");
+      if (res.is_mock) push(res.error_message ? humanizeError(res.error_message, lang, "errors.aiFallback") : t("forecast.mockNotice"), "warn");
     } catch (err) {
       push(err, "error");
     } finally {
@@ -413,6 +413,12 @@ export default function Forecast() {
             <div style={{ marginTop: 20 }}>
               <Card title={`${t("forecast.chartTitlePrefix")}: ${result.coin}`} icon={Sparkles} glow="cyan">
                 {result.is_mock && <div style={{ marginBottom: 12 }}><MockBadge /></div>}
+                {result.is_mock && result.error_message && (
+                  <details className="tech-detail">
+                    <summary>{t("forecast.technicalDetail")}</summary>
+                    <code>{String(result.error_message).slice(0, 400)}</code>
+                  </details>
+                )}
                 <ForecastChart data={result.data} t={t} createdAt={result.generatedAt} horizon={result.horizon} locale={localeForLang(lang)} />
                 {currency !== "USD" && <p className="text-sub" style={{ marginTop: 6 }}>{t("forecast.usdNote")}</p>}
               </Card>
