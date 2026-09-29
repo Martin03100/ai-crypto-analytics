@@ -4,6 +4,7 @@ import { AtSign, Compass, Info, Key, Languages, LogOut, Moon, ShieldCheck, Sun, 
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Card } from "../components/Card";
+import DemoDataCard from "../components/DemoDataCard";
 import { resetOnboarding } from "../components/OnboardingTour";
 import PasswordInput from "../components/PasswordInput";
 import TwoFactorSettings from "../components/TwoFactorSettings";
@@ -194,12 +195,16 @@ export default function Settings() {
           </button>
         </Card>
 
+        <DemoDataCard />
+
         <Card title={t("settings.about")} icon={Info}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13 }}>
             <div><strong>{t("settings.version")}:</strong> 2.2.0 — 2026 Edition</div>
             <div><strong>{t("settings.techStack")}:</strong> React (Vite), FastAPI, SQLAlchemy, Recharts, CoinGecko API</div>
             <div><strong>{t("settings.support")}:</strong> <a href="mailto:aicryptoanalytics7@gmail.com" className="key-link">aicryptoanalytics7@gmail.com</a></div>
-            <div style={{ display: "flex", gap: 14, marginTop: 6 }}>
+            <div style={{ display: "flex", gap: 14, marginTop: 6, flexWrap: "wrap" }}>
+              <Link to="/about" className="key-link">{t("about.title")}</Link>
+              <Link to="/status" className="key-link">{t("status.title")}</Link>
               <Link to="/privacy" className="key-link">{t("privacy.title")}</Link>
               <Link to="/terms" className="key-link">{t("terms.title")}</Link>
             </div>

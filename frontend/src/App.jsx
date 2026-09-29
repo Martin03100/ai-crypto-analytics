@@ -17,6 +17,7 @@ const Account = lazy(() => import("./pages/Account"));
 const Settings = lazy(() => import("./pages/Settings"));
 const SharedForecast = lazy(() => import("./pages/SharedForecast"));
 const StatusPage = lazy(() => import("./pages/StatusPage"));
+const About = lazy(() => import("./pages/About"));
 
 function FullScreenLoader() {
   const { t } = useLanguage();
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="/auth" element={user ? <Navigate to="/forecast" replace /> : <Auth />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/about" element={<Suspense fallback={<FullScreenLoader />}><About /></Suspense>} />
         <Route path="/status" element={<Suspense fallback={<FullScreenLoader />}><StatusPage /></Suspense>} />
         <Route path="/share/:token" element={<Suspense fallback={<FullScreenLoader />}><SharedForecast /></Suspense>} />
         <Route
