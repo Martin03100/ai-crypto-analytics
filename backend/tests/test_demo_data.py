@@ -71,3 +71,35 @@ def test_demo_data_is_logged(registered, monkeypatch):
     client.post("/api/account/demo-data", headers=csrf_headers(client))
     events = client.get("/api/account/activity").json()["events"]
     assert events[0]["action"] == "demo_data_loaded"
+
+
+def _load_demo(client, monkeypatch):
+    _patch_real_history(monkeypatch)
+    from app.services import demo_data
+    real_create = demo_data.create_demo_data
+    monkeypatch.setattr("app.routers.account.create_demo_data",
+                        lambda db, uid, lang: real_create(db, uid, lang, now=datetime(2026, 9, 29, tzinfo=timezone.utc)))
+    assert client.post("/api/account/demo-data", headers=csrf_headers(client)).status_code == 200
+
+
+def test_demo_forecasts_never_reach_the_shared_leaderboard(registered, monkeypatch):
+    """Regression: retroactive demo forecasts must not inflate the global model ranking."""
+    from app.routers import forecast as forecast_router
+    client, _u, _p = registered
+    _load_demo(client, monkeypatch)
+    completed = {"status": "completed", "accuracy_pct": 99.0, "baseline_accuracy_pct": 50.0,
+                 "direction_correct": True, "actual_prices": [1.0], "predicted_prices": [1.0],
+                 "time_labels": [], "matures_at": ""}
+    monkeypatch.setattr(forecast_router, "compute_forecast_accuracy", lambda *a, **k: completed)
+    board = client.get("/api/forecast/leaderboard").json()
+    assert board["providers"] == []
+    entry_id = client.get("/api/forecast/history").json()["items"][0]["id"]
+    assert client.get(f"/api/forecast/history/{entry_id}/accuracy").json()["status"] == "completed"
+    assert client.get("/api/forecast/leaderboard").json()["providers"] == []
+
+
+def test_demo_forecasts_cannot_be_shared(registered, monkeypatch):
+    client, _u, _p = registered
+    _load_demo(client, monkeypatch)
+    entry_id = client.get("/api/forecast/history").json()["items"][0]["id"]
+    assert client.post(f"/api/forecast/history/{entry_id}/share", headers=csrf_headers(client)).status_code == 400

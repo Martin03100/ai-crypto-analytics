@@ -642,7 +642,7 @@
   "status.service.deepseek": "DeepSeek",
   "status.service.grok": "xAI Grok",
   "demo.title": "Demo režim",
-  "demo.description": "Pro prezentaci: jedním klikem naplníš historii skutečnými predikcemi statistického modelu vytvořenými zpětně k minulým datům (model u každé viděl jen tehdy známé ceny). Starší jsou již vyhodnocené vůči reálným cenám. Tvé vlastní predikce zůstanou nedotčené.",
+  "demo.description": "Pro prezentaci: jedním klikem naplníš historii skutečnými predikcemi statistického modelu vytvořenými zpětně k minulým datům (model u každé viděl jen tehdy známé ceny). Starší jsou již vyhodnocené vůči reálným cenám. Tvé vlastní predikce zůstanou nedotčené. Do žebříčku AI se nezapočítávají a nedají se sdílet.",
   "demo.load": "Načíst demo data",
   "demo.remove": "Odstranit demo data",
   "demo.loaded": "Vytvořeno demo predikcí: {n}.",

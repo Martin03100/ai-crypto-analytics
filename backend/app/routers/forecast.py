@@ -26,6 +26,7 @@ from app.schemas import (
 )
 from app.services import audit
 from app.services.backtest import BACKTEST_SETUP, run_backtest
+from app.services.demo_data import DEMO_JSON_MARKER, is_demo_json
 from app.services.ai_engine import compute_forecast_accuracy, estimate_forecast_cost, get_coin_forecast
 
 router = APIRouter(prefix="/api/forecast", tags=["forecast"])
@@ -138,6 +139,8 @@ def share_forecast(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], request: 
     row = _own_forecast(db, user, entry_id)
     if row.model_used == "mock":
         raise HTTPException(status_code=400, detail="Ukážkové dáta sa nedajú zdieľať, nie sú to skutočná predikcia.")
+    if is_demo_json(row.forecast_json):
+        raise HTTPException(status_code=400, detail="Demo predikcie sa nedajú zdieľať, boli vytvorené spätne.")
     if not row.share_token:
         row.share_token = secrets.token_urlsafe(24)
         audit.record(db, user.id, "share_created", request, f"{row.crypto_symbol} {row.timeframe}")
@@ -243,6 +246,8 @@ def _created_at(row: ForecastHistory, forecast_data: dict) -> datetime:
 def _record_evaluation(db: Session, row: ForecastHistory, result: dict) -> None:
     if result.get("status") != "completed" or not result.get("actual_prices"):
         return
+    if is_demo_json(row.forecast_json):  # made after the fact: never part of the shared leaderboard
+        return
     if db.query(ForecastEvaluation).filter(ForecastEvaluation.forecast_id == row.id).first():
         return
     db.add(ForecastEvaluation(
@@ -272,7 +277,8 @@ def _settle_tip(tip, result: dict) -> None:
 def _evaluate_pending(db: Session, limit: int = 5, deadline_seconds: float = 8.0) -> None:
     candidates = (
         db.query(ForecastHistory)
-        .filter(ForecastHistory.model_used != "mock", ForecastHistory.id.not_in(select(ForecastEvaluation.forecast_id)))
+        .filter(ForecastHistory.model_used != "mock", ForecastHistory.id.not_in(select(ForecastEvaluation.forecast_id)),
+                ForecastHistory.forecast_json.notlike(f"%{DEMO_JSON_MARKER}%"))
         .order_by(ForecastHistory.created_at.asc()).limit(50).all()
     )
     now = datetime.now(timezone.utc)

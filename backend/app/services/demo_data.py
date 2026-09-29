@@ -2,8 +2,10 @@
 
 Each demo forecast is what the quant model would have produced on a past date using only the
 prices known on that date (same code as the live model). Older ones have already matured, so
-their accuracy is evaluated against real prices - the history, accuracy badges and leaderboard
-have something honest to show during a presentation."""
+their accuracy is shown against real prices in the user's history.
+
+Demo forecasts are made after the fact, so they must never count as real track record: they are
+excluded from the shared leaderboard and cannot be shared publicly."""
 
 from __future__ import annotations
 
@@ -20,6 +22,12 @@ from app.models import ForecastEvaluation, ForecastHistory, PriceTip
 from app.services import market_data, quant_engine
 
 DEMO_FLAG = "demo"
+# How the flag appears in the stored JSON (json.dumps default separators); used for SQL filtering.
+DEMO_JSON_MARKER = '"demo": true'
+
+
+def is_demo_json(forecast_json: str) -> bool:
+    return DEMO_JSON_MARKER in (forecast_json or "")
 # (coin, horizon, days ago). 1T forecasts from 7+ days ago are already evaluated; the rest are pending.
 DEMO_PLAN: List[Tuple[str, str, int]] = [
     ("BTC", "1T", 28), ("BTC", "1T", 21), ("BTC", "1T", 14), ("BTC", "1T", 8),

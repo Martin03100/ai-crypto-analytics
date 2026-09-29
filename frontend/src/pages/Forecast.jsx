@@ -41,7 +41,7 @@ function HistoryItem({ entry, onDelete }) {
   const [shareToken, setShareToken] = useState(entry.share_token || null);
   const locale = localeForLang(lang);
   const hasChart = hasForecastSeries(entry.forecast_data);
-  const canShare = entry.model_used !== "mock";
+  const canShare = entry.model_used !== "mock" && !entry.forecast_data?.demo;
   const shareUrl = shareToken ? `${window.location.origin}/share/${shareToken}` : null;
 
   useEffect(() => {

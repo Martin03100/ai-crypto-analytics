@@ -642,7 +642,7 @@
   "status.service.deepseek": "DeepSeek",
   "status.service.grok": "xAI Grok",
   "demo.title": "Demo mode",
-  "demo.description": "For presentations: one click fills your history with real statistical-model forecasts made retroactively for past dates (each one only saw the prices known at that time). Older ones are already evaluated against real prices. Your own forecasts are left untouched.",
+  "demo.description": "For presentations: one click fills your history with real statistical-model forecasts made retroactively for past dates (each one only saw the prices known at that time). Older ones are already evaluated against real prices. Your own forecasts are left untouched. They never count towards the AI leaderboard and cannot be shared.",
   "demo.load": "Load demo data",
   "demo.remove": "Remove demo data",
   "demo.loaded": "Demo forecasts created: {n}.",
