@@ -1,7 +1,7 @@
 /** Forecast price chart with optional uncertainty band and actual prices. */
 
 import {
-  Area, AreaChart, CartesianGrid, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Area, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { axisDecimals, buildTimePoints, formatPrice, formatTimeFull, formatTimeShort, formatUsd } from "../utils/formatPrice";
 
@@ -43,7 +43,7 @@ export default function ForecastChart({ data, t, actualPrices, createdAt, horizo
     <>
     <div role="img" aria-label={summary}>
     <ResponsiveContainer width="100%" height={280}>
-      <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+      <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id="priceFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--cyan)" stopOpacity={0.35} />
@@ -70,7 +70,7 @@ export default function ForecastChart({ data, t, actualPrices, createdAt, horizo
         {hasActual && (
           <Line type="monotone" dataKey="actual" stroke="var(--amber-fg)" strokeWidth={2.5} strokeDasharray="6 3" dot={{ r: 3.5, fill: "var(--amber-fg)" }} />
         )}
-      </AreaChart>
+      </ComposedChart>
     </ResponsiveContainer>
     </div>
     {band && <p className="text-sub" style={{ marginTop: 6 }}>{t("forecast.bandNote", { vol: data.denna_volatilita_pct ?? "—" })}</p>}
