@@ -13,9 +13,11 @@ import { LanguageProvider } from "./context/LanguageContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { CurrencyProvider } from "./context/CurrencyContext";
 import { startLabelAssociation } from "./utils/a11yLabels";
+import { initMonitoring } from "./utils/monitoring";
 import "./styles/app.css";
 
 startLabelAssociation();
+initMonitoring();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

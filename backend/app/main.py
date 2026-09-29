@@ -14,11 +14,13 @@ from app.config import APP_ENV, APP_TITLE, CORS_ORIGINS, validate_production_con
 from app.csrf import CSRFMiddleware
 from app.database import SessionLocal, init_db
 from app.logging_config import configure_logging
+from app.monitoring import capture_exception, init_monitoring
 from app.routers import account, auth, chat, forecast, market, portfolio, public
 from app.request_guard import RequestGuardMiddleware
 from app.security_headers import SecurityHeadersMiddleware
 
 configure_logging()
+init_monitoring()
 logger = logging.getLogger("aca.main")
 
 validate_production_config()
@@ -55,6 +57,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     logger.error("Neosetrena vynimka na %s %s: %s", request.method, request.url.path, exc, exc_info=exc)
+    capture_exception(exc)
     return JSONResponse(status_code=500, content={"detail": "Nastala neočakávaná chyba na serveri."})
 
 

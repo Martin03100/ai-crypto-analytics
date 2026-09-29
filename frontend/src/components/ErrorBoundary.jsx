@@ -1,6 +1,7 @@
 /** Error boundary. */
 
 import { Component } from "react";
+import { reportError } from "../utils/monitoring";
 
 const FALLBACK_TEXT = {
   en: {
@@ -45,6 +46,7 @@ export default class ErrorBoundary extends Component {
   componentDidCatch(error, info) {
     // eslint-disable-next-line no-console
     console.error("ErrorBoundary caught:", error, info);
+    reportError(error, { extra: { componentStack: info?.componentStack } });
   }
 
   render() {
