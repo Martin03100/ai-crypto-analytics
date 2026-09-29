@@ -8,6 +8,8 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: false,
+    // Playwright end-to-end specs in e2e/ run with `npm run test:e2e`, not with Vitest.
+    include: ["src/**/*.test.{js,jsx}"],
   },
   server: {
     port: 5173,
