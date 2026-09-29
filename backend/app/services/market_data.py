@@ -6,14 +6,14 @@ import math
 import re
 from defusedxml import ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 
 from app.config import CRYPTO_NEWS_RSS_URLS, FEAR_GREED_API_URL, REDDIT_CRYPTO_URL, REQUEST_TIMEOUT_SECONDS
-from app.i18n_content import market_events_for_lang
+from app.i18n_content import MARKET_EVENT_CALENDAR, market_events_for_lang
 from app.utils.ttl_cache import TTLCache
 
 _fear_greed_cache = TTLCache(ttl_seconds=900)
@@ -208,13 +208,17 @@ def get_dummy_crypto_headlines(limit: int = 6) -> List[Dict[str, str]]:
     ]
 
 
-def get_upcoming_market_events(lang: str = "en") -> List[Dict[str, str]]:
-    today = datetime.now(timezone.utc).date()
-    result = []
-    for event in market_events_for_lang(lang):
-        event_date = today + timedelta(days=int(event["offset_days"]))
-        result.append({"datum": event_date.strftime("%d.%m.%Y"), "udalost": event["event"], "typ": event["type"]})
-    return result
+def get_upcoming_market_events(lang: str = "en", limit: int = 5,
+                               today: Optional[date] = None) -> List[Dict[str, str]]:
+    """Next scheduled macro events that move crypto markets, from the official calendar."""
+    today = today or datetime.now(timezone.utc).date()
+    labels = market_events_for_lang(lang)
+    upcoming = sorted(
+        (date.fromisoformat(day), kind) for day, kind in MARKET_EVENT_CALENDAR
+        if date.fromisoformat(day) >= today and kind in labels
+    )
+    return [{"datum": day.strftime("%d.%m.%Y"), "udalost": labels[kind][0], "typ": labels[kind][1]}
+            for day, kind in upcoming[:limit]]
 
 
 from app.config import (  # noqa: E402

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 SUPPORTED_LANGS = ("en", "sk", "cs")
 DEFAULT_LANG = "en"
@@ -247,30 +247,28 @@ def mock_chat_reply(last_user_question: str, lang: str) -> str:
     return templates.get(lang, templates[DEFAULT_LANG])
 
 
-MARKET_EVENTS_BY_LANG: Dict[str, List[Dict[str, object]]] = {
-    "en": [
-        {"offset_days": 3, "event": "FOMC meeting (interest rates)", "type": "Macro"},
-        {"offset_days": 7, "event": "Ethereum network upgrade (testnet)", "type": "Network"},
-        {"offset_days": 12, "event": "Inflation data release (CPI)", "type": "Macro"},
-        {"offset_days": 18, "event": "Bitcoin halving anniversary / analysis", "type": "Network"},
-        {"offset_days": 25, "event": "Crypto ETF decision", "type": "Regulatory"},
-    ],
-    "sk": [
-        {"offset_days": 3, "event": "Zasadnutie FOMC (úrokové sadzby)", "type": "Makro"},
-        {"offset_days": 7, "event": "Ethereum sieťový upgrade (testnet)", "type": "Sieťová"},
-        {"offset_days": 12, "event": "Zverejnenie dát o inflácii (CPI)", "type": "Makro"},
-        {"offset_days": 18, "event": "Bitcoin halving výročie / analýza", "type": "Sieťová"},
-        {"offset_days": 25, "event": "Rozhodnutie o kryptomenovom ETF", "type": "Regulačná"},
-    ],
-    "cs": [
-        {"offset_days": 3, "event": "Zasedání FOMC (úrokové sazby)", "type": "Makro"},
-        {"offset_days": 7, "event": "Ethereum síťový upgrade (testnet)", "type": "Síťová"},
-        {"offset_days": 12, "event": "Zveřejnění dat o inflaci (CPI)", "type": "Makro"},
-        {"offset_days": 18, "event": "Bitcoin halving výročí / analýza", "type": "Síťová"},
-        {"offset_days": 25, "event": "Rozhodnutí o kryptoměnovém ETF", "type": "Regulační"},
-    ],
+# Real, officially published dates (decision day of each FOMC meeting, CPI release day).
+# Sources: federalreserve.gov/monetarypolicy/fomccalendars.htm, bls.gov/schedule/news_release/cpi.htm
+# BLS publishes next year's CPI schedule in autumn - extend the list when it is out.
+MARKET_EVENT_CALENDAR: List[Tuple[str, str]] = [
+    ("2026-01-28", "fomc"), ("2026-03-18", "fomc"), ("2026-04-29", "fomc"), ("2026-06-17", "fomc"),
+    ("2026-07-29", "fomc"), ("2026-09-16", "fomc"), ("2026-10-28", "fomc"), ("2026-12-09", "fomc"),
+    ("2027-01-27", "fomc"), ("2027-03-17", "fomc"), ("2027-04-28", "fomc"), ("2027-06-09", "fomc"),
+    ("2027-07-28", "fomc"), ("2027-09-15", "fomc"), ("2027-10-27", "fomc"), ("2027-12-08", "fomc"),
+    ("2026-01-13", "cpi"), ("2026-02-13", "cpi"), ("2026-03-11", "cpi"), ("2026-04-10", "cpi"),
+    ("2026-05-12", "cpi"), ("2026-06-10", "cpi"), ("2026-07-14", "cpi"), ("2026-08-12", "cpi"),
+    ("2026-09-11", "cpi"), ("2026-10-14", "cpi"), ("2026-11-10", "cpi"), ("2026-12-10", "cpi"),
+]
+
+MARKET_EVENT_LABELS: Dict[str, Dict[str, Tuple[str, str]]] = {
+    "en": {"fomc": ("FOMC interest rate decision (Fed)", "Macro"),
+           "cpi": ("US inflation data release (CPI)", "Macro")},
+    "sk": {"fomc": ("Rozhodnutie FOMC o úrokových sadzbách (Fed)", "Makro"),
+           "cpi": ("Zverejnenie dát o inflácii v USA (CPI)", "Makro")},
+    "cs": {"fomc": ("Rozhodnutí FOMC o úrokových sazbách (Fed)", "Makro"),
+           "cpi": ("Zveřejnění dat o inflaci v USA (CPI)", "Makro")},
 }
 
 
-def market_events_for_lang(lang: str) -> List[Dict[str, object]]:
-    return MARKET_EVENTS_BY_LANG.get(normalize_lang(lang), MARKET_EVENTS_BY_LANG[DEFAULT_LANG])
+def market_events_for_lang(lang: str) -> Dict[str, Tuple[str, str]]:
+    return MARKET_EVENT_LABELS.get(normalize_lang(lang), MARKET_EVENT_LABELS[DEFAULT_LANG])

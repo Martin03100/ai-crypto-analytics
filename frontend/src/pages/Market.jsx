@@ -58,7 +58,7 @@ export default function Market() {
   const [provider, setProvider] = useState(null);
   const [newsResult, setNewsResult] = useState(null);
   const [newsLoading, setNewsLoading] = useState(false);
-  const [events, setEvents] = useState([]);
+  const [events, setEvents] = useState(null);
   const [myVote, setMyVote] = useState(null);
   const [percentages, setPercentages] = useState(null);
 
@@ -249,7 +249,9 @@ export default function Market() {
       <OnchainCard />
 
       <Card title={t("market.eventsTitle")} icon={Calendar}>
-        {events.length === 0 ? (failed.events ? <LoadError onRetry={loadEvents} /> : <SkeletonLines count={3} />) : (
+        {failed.events ? <LoadError onRetry={loadEvents} /> : events === null ? <SkeletonLines count={3} /> : events.length === 0 ? (
+          <p className="text-sub">{t("market.noEvents")}</p>
+        ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {events.map((ev, i) => (
               <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderBottom: i < events.length - 1 ? "1px solid var(--border-subtle)" : "none", fontSize: 13 }}>
@@ -260,6 +262,7 @@ export default function Market() {
             ))}
           </div>
         )}
+        <p className="data-sources">{t("market.eventsSource")}</p>
       </Card>
     </div>
   );
