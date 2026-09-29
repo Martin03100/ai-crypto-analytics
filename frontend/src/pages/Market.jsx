@@ -1,6 +1,6 @@
 /** Market sentiment page. */
 
-import { Calendar, Gauge, Newspaper, Vote } from "lucide-react";
+import { Calendar, Gauge, Newspaper, Vote, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { MockBadge, SentimentBadge } from "../components/Badge";
@@ -35,6 +35,16 @@ function FearGreedGauge({ value, classification }) {
   );
 }
 
+function LoadError({ onRetry }) {
+  const { t } = useLanguage();
+  return (
+    <div className="inline-error" role="alert">
+      <span>{t("common.loadFailed")}</span>
+      <button className="btn btn-ghost btn-sm" onClick={onRetry}><RefreshCw size={13} /> {t("common.retry")}</button>
+    </div>
+  );
+}
+
 export default function Market() {
   const { push } = useToast();
   const { t, lang } = useLanguage();
@@ -52,12 +62,37 @@ export default function Market() {
   const [myVote, setMyVote] = useState(null);
   const [percentages, setPercentages] = useState(null);
 
+  const [failed, setFailed] = useState({ fg: false, headlines: false, events: false });
+  const markFailed = (key, value) => setFailed((prev) => ({ ...prev, [key]: value }));
+
+  function loadFearGreed() {
+    markFailed("fg", false);
+    api.fearGreed()
+      .then((r) => {
+        if (!r.data) throw new Error("invalid");
+        setFg(r.data);
+        setFgMock(r.is_mock);
+      })
+      .catch(() => markFailed("fg", true));
+  }
+
+  function loadHeadlines() {
+    markFailed("headlines", false);
+    api.headlines().then((r) => setHeadlines(r.headlines)).catch(() => markFailed("headlines", true));
+  }
+
+  function loadEvents() {
+    markFailed("events", false);
+    api.events().then((r) => setEvents(r.events)).catch(() => markFailed("events", true));
+  }
+
   useEffect(() => {
-    api.fearGreed().then((r) => { setFg(r.data); setFgMock(r.is_mock); }).catch(() => {});
-    api.headlines().then((r) => setHeadlines(r.headlines)).catch(() => {});
-    api.events().then((r) => setEvents(r.events)).catch(() => {});
-    api.myVote().then((r) => setMyVote(r.sentiment_vote)).catch(() => {});
+    loadFearGreed();
+    loadHeadlines();
+    loadEvents();
+    api.myVote().then((r) => setMyVote(typeof r.sentiment_vote === "string" ? r.sentiment_vote : null)).catch(() => {});
     api.votePercentages().then(setPercentages).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -69,8 +104,12 @@ export default function Market() {
     if (!provider || headlines.length === 0) return;
     setNewsLoading(true);
     try {
-      const titles = headlines.map((h) => h.title);
-      const res = await api.newsSentiment(provider, titles);
+      const titles = headlines.map((h) => h.title).filter((title) => typeof title === "string" && title.trim());
+      const res = await api.newsSentiment(provider, titles.slice(0, 20));
+      if (!res.success) {
+        push(res.error_message || t("errors.generic"), "error");
+        return;
+      }
       setNewsResult(res);
       if (res.is_mock) push(res.error_message ? humanizeError(res.error_message, lang) : t("market.mockNotice"), "warn");
     } catch (err) {
@@ -85,7 +124,7 @@ export default function Market() {
       await api.vote(sentiment);
       setMyVote(sentiment);
       push(t("market.voteRecorded"), "success");
-      api.votePercentages().then(setPercentages);
+      api.votePercentages().then(setPercentages).catch(() => {});
     } catch (err) {
       push(err, "error");
     }
@@ -130,7 +169,7 @@ export default function Market() {
                 </p>
               )}
             </>
-          ) : <SkeletonLines count={2} />}
+          ) : failed.fg ? <LoadError onRetry={loadFearGreed} /> : <SkeletonLines count={2} />}
         </Card>
 
         <Card title={t("market.communityTitle")} icon={Vote}>
@@ -176,7 +215,7 @@ export default function Market() {
           <>
             {newsResult.is_mock && <div style={{ marginBottom: 10 }}><MockBadge /></div>}
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
-              {newsResult.data.spravy.map((item, i) => {
+              {(Array.isArray(newsResult.data.spravy) ? newsResult.data.spravy : []).filter((item) => item && typeof item === "object").map((item, i) => {
                 const headline = headlineFor(item.titulok);
                 const link = safeUrl(headline?.link);
                 return (
@@ -199,18 +238,18 @@ export default function Market() {
             </div>
             <p className="card-title" style={{ marginBottom: 8 }}>{t("market.trendingTitle")}</p>
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.8 }}>
-              {newsResult.data.trendy.map((trend, i) => <li key={i}>{trend}</li>)}
+              {(Array.isArray(newsResult.data.trendy) ? newsResult.data.trendy : []).map((trend, i) => <li key={i}>{stripMockTag(String(trend))}</li>)}
             </ul>
           </>
         )}
 
-        {!newsLoading && !newsResult && headlines.length === 0 && <SkeletonLines count={4} />}
+        {!newsLoading && !newsResult && headlines.length === 0 && (failed.headlines ? <LoadError onRetry={loadHeadlines} /> : <SkeletonLines count={4} />)}
       </Card>
 
       <OnchainCard />
 
       <Card title={t("market.eventsTitle")} icon={Calendar}>
-        {events.length === 0 ? <SkeletonLines count={3} /> : (
+        {events.length === 0 ? (failed.events ? <LoadError onRetry={loadEvents} /> : <SkeletonLines count={3} />) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {events.map((ev, i) => (
               <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderBottom: i < events.length - 1 ? "1px solid var(--border-subtle)" : "none", fontSize: 13 }}>

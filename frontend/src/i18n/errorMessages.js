@@ -35,7 +35,7 @@ const KNOWN_BACKEND_PATTERNS = [
   { test: /najprv ulo[zž] api kl[uú][cč] pre tohto providera/i, key: "errors.noKeyToTest" },
   { test: /pou[zž][ií]vate[lľ]sk[eé] meno mus[ií] ma[tť] 3/i, key: "errors.usernameInvalid" },
   { test: /predikciu sa nepodarilo overi[tť]/i, key: "errors.forecastUnverified" },
-  { test: /bezplatn[yý] model|nedostatok historick[yý]ch d[aá]t|trhov[eé] d[aá]ta moment[aá]lne|trhove data sa nepodarilo/i, key: "errors.quantUnavailable" },
+  { test: /bezplatn[yý] model|chyba pri na[cč][ií]tan[ií] historick[yý]ch d[aá]t|nedostatok historick[yý]ch d[aá]t|trhov[eé] d[aá]ta moment[aá]lne|trhove data sa nepodarilo/i, key: "errors.quantUnavailable" },
 ];
 
 const TECHNICAL_PATTERNS = [

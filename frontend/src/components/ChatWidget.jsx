@@ -9,6 +9,7 @@ import { useToast } from "../context/ToastContext";
 import { useProviders } from "../context/ProvidersContext";
 import { useLanguage } from "../context/LanguageContext";
 import { localeForLang } from "../i18n/locale";
+import { stripMockTag } from "../utils/mockText";
 
 const CONVERSATIONS_KEY = "aca_chat_conversations";
 const keyFor = (userId) => `${CONVERSATIONS_KEY}:${userId ?? "anon"}`;
@@ -19,7 +20,11 @@ const PROVIDER_LABELS = {
   anthropic: "Anthropic (Claude)",
   deepseek: "DeepSeek",
   grok: "Grok (xAI)",
+  custom: "Custom",
 };
+// The backend only uses the most recent turns and caps each message; send what it actually reads.
+const CHAT_CONTEXT_MESSAGES = 20;
+const CHAT_MAX_INPUT = 4000;
 
 function loadConversations(userId) {
   try {
@@ -33,7 +38,15 @@ function loadConversations(userId) {
       localStorage.removeItem(CONVERSATIONS_KEY);
     }
     const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    // Drop entries saved by older versions or edited by hand so rendering never trips over them.
+    return parsed
+      .filter((c) => c && typeof c.id === "string" && Array.isArray(c.messages))
+      .map((c) => ({
+        ...c,
+        title: typeof c.title === "string" ? c.title : "",
+        messages: c.messages.filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string"),
+      }));
   } catch {
     return [];
   }
@@ -75,8 +88,12 @@ export default function ChatWidget() {
 
   useEffect(() => {
     if (providersCtx.defaultProvider) setProvider(providersCtx.defaultProvider);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [providersCtx.defaultProvider]);
+
+  // Without any API key the chat still works in demo mode, so fall back to the first provider.
+  useEffect(() => {
+    if (!provider && providers.length > 0) setProvider(providers[0].provider);
+  }, [provider, providers]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -144,7 +161,10 @@ export default function ChatWidget() {
     setInput("");
     setSending(true);
     try {
-      const res = await api.sendChatMessage(provider, nextMessages.map(({ role, content }) => ({ role, content })));
+      const res = await api.sendChatMessage(
+        provider,
+        nextMessages.slice(-CHAT_CONTEXT_MESSAGES).map(({ role, content }) => ({ role, content: content.slice(0, CHAT_MAX_INPUT) })),
+      );
       if (res.success && res.data) {
         const assistantMsg = {
           role: "assistant", content: res.data.reply, tokens: res.data.tokens_used,
@@ -152,7 +172,7 @@ export default function ChatWidget() {
         };
         updateConversation(conv.id, (c) => ({ ...c, messages: [...c.messages, assistantMsg], updatedAt: Date.now() }));
       } else {
-        push(res.error_message || t("chat.sendFailed"), "error");
+        push(res.error_message || t("chat.sendFailed"), "error", { translated: !res.error_message });
       }
     } catch (err) {
       push(err, "error");
@@ -217,11 +237,12 @@ export default function ChatWidget() {
                   className="select"
                   value={provider || ""}
                   onChange={(e) => setProvider(e.target.value)}
+                  aria-label={t("chat.title")}
                   style={{ fontSize: 12.5, padding: "6px 8px" }}
                 >
                   {providers.length === 0 && <option value="">{t("chat.providerLoading")}</option>}
                   {providers.map((p) => (
-                    <option key={p.provider} value={p.provider} disabled={!p.connected}>
+                    <option key={p.provider} value={p.provider}>
                       {PROVIDER_LABELS[p.provider] || p.label}{!p.connected ? t("chat.missingKeySuffix") : ""}
                     </option>
                   ))}
@@ -241,7 +262,7 @@ export default function ChatWidget() {
                 )}
                 {messages.map((m, i) => (
                   <div key={i} className={`chat-bubble ${m.role}`}>
-                    <div>{m.content}</div>
+                    <div>{m.role === "assistant" ? stripMockTag(m.content) : m.content}</div>
                     {m.role === "assistant" && (m.tokens || m.cost !== undefined) && (
                       <div className="chat-meta">
                         {m.isMock && <span className="badge badge-mock" style={{ marginRight: 6 }}>{t("badge.mock")}</span>}
@@ -258,6 +279,8 @@ export default function ChatWidget() {
                   className="input"
                   rows={1}
                   placeholder={t("chat.placeholder")}
+                  aria-label={t("chat.placeholder")}
+                  maxLength={CHAT_MAX_INPUT}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}

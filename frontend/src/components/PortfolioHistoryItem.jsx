@@ -10,6 +10,7 @@ import { useToast } from "../context/ToastContext";
 import { useLanguage } from "../context/LanguageContext";
 import { localeForLang } from "../i18n/locale";
 import { copyToClipboard } from "../utils/copyToClipboard";
+import { stripMockTag } from "../utils/mockText";
 
 export default function PortfolioHistoryItem({ entry, onDelete }) {
   const { push } = useToast();
@@ -27,12 +28,13 @@ export default function PortfolioHistoryItem({ entry, onDelete }) {
       t("portfolio.copyHoldings", { holdings: holdingsText }),
     ];
     if (entry.analysis_data?.odborna_analyza) lines.push("", entry.analysis_data.odborna_analyza);
-    if (entry.analysis_data?.odporucania?.length) {
+    if (Array.isArray(entry.analysis_data?.odporucania) && entry.analysis_data.odporucania.length) {
       lines.push("", t("portfolio.copyRecommendations"));
-      entry.analysis_data.odporucania.forEach((r) => lines.push(`- ${r.minca}: ${r.akcia} — ${r.dovod}`));
+      entry.analysis_data.odporucania.filter((r) => r && typeof r === "object")
+        .forEach((r) => lines.push(`- ${r.minca}: ${r.akcia} — ${stripMockTag(r.dovod)}`));
     }
     const ok = await copyToClipboard(lines.join("\n"));
-    push(ok ? t("common.copied") : t("common.copyFailed"), ok ? "success" : "error");
+    push(ok ? t("common.copied") : t("common.copyFailed"), ok ? "success" : "error", { translated: true });
   }
 
   async function handleDelete(e) {
@@ -71,17 +73,17 @@ export default function PortfolioHistoryItem({ entry, onDelete }) {
       {open && (
         <div style={{ padding: "0 18px 18px" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-            {entry.analysis_data?.odporucania?.map((rec, i) => (
+            {(Array.isArray(entry.analysis_data?.odporucania) ? entry.analysis_data.odporucania : []).filter((rec) => rec && typeof rec === "object").map((rec, i) => (
               <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", borderRadius: 8, background: "var(--bg-inset)" }}>
                 <div>
                   <strong style={{ fontSize: 12.5 }}>{rec.minca}</strong>
-                  <p className="text-sub" style={{ margin: "2px 0 0" }}>{rec.dovod}</p>
+                  <p className="text-sub" style={{ margin: "2px 0 0" }}>{stripMockTag(rec.dovod)}</p>
                 </div>
                 <ActionBadge action={rec.akcia} />
               </div>
             ))}
           </div>
-          <p className="text-sub">{entry.analysis_data?.odborna_analyza}</p>
+          <p className="text-sub">{stripMockTag(entry.analysis_data?.odborna_analyza)}</p>
           <DataSources sources={entry.analysis_data?.zdroje_dat} />
         </div>
       )}

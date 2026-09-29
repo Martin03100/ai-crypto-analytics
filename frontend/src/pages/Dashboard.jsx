@@ -46,10 +46,10 @@ export default function Dashboard() {
   useEffect(() => {
     Promise.allSettled([
       api.fearGreed(),
-      api.forecastHistory(undefined, 90),
-      api.portfolioHistory(),
+      api.forecastHistory(undefined, null, 1, 1),
+      api.portfolioHistory(1, 1),
     ]).then(([fgRes, forecastRes, portfolioRes]) => {
-      if (fgRes.status === "fulfilled") setFg(fgRes.value.data);
+      if (fgRes.status === "fulfilled" && fgRes.value.data) setFg(fgRes.value.data);
       else setFgError(true);
       if (forecastRes.status === "fulfilled" && forecastRes.value.items.length > 0) setLastForecast(forecastRes.value.items[0]);
       if (portfolioRes.status === "fulfilled" && portfolioRes.value.items.length > 0) setLastPortfolio(portfolioRes.value.items[0]);
@@ -60,6 +60,7 @@ export default function Dashboard() {
     setRefreshingFg(true);
     try {
       const res = await api.fearGreed(true);
+      if (!res.data) throw new Error("Server error (502): invalid response");
       setFg(res.data);
       setFgError(false);
       push(t("dashboard.fearGreedRefreshed"), "success");

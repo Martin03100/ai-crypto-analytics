@@ -4,7 +4,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { useLanguage } from "../context/LanguageContext";
 
-export default function PasswordInput({ value, onChange, placeholder, className = "input" }) {
+export default function PasswordInput({ value, onChange, placeholder, className = "input", autoComplete = "current-password" }) {
   const [visible, setVisible] = useState(false);
   const { t } = useLanguage();
   return (
@@ -15,6 +15,8 @@ export default function PasswordInput({ value, onChange, placeholder, className 
         value={value}
         onChange={onChange}
         placeholder={placeholder}
+        autoComplete={autoComplete}
+        maxLength={128}
       />
       <button
         type="button"

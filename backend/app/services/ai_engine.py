@@ -26,7 +26,7 @@ from app.config import (
     DEEPSEEK_API_URL, DEEPSEEK_MODEL, DEFAULT_COIN_IDS, GEMINI_MODEL, GROK_API_URL, GROK_MODEL, QUANT_PROVIDER,
     MOCK_BASE_PRICES, OPENAI_API_URL, OPENAI_MODEL,
     PROVIDER_TOKEN_PRICE_USD_PER_1K,
-    REQUEST_TIMEOUT_SECONDS, SECTOR_CATEGORIES, TIME_HORIZONS,
+    AI_REQUEST_TIMEOUT_SECONDS, SECTOR_CATEGORIES, TIME_HORIZONS,
 )
 from app.services import data_sources, market_data, quant_engine
 
@@ -97,7 +97,7 @@ def _call_gemini(prompt: str, api_key: str) -> tuple[bool, str, Optional[str]]:
         try:
             from google import genai
             from google.genai import types
-            client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=REQUEST_TIMEOUT_SECONDS * 1000))
+            client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=AI_REQUEST_TIMEOUT_SECONDS * 1000))
             response = client.models.generate_content(
                 model=GEMINI_MODEL, contents=prompt,
                 config=types.GenerateContentConfig(
@@ -132,7 +132,7 @@ def _call_openai_compatible(url: str, model: str, prompt: str, api_key: str,
     if extra_body:
         payload.update(extra_body)
     try:
-        response = _post_with_retry(url, headers, payload, REQUEST_TIMEOUT_SECONDS)
+        response = _post_with_retry(url, headers, payload, AI_REQUEST_TIMEOUT_SECONDS)
         body = response.json()
         text = body.get("choices", [{}])[0].get("message", {}).get("content", "")
         return True, text, None
@@ -147,7 +147,7 @@ def _call_anthropic(prompt: str, api_key: str) -> tuple[bool, str, Optional[str]
     payload = {"model": ANTHROPIC_MODEL, "max_tokens": _MAX_OUTPUT_TOKENS, "temperature": _TEMPERATURE,
                "messages": [{"role": "user", "content": prompt}]}
     try:
-        response = _post_with_retry(ANTHROPIC_API_URL, headers, payload, REQUEST_TIMEOUT_SECONDS)
+        response = _post_with_retry(ANTHROPIC_API_URL, headers, payload, AI_REQUEST_TIMEOUT_SECONDS)
         body = response.json()
         blocks = body.get("content", [])
         text = blocks[0].get("text", "") if blocks else ""
@@ -245,7 +245,7 @@ def _call_custom_provider(prompt: str, secret: str) -> tuple[bool, str, Optional
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             json={"model": model, "messages": [{"role": "user", "content": prompt}],
                   "temperature": _TEMPERATURE, "max_tokens": _MAX_OUTPUT_TOKENS},
-            timeout=REQUEST_TIMEOUT_SECONDS, allow_redirects=False,
+            timeout=AI_REQUEST_TIMEOUT_SECONDS, allow_redirects=False,
         )
         if response.is_redirect:
             return False, "", "Vlastný provider vrátil presmerovanie - zadaj priamu adresu API."

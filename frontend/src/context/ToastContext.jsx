@@ -14,8 +14,9 @@ export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
   const { lang } = useLanguage();
 
-  const push = useCallback((message, type = "success") => {
-    const displayMessage = type === "error" ? humanizeError(message, lang) : message;
+  // Errors are humanized here; pass { translated: true } when the message is already user-facing text.
+  const push = useCallback((message, type = "success", { translated = false } = {}) => {
+    const displayMessage = type === "error" && !translated ? humanizeError(message, lang) : String(message ?? "");
     const id = ++idCounter;
     setToasts((prev) => [...prev, { id, message: displayMessage, type }]);
     setTimeout(() => {

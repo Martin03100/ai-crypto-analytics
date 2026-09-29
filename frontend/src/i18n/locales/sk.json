@@ -534,5 +534,6 @@
   "verify.success": "Email overený. Vitaj!",
   "verify.title": "Over si email",
   "common.retry": "Skúsiť znova",
-  "dashboard.fearGreedError": "Index strachu a chamtivosti sa nepodarilo načítať."
+  "dashboard.fearGreedError": "Index strachu a chamtivosti sa nepodarilo načítať.",
+  "common.loadFailed": "Tieto dáta sa nepodarilo načítať."
 }

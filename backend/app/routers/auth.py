@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import hmac
 import threading
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import (
@@ -68,7 +70,11 @@ def register(payload: RegisterRequest, response: Response, request: Request, bac
     user = User(username=username, password_hash=hash_password(payload.password), email=email,
                 email_verified=False if is_email_configured() else None)
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Toto pouzivatelske meno je uz obsadene.") from None
     db.refresh(user)
     if user.email_verified is False:
         send_verification_code(db, user, background_tasks)
@@ -187,7 +193,7 @@ def _find_valid_reset_token(db: Session, user_id: int, code: str) -> PasswordRes
     now = datetime.now(timezone.utc)
     if row.expires_at.replace(tzinfo=timezone.utc) < now:
         return None
-    if row.token_hash != hash_reset_token(code):
+    if not hmac.compare_digest(row.token_hash, hash_reset_token(code)):
         return None
     return row
 
@@ -245,7 +251,7 @@ def verify_email(payload: VerifyEmailRequest, user: User = Depends(get_current_u
     row = (db.query(EmailVerificationCode).filter(EmailVerificationCode.user_id == user.id)
            .order_by(EmailVerificationCode.created_at.desc()).first())
     if (row is None or row.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc)
-            or row.code_hash != hash_reset_token(payload.code.strip())):
+            or not hmac.compare_digest(row.code_hash, hash_reset_token(payload.code.strip()))):
         raise HTTPException(status_code=400, detail="Kód je nesprávny alebo expirovaný.")
     user.email_verified = True
     db.query(EmailVerificationCode).filter(EmailVerificationCode.user_id == user.id).delete(synchronize_session=False)

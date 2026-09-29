@@ -18,7 +18,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     api.me()
-      .then((res) => setUser(toUser(res)))
+      .then((res) => setUser(res.user_id ? toUser(res) : null))
       .catch(() => setUser(null))
       .finally(() => setChecking(false));
   }, []);
@@ -51,6 +51,8 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     try {
       await api.logout();
+    } catch {
+      // The local session is cleared either way; a failed logout request must not surface as an error.
     } finally {
       setUser(null);
     }

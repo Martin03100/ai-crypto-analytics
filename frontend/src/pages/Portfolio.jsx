@@ -21,6 +21,7 @@ import { useLanguage } from "../context/LanguageContext";
 import { humanizeError } from "../i18n/errorMessages";
 import { localeForLang } from "../i18n/locale";
 import { usePageTitle } from "../hooks/usePageTitle";
+import { stripMockTag } from "../utils/mockText";
 
 const COINS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "DOT", "LINK"];
 const PIE_COLORS = ["#22d3ee", "#34d399", "#a78bfa", "#fbbf24", "#fb5a6a"];
@@ -282,7 +283,9 @@ export default function Portfolio() {
   }
 
   const sectorData = result?.data?.sektorova_alokacia
-    ? Object.entries(result.data.sektorova_alokacia).map(([name, value]) => ({ name, value }))
+    ? Object.entries(result.data.sektorova_alokacia)
+      .map(([name, value]) => ({ name, value: Number(value) }))
+      .filter((s) => Number.isFinite(s.value) && s.value > 0)
     : [];
 
   return (
@@ -383,14 +386,14 @@ export default function Portfolio() {
 
           <Card title={t("portfolio.coinRatingTitle")} icon={Compass}>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {result.data.odporucania?.map((rec, i) => (
+              {(Array.isArray(result.data.odporucania) ? result.data.odporucania : []).filter((rec) => rec && typeof rec === "object").map((rec, i) => (
                 <div key={i} style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",
                   padding: "12px 14px", borderRadius: 10, background: "var(--bg-inset)", border: "1px solid var(--border-subtle)",
                 }}>
                   <div>
                     <strong style={{ fontSize: 13.5 }}>{rec.minca}</strong>
-                    <p className="text-sub" style={{ margin: "3px 0 0" }}>{rec.dovod}</p>
+                    <p className="text-sub" style={{ margin: "3px 0 0" }}>{stripMockTag(rec.dovod)}</p>
                   </div>
                   <ActionBadge action={rec.akcia} />
                 </div>
@@ -422,7 +425,7 @@ export default function Portfolio() {
           )}
 
           <Card title={t("portfolio.checklistTitle")}>
-            {result.data.rebalancing_checklist?.map((step, i) => (
+            {(Array.isArray(result.data.rebalancing_checklist) ? result.data.rebalancing_checklist : []).map((step, i) => (
               <button
                 key={i}
                 type="button"
@@ -433,14 +436,14 @@ export default function Portfolio() {
               >
                 <span className={`checkbox ${checked[i] ? "checked" : ""}`} aria-hidden="true">{checked[i] && "✓"}</span>
                 <span style={{ textDecoration: checked[i] ? "line-through" : "none", color: checked[i] ? "var(--text-tertiary)" : "inherit" }}>
-                  {step}
+                  {stripMockTag(String(step))}
                 </span>
               </button>
             ))}
           </Card>
 
           <Card title={t("portfolio.expertAnalysisTitle")} icon={GraduationCap}>
-            <p style={{ margin: 0, lineHeight: 1.6, fontSize: 13.5, color: "var(--text-secondary)" }}>{result.data.odborna_analyza}</p>
+            <p style={{ margin: 0, lineHeight: 1.6, fontSize: 13.5, color: "var(--text-secondary)" }}>{stripMockTag(result.data.odborna_analyza)}</p>
             <DataSources sources={result.data.zdroje_dat} />
           </Card>
         </div>

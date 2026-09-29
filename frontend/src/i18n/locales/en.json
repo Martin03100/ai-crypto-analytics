@@ -534,5 +534,6 @@
   "verify.success": "Email verified. Welcome!",
   "verify.title": "Verify your email",
   "common.retry": "Try again",
-  "dashboard.fearGreedError": "Couldn't load the Fear & Greed Index."
+  "dashboard.fearGreedError": "Couldn't load the Fear & Greed Index.",
+  "common.loadFailed": "Couldn't load this data."
 }

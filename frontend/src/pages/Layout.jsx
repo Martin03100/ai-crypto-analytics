@@ -4,6 +4,7 @@ import { Menu } from "lucide-react";
 import { Suspense, useCallback, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import ChatWidget from "../components/ChatWidget";
+import ErrorBoundary from "../components/ErrorBoundary";
 import OnboardingTour from "../components/OnboardingTour";
 import Sidebar from "../components/Sidebar";
 import ShortcutsHelp from "../components/ShortcutsHelp";
@@ -23,7 +24,11 @@ function ContentLoader() {
 
 function PageTransition({ children }) {
   const { pathname } = useLocation();
-  return <div key={pathname} className="page-transition">{children}</div>;
+  return (
+    <div key={pathname} className="page-transition">
+      <ErrorBoundary inline>{children}</ErrorBoundary>
+    </div>
+  );
 }
 
 export default function Layout() {

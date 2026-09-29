@@ -191,7 +191,7 @@ def _check_json_size(value: Dict[str, Any]) -> Dict[str, Any]:
     try:
         size = len(json.dumps(value, ensure_ascii=False))
     except (TypeError, ValueError):
-        raise ValueError("Neplatné dáta.")
+        raise ValueError("Neplatné dáta.") from None
     if size > _MAX_SAVED_JSON_BYTES:
         raise ValueError("Ukladané dáta sú príliš veľké.")
     return value

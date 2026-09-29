@@ -77,7 +77,7 @@ export default function Settings() {
       await api.deleteAccount(deletePassword);
       push(t("settings.accountDeleted"), "success");
       await logout();
-      navigate("/auth");
+      navigate("/auth", { replace: true });
     } catch (err) {
       push(err, "error");
     } finally {
@@ -146,7 +146,7 @@ export default function Settings() {
           <form onSubmit={handleSaveEmail} style={{ marginTop: 14 }}>
             <div className="field">
               <label><AtSign size={12} style={{ verticalAlign: -1, marginRight: 4 }} />{t("settings.emailLabel")}</label>
-              <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("settings.emailPlaceholder")} />
+              <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("settings.emailPlaceholder")} autoComplete="email" maxLength={255} />
               <span className="text-sub" style={{ display: "block", marginTop: 4 }}>{t("settings.emailDesc")}</span>
             </div>
             <button className="btn btn-ghost btn-sm" type="submit" disabled={savingEmail}>
@@ -164,7 +164,7 @@ export default function Settings() {
               </div>
               <div className="field">
                 <label>{t("settings.newPassword")}</label>
-                <PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t("settings.newPasswordPlaceholder")} />
+                <PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t("settings.newPasswordPlaceholder")} autoComplete="new-password" />
               </div>
             </div>
             <button className="btn btn-primary btn-sm" type="submit" disabled={savingPassword}>

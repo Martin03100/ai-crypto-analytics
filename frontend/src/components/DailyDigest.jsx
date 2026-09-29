@@ -21,7 +21,7 @@ function loadCached(userId) {
     const raw = localStorage.getItem(keyFor(userId));
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return parsed.date === todayKey() ? parsed : null;
+    return parsed?.date === todayKey() && parsed.data && typeof parsed.data === "object" ? parsed : null;
   } catch {
     return null;
   }
@@ -79,7 +79,7 @@ export default function DailyDigest() {
           <>
             <p style={{ margin: "4px 0 6px", fontSize: 13, color: "var(--text-secondary)" }}>{stripMockTag(digest.data.zhrnutie)}</p>
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: "var(--text-tertiary)" }}>
-              {digest.data.kluceve_body?.map((point, i) => <li key={i}>{stripMockTag(point)}</li>)}
+              {(Array.isArray(digest.data.kluceve_body) ? digest.data.kluceve_body : []).map((point, i) => <li key={i}>{stripMockTag(String(point))}</li>)}
             </ul>
           </>
         )}

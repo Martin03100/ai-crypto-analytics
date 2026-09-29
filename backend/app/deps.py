@@ -51,7 +51,10 @@ def get_current_user(
     user_id = payload.get("sub")
     if user_id is None:
         raise credentials_error
-    user = db.get(User, int(user_id))
+    try:
+        user = db.get(User, int(user_id))
+    except (TypeError, ValueError):
+        raise credentials_error from None
     if user is None:
         raise credentials_error
     token_version = payload.get("tv", 0)

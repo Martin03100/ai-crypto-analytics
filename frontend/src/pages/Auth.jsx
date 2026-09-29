@@ -236,17 +236,19 @@ export default function Auth() {
             <form onSubmit={handleSubmit}>
               <div className="field">
                 <label>{t("auth.username")}</label>
-                <input className="input" value={username} onChange={(e) => setUsername(e.target.value)} placeholder={t("auth.usernamePlaceholder")} />
+                <input className="input" value={username} onChange={(e) => setUsername(e.target.value)} placeholder={t("auth.usernamePlaceholder")}
+                  autoComplete="username" maxLength={tab === "register" ? 32 : 64} />
               </div>
               {tab === "register" && (
                 <div className="field">
                   <label>{t("auth.email")}</label>
-                  <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("auth.emailPlaceholder")} />
+                  <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("auth.emailPlaceholder")} autoComplete="email" maxLength={255} />
                 </div>
               )}
               <div className="field">
                 <label>{t("auth.password")}</label>
-                <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.passwordPlaceholder")} />
+                <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("auth.passwordPlaceholder")}
+                  autoComplete={tab === "register" ? "new-password" : "current-password"} />
               </div>
               {tab === "login" && needTotp && (
                 <div className="field">
@@ -258,7 +260,7 @@ export default function Auth() {
               {tab === "register" && (
                 <div className="field">
                   <label>{t("auth.confirmPassword")}</label>
-                  <PasswordInput value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+                  <PasswordInput value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" />
                 </div>
               )}
               <button className="btn btn-primary btn-block" type="submit" disabled={loading}>
@@ -280,7 +282,7 @@ export default function Auth() {
               </p>
               <div className="field">
                 <label>{t("auth.email")}</label>
-                <input className="input" type="email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} placeholder={t("auth.emailPlaceholder")} />
+                <input className="input" type="email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} placeholder={t("auth.emailPlaceholder")} autoComplete="email" maxLength={255} />
               </div>
               <button className="btn btn-primary btn-block" type="submit" disabled={loading}>
                 {loading && <Loader2 size={15} className="spin" />} {t("auth.sendCode")}
@@ -327,7 +329,7 @@ export default function Auth() {
               <p className="text-sub" style={{ marginTop: 0 }}>{t("auth.resetInstructions")}</p>
               <div className="field">
                 <label>{t("auth.newPasswordLabel")}</label>
-                <PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t("auth.passwordPlaceholder")} />
+                <PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t("auth.passwordPlaceholder")} autoComplete="new-password" />
               </div>
               <button className="btn btn-primary btn-block" type="submit" disabled={loading}>
                 {loading && <Loader2 size={15} className="spin" />} {t("auth.setNewPassword")}

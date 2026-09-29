@@ -108,7 +108,7 @@ def test_anthropic_payload_caps_tokens_and_temperature(monkeypatch):
 
 def test_estimate_forecast_cost_scales_with_points():
     short = ai_engine.estimate_forecast_cost("gemini", "BTC", "24h")
-    long = ai_engine.estimate_forecast_cost("gemini", "BTC", "1R")
+    _long = ai_engine.estimate_forecast_cost("gemini", "BTC", "1R")
     assert short["estimated_total_tokens"] > 0
     assert short["estimated_cost_usd"] > 0
     assert "estimated_input_tokens" in short and "estimated_output_tokens" in short
@@ -230,7 +230,7 @@ def test_market_context_uses_short_timeout(monkeypatch):
     _patch_sources(monkeypatch, _hist(1.0, 2.0), timeouts=timeouts)
     ai_engine._fetch_market_context("ETH")
     assert timeouts and all(t == ai_engine._MARKET_CONTEXT_TIMEOUT for t in timeouts)
-    assert ai_engine._MARKET_CONTEXT_TIMEOUT < ai_engine.REQUEST_TIMEOUT_SECONDS
+    assert ai_engine._MARKET_CONTEXT_TIMEOUT < ai_engine.AI_REQUEST_TIMEOUT_SECONDS
 
 
 def test_market_context_never_raises(monkeypatch):

@@ -79,6 +79,11 @@ def get_portfolio_history(page: int = Query(default=1, ge=1, le=100_000), page_s
             analysis_data = json.loads(row.analysis_json)
         except json.JSONDecodeError:
             holdings, analysis_data = [], {}
+        if not isinstance(holdings, list):
+            holdings = []
+        holdings = [h for h in holdings if isinstance(h, dict)]
+        if not isinstance(analysis_data, dict):
+            analysis_data = {}
         items.append(PortfolioHistoryOut(
             id=row.id, holdings=holdings, analysis_data=analysis_data,
             model_used=row.model_used, created_at=row.created_at,

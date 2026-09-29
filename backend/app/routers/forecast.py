@@ -118,6 +118,8 @@ def get_forecast_accuracy(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], us
         forecast_data = json.loads(row.forecast_json)
     except json.JSONDecodeError:
         forecast_data = {}
+    if not isinstance(forecast_data, dict):
+        forecast_data = {}
     predicted_prices = _numeric_prices(forecast_data.get("ceny"))
     time_labels = forecast_data.get("casove_body", []) if isinstance(forecast_data.get("casove_body"), list) else []
     if row.model_used == "mock":
@@ -128,7 +130,7 @@ def get_forecast_accuracy(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], us
     _record_evaluation(db, row, result)
     tip = db.query(PriceTip).filter(PriceTip.forecast_id == row.id, PriceTip.user_id == user.id).first()
     _settle_tip(tip, result)
-    db.commit()
+    _commit_ignoring_duplicates(db)
     can_tip = (tip is None and bool(predicted_prices)
                and datetime.now(timezone.utc) - _created_at(row, forecast_data) <= _TIP_WINDOW)
     return ForecastAccuracyOut(
@@ -138,15 +140,15 @@ def get_forecast_accuracy(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], us
 
 
 @router.get("/history", response_model=PaginatedForecastHistory)
-def get_history(symbol: Optional[str] = Query(default=None), days_back: int = Query(default=30, ge=1, le=365),
+def get_history(symbol: Optional[str] = Query(default=None, max_length=16),
+                days_back: Optional[int] = Query(default=None, ge=1, le=3650),
                  page: int = Query(default=1, ge=1, le=100_000), page_size: int = Query(default=20, ge=1, le=100),
                  user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> PaginatedForecastHistory:
-    date_from = datetime.now(timezone.utc) - timedelta(days=days_back)
-    query = db.query(ForecastHistory).filter(
-        ForecastHistory.user_id == user.id, ForecastHistory.created_at >= date_from
-    )
+    query = db.query(ForecastHistory).filter(ForecastHistory.user_id == user.id)
+    if days_back is not None:
+        query = query.filter(ForecastHistory.created_at >= datetime.now(timezone.utc) - timedelta(days=days_back))
     if symbol:
-        query = query.filter(ForecastHistory.crypto_symbol == symbol)
+        query = query.filter(ForecastHistory.crypto_symbol == symbol.upper())
 
     total = query.count()
     rows = (
@@ -161,6 +163,8 @@ def get_history(symbol: Optional[str] = Query(default=None), days_back: int = Qu
         try:
             forecast_data = json.loads(row.forecast_json)
         except json.JSONDecodeError:
+            forecast_data = {}
+        if not isinstance(forecast_data, dict):
             forecast_data = {}
         items.append(ForecastHistoryOut(
             id=row.id, crypto_symbol=row.crypto_symbol, timeframe=row.timeframe,
@@ -199,6 +203,14 @@ def _record_evaluation(db: Session, row: ForecastHistory, result: dict) -> None:
     ))
 
 
+def _commit_ignoring_duplicates(db: Session) -> None:
+    """Another request may have evaluated the same forecast concurrently; that result is equally valid."""
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+
+
 def _settle_tip(tip, result: dict) -> None:
     if tip is None or tip.outcome or result.get("status") != "completed" or not result.get("actual_prices"):
         return
@@ -220,6 +232,8 @@ def _evaluate_pending(db: Session, limit: int = 5, deadline_seconds: float = 8.0
             data = json.loads(row.forecast_json)
         except json.JSONDecodeError:
             continue
+        if not isinstance(data, dict):
+            continue
         created = _created_at(row, data)
         if _numeric_prices(data.get("ceny")) and now >= created + timedelta(days=_HORIZON_DAYS.get(row.timeframe, 7)):
             ready.append((row, data, created))
@@ -240,7 +254,7 @@ def _evaluate_pending(db: Session, limit: int = 5, deadline_seconds: float = 8.0
                 continue
             _record_evaluation(db, row, result)
             _settle_tip(db.query(PriceTip).filter(PriceTip.forecast_id == row.id).first(), result)
-        db.commit()
+        _commit_ignoring_duplicates(db)
     finally:
         pool.shutdown(wait=False)
 
@@ -255,6 +269,8 @@ def submit_tip(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], payload: TipR
         forecast_data = json.loads(row.forecast_json)
     except json.JSONDecodeError:
         forecast_data = {}
+    if not isinstance(forecast_data, dict):
+        forecast_data = {}
     predicted = _numeric_prices(forecast_data.get("ceny"))
     if row.model_used == "mock" or not predicted:
         raise HTTPException(status_code=400, detail="Na ukážkové dáta sa tipovať nedá.")
@@ -265,13 +281,13 @@ def submit_tip(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], payload: TipR
     try:
         ai_price = float(predicted[-1])
     except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail="Na túto predikciu sa tipovať nedá.")
+        raise HTTPException(status_code=400, detail="Na túto predikciu sa tipovať nedá.") from None
     db.add(PriceTip(user_id=user.id, forecast_id=row.id, tip_price=payload.price, ai_price=ai_price))
     try:
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=400, detail="Na túto predikciu si už tipoval.")
+        raise HTTPException(status_code=400, detail="Na túto predikciu si už tipoval.") from None
     return {"success": True}
 
 

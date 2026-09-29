@@ -579,7 +579,8 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
   position: fixed; bottom: 92px; right: 24px; z-index: 45;
   width: 360px; max-width: calc(100vw - 32px);
   height: 500px; max-height: calc(100vh - 140px);
-  background: linear-gradient(180deg, var(--bg-card), var(--bg-card-hover) 140%);
+  /* Opaque base: the chat floats over busy pages and must stay readable without relying on blur. */
+  background: linear-gradient(180deg, var(--bg-card), var(--bg-card-hover) 140%), var(--bg-void-2);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   box-shadow: 0 20px 60px -16px rgba(0,0,0,0.65);

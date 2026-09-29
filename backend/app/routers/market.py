@@ -43,7 +43,7 @@ def fear_greed(refresh: bool = False) -> dict:
     return {"data": data, "is_mock": False, "error_message": None}
 
 
-@router.get("/headlines")
+@router.get("/headlines", dependencies=_PUBLIC_LIMITS)
 def headlines() -> dict:
     success, items, error = get_crypto_headlines(limit=8)
     if not success or not items:

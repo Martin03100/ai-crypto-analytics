@@ -8,14 +8,21 @@ const ProvidersContext = createContext(null);
 
 export function ProvidersProvider({ children }) {
   const { user } = useAuth();
+  const userId = user?.id;
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(() => {
-    if (!user) return;
+    if (!userId) {
+      setProviders([]);
+      return;
+    }
     setLoading(true);
-    api.listApiKeys().then(setProviders).catch(() => {}).finally(() => setLoading(false));
-  }, [user]);
+    api.listApiKeys()
+      .then((res) => setProviders(Array.isArray(res) ? res.filter((p) => p && typeof p.provider === "string") : []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [userId]);
 
   useEffect(() => {
     refresh();

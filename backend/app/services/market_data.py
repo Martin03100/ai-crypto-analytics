@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from defusedxml import ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
@@ -45,7 +46,7 @@ def get_fear_greed_index(force_refresh: bool = False) -> Tuple[bool, Optional[Di
         except (TypeError, ValueError):
             updated_at = ""
         data = {
-            "value": int(latest.get("value", 50)),
+            "value": min(100, max(0, int(latest.get("value", 50)))),
             "classification": str(latest.get("value_classification", "Nezname")),
             "timestamp": raw_ts,
             "updated_at": updated_at,
@@ -57,7 +58,7 @@ def get_fear_greed_index(force_refresh: bool = False) -> Tuple[bool, Optional[Di
         if stale is not None:
             return True, stale, f"Pouzivam starsiu cachovanu hodnotu (chyba siete: {exc})"
         return False, None, f"Chyba siete pri nacitani Fear & Greed Index: {exc}"
-    except (ValueError, KeyError, TypeError) as exc:
+    except (ValueError, KeyError, TypeError, AttributeError, IndexError) as exc:
         return False, None, f"Chyba pri spracovani Fear & Greed Index: {exc}"
 
 
@@ -222,6 +223,21 @@ from app.config import (  # noqa: E402
 
 _price_cache = TTLCache(ttl_seconds=PRICE_CACHE_TTL_SECONDS)
 _market_chart_cache = TTLCache(ttl_seconds=PRICE_CACHE_TTL_SECONDS)
+
+
+def clean_price_points(raw: Any) -> List[List[float]]:
+    """Keeps only well-formed [timestamp, price] pairs with finite, positive prices."""
+    points: List[List[float]] = []
+    if not isinstance(raw, list):
+        return points
+    for item in raw:
+        try:
+            ts, price = float(item[0]), float(item[1])
+        except (TypeError, ValueError, IndexError, KeyError):
+            continue
+        if math.isfinite(ts) and math.isfinite(price) and price > 0:
+            points.append([ts, price])
+    return points
 _search_cache = TTLCache(ttl_seconds=300)
 _history_cache = TTLCache(ttl_seconds=300)
 
@@ -251,7 +267,7 @@ def get_live_prices(coin_ids: List[str], vs_currency: str = "usd", timeout: int 
         response.raise_for_status()
         body = response.json()
         prices: Dict[str, float] = {}
-        for coin_id, values in body.items():
+        for coin_id, values in (body.items() if isinstance(body, dict) else []):
             if isinstance(values, dict) and vs_currency in values:
                 prices[coin_id] = {
                     vs_currency: float(values[vs_currency]),
@@ -264,7 +280,7 @@ def get_live_prices(coin_ids: List[str], vs_currency: str = "usd", timeout: int 
         if stale is not None:
             return True, stale, f"Pouzivam starsie cachovane ceny (CoinGecko chyba: {exc})"
         return False, None, f"Chyba siete pri nacitani cien z CoinGecko: {exc}"
-    except (ValueError, KeyError, TypeError) as exc:
+    except (ValueError, KeyError, TypeError, AttributeError, IndexError) as exc:
         return False, None, f"Chyba pri spracovani odpovede CoinGecko: {exc}"
 
 
@@ -283,7 +299,9 @@ def get_market_chart(coin_id: str, vs_currency: str = "usd", days: str = "7", ti
         )
         response.raise_for_status()
         body = response.json()
-        prices = body.get("prices", [])
+        prices = clean_price_points(body.get("prices") if isinstance(body, dict) else None)
+        if not prices:
+            return False, [], "CoinGecko vratil prazdne alebo neplatne data grafu."
         _market_chart_cache.set(cache_key, prices)
         return True, prices, None
     except requests.exceptions.RequestException as exc:
@@ -291,7 +309,7 @@ def get_market_chart(coin_id: str, vs_currency: str = "usd", days: str = "7", ti
         if stale is not None:
             return True, stale, f"Pouzivam starsie cachovane data (chyba: {exc})"
         return False, [], f"Chyba siete pri nacitani historickych cien: {exc}"
-    except (ValueError, KeyError, TypeError) as exc:
+    except (ValueError, KeyError, TypeError, AttributeError, IndexError) as exc:
         return False, [], f"Chyba pri spracovani historickych cien: {exc}"
 
 
@@ -310,7 +328,9 @@ def get_market_chart_range(coin_id: str, vs_currency: str, from_ts: int, to_ts: 
         )
         response.raise_for_status()
         body = response.json()
-        prices = body.get("prices", [])
+        prices = clean_price_points(body.get("prices") if isinstance(body, dict) else None)
+        if not prices:
+            return False, [], "CoinGecko vratil prazdne alebo neplatne data grafu."
         _market_chart_cache.set(cache_key, prices)
         return True, prices, None
     except requests.exceptions.RequestException as exc:
@@ -318,7 +338,7 @@ def get_market_chart_range(coin_id: str, vs_currency: str, from_ts: int, to_ts: 
         if stale is not None:
             return True, stale, f"Pouzivam starsie cachovane data (chyba: {exc})"
         return False, [], f"Chyba siete pri nacitani historickych cien: {exc}"
-    except (ValueError, KeyError, TypeError) as exc:
+    except (ValueError, KeyError, TypeError, AttributeError, IndexError) as exc:
         return False, [], f"Chyba pri spracovani historickych cien: {exc}"
 
 
@@ -336,16 +356,16 @@ def search_coins(query: str, limit: int = 8) -> Tuple[bool, List[Dict[str, str]]
         )
         response.raise_for_status()
         body = response.json()
-        coins = body.get("coins", [])[:limit]
+        coins = body.get("coins", []) if isinstance(body, dict) else []
         result = [
-            {"id": c.get("id", ""), "symbol": str(c.get("symbol", "")).upper(), "name": c.get("name", "")}
-            for c in coins if c.get("id")
-        ]
+            {"id": str(c.get("id")), "symbol": str(c.get("symbol", "")).upper(), "name": str(c.get("name", ""))}
+            for c in (coins if isinstance(coins, list) else []) if isinstance(c, dict) and c.get("id")
+        ][:limit]
         _search_cache.set(cache_key, result)
         return True, result, None
     except requests.exceptions.RequestException as exc:
         return False, [], f"Chyba siete pri vyhladavani mincí: {exc}"
-    except (ValueError, KeyError, TypeError) as exc:
+    except (ValueError, KeyError, TypeError, AttributeError, IndexError) as exc:
         return False, [], f"Chyba pri spracovani vysledkov vyhladavania: {exc}"
 
 

@@ -1,0 +1,115 @@
+/** API client: error handling and response normalization. */
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { humanizeError } from "../i18n/errorMessages";
+
+function jsonResponse(body, { status = 200, headers = {} } = {}) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (k) => headers[k] ?? null },
+    json: async () => {
+      if (typeof body === "string") throw new SyntaxError("Unexpected token <");
+      return body;
+    },
+  };
+}
+
+beforeEach(() => {
+  vi.stubGlobal("document", { cookie: "aca_csrf=tok" });
+  vi.stubGlobal("localStorage", { getItem: () => "en", setItem: () => {}, removeItem: () => {} });
+  vi.stubGlobal("window", { dispatchEvent: vi.fn() });
+  vi.stubGlobal("Event", class { constructor(type) { this.type = type; } });
+});
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
+
+async function loadApi(fetchImpl) {
+  vi.stubGlobal("fetch", vi.fn(fetchImpl));
+  vi.resetModules();
+  return (await import("../api")).api;
+}
+
+describe("request errors", () => {
+  it("turns a failed fetch into a friendly network error", async () => {
+    const api = await loadApi(async () => { throw new TypeError("Failed to fetch"); });
+    const err = await api.headlines().catch((e) => e);
+    expect(err.code).toBe("network");
+    expect(humanizeError(err, "en")).toMatch(/connect/i);
+  });
+
+  it("aborts requests that take too long", async () => {
+    vi.useFakeTimers();
+    const api = await loadApi((_url, { signal }) => new Promise((_resolve, reject) => {
+      signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
+    }));
+    const pending = api.headlines().catch((e) => e);
+    await vi.advanceTimersByTimeAsync(61_000);
+    const err = await pending;
+    expect(err.code).toBe("timeout");
+    expect(humanizeError(err, "en")).toMatch(/timed out/i);
+  });
+
+  it("reports a non-JSON success body instead of crashing", async () => {
+    const api = await loadApi(async () => jsonResponse("<html>proxy</html>"));
+    const err = await api.events().catch((e) => e);
+    expect(err.status).toBe(502);
+    expect(humanizeError(err, "en")).not.toBe("");
+  });
+
+  it("keeps a status-based message for non-JSON error pages", async () => {
+    const api = await loadApi(async () => jsonResponse("<html>Bad gateway</html>", { status: 502 }));
+    const err = await api.events().catch((e) => e);
+    expect(err.message).toBe("Server error (502)");
+  });
+});
+
+describe("response normalization", () => {
+  it("always gives list endpoints an array", async () => {
+    const api = await loadApi(async () => jsonResponse({}));
+    expect((await api.headlines()).headlines).toEqual([]);
+    expect((await api.events()).events).toEqual([]);
+    expect((await api.searchCoins("x")).results).toEqual([]);
+    expect((await api.onchain()).items).toEqual([]);
+    expect(await api.listApiKeys()).toEqual([]);
+    const history = await api.portfolioHistory();
+    expect(history.items).toEqual([]);
+    expect(history.total).toBe(0);
+  });
+
+  it("drops malformed history entries and fills nested defaults", async () => {
+    const api = await loadApi(async () => jsonResponse({ items: [{}, null, { id: 3 }], total: 3 }));
+    const res = await api.portfolioHistory();
+    expect(res.items).toEqual([{ id: 3, holdings: [], analysis_data: {} }]);
+  });
+
+  it("marks an AI result without data as unsuccessful", async () => {
+    const api = await loadApi(async () => jsonResponse({ success: true, data: null }));
+    const res = await api.generateForecast("quant", "BTC", "1T");
+    expect(res.success).toBe(false);
+    expect(res.data).toBeNull();
+  });
+
+  it("filters invalid chart points and clamps Fear & Greed", async () => {
+    let call = 0;
+    const api = await loadApi(async () => {
+      call += 1;
+      return call === 1
+        ? jsonResponse({ prices: [[1, 10], [2, null], "x", [3, "11"]] })
+        : jsonResponse({ data: { value: 140, classification: "Extreme Greed" } });
+    });
+    expect((await api.marketChart("bitcoin")).prices).toEqual([[1, 10], [3, 11]]);
+    expect((await api.fearGreed()).data.value).toBe(100);
+  });
+
+  it("returns null Fear & Greed data when the value is missing", async () => {
+    const api = await loadApi(async () => jsonResponse({ data: {} }));
+    expect((await api.fearGreed()).data).toBeNull();
+  });
+});
+
+describe("humanizeError", () => {
+  it("maps a market-history failure to the free-model message", () => {
+    const msg = humanizeError("Chyba pri nacitani historickych dat: HTTPSConnectionPool 403 Forbidden", "en");
+    expect(msg).toMatch(/free model/i);
+  });
+});

@@ -21,10 +21,12 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor_react: ["react", "react-dom", "react-router-dom"],
-          vendor_charts: ["recharts"],
-          vendor_icons: ["lucide-react"],
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id)) return "vendor_react";
+          if (/[\\/]node_modules[\\/](recharts|d3-[^\\/]+|victory-vendor|internmap|decimal\.js-light|eventemitter3|lodash)[\\/]/.test(id)) return "vendor_charts";
+          if (/[\\/]node_modules[\\/]lucide-react[\\/]/.test(id)) return "vendor_icons";
+          return undefined;
         },
       },
     },

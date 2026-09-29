@@ -26,19 +26,25 @@ import { localeForLang } from "../i18n/locale";
 import { copyToClipboard } from "../utils/copyToClipboard";
 import { axisDecimals, buildTimePoints, formatPrice, formatTimeFull, formatTimeShort, formatUsd } from "../utils/formatPrice";
 import { usePageTitle } from "../hooks/usePageTitle";
+import { stripMockTag } from "../utils/mockText";
 
 const COINS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "DOT", "LINK"];
 const HORIZONS = ["24h", "1T", "1M", "1R"];
 
+function hasForecastSeries(data) {
+  return Array.isArray(data?.ceny) && data.ceny.length > 0 && data.ceny.every((p) => Number.isFinite(p));
+}
+
 function ForecastChart({ data, t, actualPrices, createdAt, horizon, locale }) {
   const n = data.ceny.length;
+  const labels = Array.isArray(data.casove_body) ? data.casove_body : [];
   const band = data.pasmo && Array.isArray(data.pasmo.dolne) && Array.isArray(data.pasmo.horne)
     && data.pasmo.dolne.length === n && data.pasmo.horne.length === n ? data.pasmo : null;
   const hasActual = Array.isArray(actualPrices) && actualPrices.length === n;
   const points = buildTimePoints(data.vytvorene || createdAt, horizon, n);
   const startPrice = points && typeof data.aktualna_cena === "number" ? data.aktualna_cena : null;
-  const shortLabel = (i) => (points ? formatTimeShort(points[i], horizon, locale) : data.casove_body[i - 1]);
-  const fullLabel = (i) => (points ? formatTimeFull(points[i], locale) : data.casove_body[i - 1]);
+  const shortLabel = (i) => (points ? formatTimeShort(points[i], horizon, locale) : String(labels[i - 1] ?? i));
+  const fullLabel = (i) => (points ? formatTimeFull(points[i], locale) : String(labels[i - 1] ?? i));
 
   const chartData = [];
   if (startPrice !== null) {
@@ -106,7 +112,7 @@ function HistoryItem({ entry, onDelete }) {
   const [accuracy, setAccuracy] = useState(null);
   const [accuracyLoading, setAccuracyLoading] = useState(false);
   const locale = localeForLang(lang);
-  const hasChart = entry.forecast_data?.ceny && entry.forecast_data?.casove_body;
+  const hasChart = hasForecastSeries(entry.forecast_data);
 
   useEffect(() => {
     if (!open || accuracy || accuracyLoading) return;
@@ -129,7 +135,7 @@ function HistoryItem({ entry, onDelete }) {
     if (entry.forecast_data?.risk_level) lines.push(t("forecast.copyRisk", { level: entry.forecast_data.risk_level }));
     if (entry.forecast_data?.odovodnenie) lines.push("", entry.forecast_data.odovodnenie);
     const ok = await copyToClipboard(lines.join("\n"));
-    push(ok ? t("common.copied") : t("common.copyFailed"), ok ? "success" : "error");
+    push(ok ? t("common.copied") : t("common.copyFailed"), ok ? "success" : "error", { translated: true });
   }
 
   async function handleDelete(e) {
@@ -198,7 +204,7 @@ function HistoryItem({ entry, onDelete }) {
                   {t("forecast.accuracyPending", { date: new Date(accuracy.matures_at).toLocaleDateString(locale) })}
                 </p>
               )}
-              <p className="text-sub" style={{ marginTop: 8 }}>{entry.forecast_data.odovodnenie}</p>
+              <p className="text-sub" style={{ marginTop: 8 }}>{stripMockTag(entry.forecast_data.odovodnenie)}</p>
               <DataSources sources={entry.forecast_data.zdroje_dat} />
             </>
           ) : (
@@ -254,7 +260,7 @@ export default function Forecast() {
   async function loadHistory() {
     setHistoryLoading(true);
     try {
-      const data = await api.forecastHistory(null, 30, 1, HISTORY_PAGE_SIZE);
+      const data = await api.forecastHistory(null, null, 1, HISTORY_PAGE_SIZE);
       setHistory(data.items);
       setHistoryTotal(data.total);
       setHistoryPage(1);
@@ -269,8 +275,8 @@ export default function Forecast() {
     setHistoryLoadingMore(true);
     try {
       const nextPage = historyPage + 1;
-      const data = await api.forecastHistory(null, 30, nextPage, HISTORY_PAGE_SIZE);
-      setHistory((prev) => [...prev, ...data.items]);
+      const data = await api.forecastHistory(null, null, nextPage, HISTORY_PAGE_SIZE);
+      setHistory((prev) => [...prev, ...data.items.filter((n) => !prev.some((p) => p.id === n.id))]);
       setHistoryPage(nextPage);
     } catch (err) {
       push(err, "error");
@@ -319,7 +325,7 @@ export default function Forecast() {
     try {
       const res = await api.generateForecast(provider, coin, horizon);
       if (!res.success || !res.data) {
-        push(res.error_message ? humanizeError(res.error_message, lang) : t("errors.generic"), "error");
+        push(res.error_message || t("errors.generic"), "error");
         return;
       }
       setResult({ ...res, generatedAt: new Date().toISOString(), horizon, coin, provider });
@@ -419,7 +425,7 @@ export default function Forecast() {
                   </div>
                 )}
                 <p style={{ margin: 0, lineHeight: 1.6, fontSize: 13.5, color: "var(--text-secondary)" }}>
-                  {result.data.odovodnenie}
+                  {stripMockTag(result.data.odovodnenie)}
                 </p>
                 <DataSources sources={result.data.zdroje_dat} />
               </Card>
