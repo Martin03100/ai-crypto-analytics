@@ -1,6 +1,6 @@
 /** App routes. */
 
-import { lazy } from "react";
+import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import Landing from "./pages/Landing";
 import { useAuth } from "./context/AuthContext";
@@ -15,6 +15,7 @@ const Portfolio = lazy(() => import("./pages/Portfolio"));
 const Market = lazy(() => import("./pages/Market"));
 const Account = lazy(() => import("./pages/Account"));
 const Settings = lazy(() => import("./pages/Settings"));
+const SharedForecast = lazy(() => import("./pages/SharedForecast"));
 
 function FullScreenLoader() {
   const { t } = useLanguage();
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="/auth" element={user ? <Navigate to="/forecast" replace /> : <Auth />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/share/:token" element={<Suspense fallback={<FullScreenLoader />}><SharedForecast /></Suspense>} />
         <Route
           path="/"
           element={

@@ -1,16 +1,14 @@
 /** Forecast page. */
 
-import { Brain, CheckCircle2, ChevronDown, Copy, Loader2, RefreshCw, Rocket, Save, Sparkles, Trash2 } from "lucide-react";
+import { Brain, CheckCircle2, ChevronDown, Copy, Link2, Loader2, RefreshCw, Rocket, Save, Share2, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  Area, AreaChart, CartesianGrid, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis,
-} from "recharts";
 import { api } from "../api";
 import { AccuracyBadge, ConfidenceBadge, FallbackBadge, MockBadge, RiskBadge } from "../components/Badge";
 import { Card } from "../components/Card";
 import CostConfirmModal from "../components/CostConfirmModal";
 import DataSources from "../components/DataSources";
+import ForecastChart, { hasForecastSeries } from "../components/ForecastChart";
 import InfoTip from "../components/InfoTip";
 import Leaderboard from "../components/Leaderboard";
 import TipBox from "../components/TipBox";
@@ -24,86 +22,12 @@ import { useLanguage } from "../context/LanguageContext";
 import { humanizeError } from "../i18n/errorMessages";
 import { localeForLang } from "../i18n/locale";
 import { copyToClipboard } from "../utils/copyToClipboard";
-import { axisDecimals, buildTimePoints, formatPrice, formatTimeFull, formatTimeShort, formatUsd } from "../utils/formatPrice";
 import { usePageTitle } from "../hooks/usePageTitle";
 import { stripMockTag } from "../utils/mockText";
 import { formatTechDetail } from "../utils/techDetail";
 
 const COINS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "DOT", "LINK"];
 const HORIZONS = ["24h", "1T", "1M", "1R"];
-
-function hasForecastSeries(data) {
-  return Array.isArray(data?.ceny) && data.ceny.length > 0 && data.ceny.every((p) => Number.isFinite(p));
-}
-
-function ForecastChart({ data, t, actualPrices, createdAt, horizon, locale }) {
-  const n = data.ceny.length;
-  const labels = Array.isArray(data.casove_body) ? data.casove_body : [];
-  const band = data.pasmo && Array.isArray(data.pasmo.dolne) && Array.isArray(data.pasmo.horne)
-    && data.pasmo.dolne.length === n && data.pasmo.horne.length === n ? data.pasmo : null;
-  const hasActual = Array.isArray(actualPrices) && actualPrices.length === n;
-  const points = buildTimePoints(data.vytvorene || createdAt, horizon, n);
-  const startPrice = points && typeof data.aktualna_cena === "number" ? data.aktualna_cena : null;
-  const shortLabel = (i) => (points ? formatTimeShort(points[i], horizon, locale) : String(labels[i - 1] ?? i));
-  const fullLabel = (i) => (points ? formatTimeFull(points[i], locale) : String(labels[i - 1] ?? i));
-
-  const chartData = [];
-  if (startPrice !== null) {
-    chartData.push({ t: shortLabel(0), full: `${fullLabel(0)} · ${t("forecast.startPoint")}`, price: startPrice, band: band ? [startPrice, startPrice] : undefined, actual: hasActual ? startPrice : undefined });
-  }
-  data.ceny.forEach((price, idx) => {
-    chartData.push({ t: shortLabel(idx + 1), full: fullLabel(idx + 1), price, band: band ? [band.dolne[idx], band.horne[idx]] : undefined, actual: hasActual ? actualPrices[idx] : undefined });
-  });
-
-  const values = chartData.flatMap((p) => [p.price, p.actual, ...(p.band || [])]).filter((v) => Number.isFinite(v));
-  const minPrice = Math.min(...values);
-  const maxPrice = Math.max(...values);
-  const padding = (maxPrice - minPrice) * 0.05 || maxPrice * 0.05 || 1;
-  const yDomain = [Math.max(0, minPrice - padding), maxPrice + padding];
-  const decimals = axisDecimals(yDomain[0], yDomain[1]);
-
-  const first = chartData[0];
-  const last = chartData[chartData.length - 1];
-  const summary = t("forecast.chartSummary", { from: formatPrice(first.price), to: formatPrice(last.price), start: first.full, end: last.full });
-
-  return (
-    <>
-    <div role="img" aria-label={summary}>
-    <ResponsiveContainer width="100%" height={280}>
-      <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-        <defs>
-          <linearGradient id="priceFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--cyan)" stopOpacity={0.35} />
-            <stop offset="100%" stopColor="var(--cyan)" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-        <XAxis dataKey="t" stroke="var(--text-tertiary)" fontSize={11} tickLine={false} axisLine={false} minTickGap={16} />
-        <YAxis
-          stroke="var(--text-tertiary)" fontSize={11} tickLine={false} axisLine={false} width={84}
-          domain={yDomain} tickFormatter={(v) => formatUsd(v, decimals)}
-        />
-        <Tooltip
-          contentStyle={{ background: "var(--bg-tooltip)", border: "1px solid var(--border-strong)", borderRadius: 10, fontSize: 12, color: "var(--text-primary)" }}
-          labelStyle={{ color: "var(--text-secondary)" }}
-          formatter={(v, name) => (name === "band" && Array.isArray(v)
-            ? [`${formatPrice(v[0])} – ${formatPrice(v[1])}`, t("forecast.legendBand")]
-            : [formatPrice(v), name === "price" ? t("forecast.legendPredicted") : name === "actual" ? t("forecast.legendActual") : name])}
-          labelFormatter={(label, payload) => t("forecast.timeTooltip", { label: payload?.[0]?.payload?.full || label })}
-        />
-        {hasActual && <Legend formatter={(value) => (value === "price" ? t("forecast.legendPredicted") : value === "band" ? t("forecast.legendBand") : t("forecast.legendActual"))} wrapperStyle={{ fontSize: 12 }} />}
-        {band && <Area type="monotone" dataKey="band" name="band" stroke="none" fill="var(--cyan)" fillOpacity={0.14} isAnimationActive={false} />}
-        <Area type="monotone" dataKey="price" stroke="var(--cyan-fg)" strokeWidth={2.5} fill="url(#priceFill)" dot={{ r: 3, fill: "var(--cyan-fg)" }} />
-        {hasActual && (
-          <Line type="monotone" dataKey="actual" stroke="var(--amber-fg)" strokeWidth={2.5} strokeDasharray="6 3" dot={{ r: 3.5, fill: "var(--amber-fg)" }} />
-        )}
-      </AreaChart>
-    </ResponsiveContainer>
-    </div>
-    {band && <p className="text-sub" style={{ marginTop: 6 }}>{t("forecast.bandNote", { vol: data.denna_volatilita_pct ?? "—" })}</p>}
-    </>
-  );
-}
 
 function HistoryItem({ entry, onDelete }) {
   const { push } = useToast();
@@ -112,8 +36,11 @@ function HistoryItem({ entry, onDelete }) {
   const [open, setOpen] = useState(false);
   const [accuracy, setAccuracy] = useState(null);
   const [accuracyLoading, setAccuracyLoading] = useState(false);
+  const [shareToken, setShareToken] = useState(entry.share_token || null);
   const locale = localeForLang(lang);
   const hasChart = hasForecastSeries(entry.forecast_data);
+  const canShare = entry.model_used !== "mock";
+  const shareUrl = shareToken ? `${window.location.origin}/share/${shareToken}` : null;
 
   useEffect(() => {
     if (!open || accuracy || accuracyLoading) return;
@@ -137,6 +64,30 @@ function HistoryItem({ entry, onDelete }) {
     if (entry.forecast_data?.odovodnenie) lines.push("", entry.forecast_data.odovodnenie);
     const ok = await copyToClipboard(lines.join("\n"));
     push(ok ? t("common.copied") : t("common.copyFailed"), ok ? "success" : "error", { translated: true });
+  }
+
+  async function handleShare(e) {
+    e.stopPropagation();
+    try {
+      const token = shareToken || (await api.shareForecast(entry.id)).share_token;
+      setShareToken(token);
+      const ok = await copyToClipboard(`${window.location.origin}/share/${token}`);
+      push(t(ok ? "share.linkCopied" : "share.linkCreated"), "success");
+    } catch (err) {
+      push(err, "error");
+    }
+  }
+
+  async function handleUnshare() {
+    const ok = await confirm(t("share.revokeConfirm"));
+    if (!ok) return;
+    try {
+      await api.unshareForecast(entry.id);
+      setShareToken(null);
+      push(t("share.revoked"), "success");
+    } catch (err) {
+      push(err, "error");
+    }
   }
 
   async function handleDelete(e) {
@@ -168,12 +119,22 @@ function HistoryItem({ entry, onDelete }) {
         </span>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
           <span className="btn btn-ghost btn-sm" onClick={handleCopy} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleCopy(e); } }} title={t("common.copy")} aria-label={t("common.copy")} role="button" tabIndex={0}><Copy size={12} /></span>
+          {canShare && (
+            <span className={`btn btn-ghost btn-sm ${shareToken ? "is-shared" : ""}`} onClick={handleShare} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleShare(e); } }} title={t("share.button")} aria-label={t("share.button")} role="button" tabIndex={0}><Share2 size={12} /></span>
+          )}
           <span className="btn btn-danger-ghost btn-sm" onClick={handleDelete} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleDelete(e); } }} title={t("common.delete")} aria-label={t("common.delete")} role="button" tabIndex={0}><Trash2 size={12} /></span>
           <ChevronDown size={16} style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
         </span>
       </button>
       {open && (
         <div style={{ padding: "0 18px 18px" }}>
+          {shareUrl && (
+            <div className="share-row">
+              <Link2 size={13} />
+              <a href={shareUrl} target="_blank" rel="noreferrer" className="mono share-url">{shareUrl}</a>
+              <button className="btn btn-danger-ghost btn-sm" onClick={handleUnshare}>{t("share.revoke")}</button>
+            </div>
+          )}
           {hasChart ? (
             <>
               <ForecastChart data={entry.forecast_data} t={t} createdAt={entry.created_at} horizon={entry.timeframe} locale={locale} actualPrices={accuracy?.status === "completed" ? accuracy.actual_prices : undefined} />

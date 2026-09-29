@@ -175,6 +175,9 @@ export const api = {
   totpEnable: (code) => request("/account/2fa/enable", { method: "POST", body: { code } }),
   totpDisable: (password, code) => request("/account/2fa/disable", { method: "POST", body: { password, code } }),
   updateEmail: (email) => request("/account/email", { method: "PUT", body: { email } }),
+  shareForecast: (id) => request(`/forecast/history/${id}/share`, { method: "POST" }).then(obj),
+  unshareForecast: (id) => request(`/forecast/history/${id}/share`, { method: "DELETE" }),
+  sharedForecast: (token) => request(`/public/forecasts/${encodeURIComponent(token)}`).then(obj),
   accountActivity: () => request("/account/activity").then((r) => withArrays(r, ["events"])),
 
   generateForecast: (provider, coin, horizon) =>

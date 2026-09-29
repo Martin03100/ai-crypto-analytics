@@ -562,5 +562,17 @@
   "activity.action.twofa_disabled": "Vypnuté 2FA",
   "activity.action.share_created": "Zdieľanie predikcie",
   "activity.action.share_revoked": "Zrušené zdieľanie predikcie",
-  "activity.action.demo_data_loaded": "Načítané demo dáta"
+  "activity.action.demo_data_loaded": "Načítané demo dáta",
+  "share.button": "Zdieľať odkaz",
+  "share.linkCopied": "Odkaz na predikciu je skopírovaný do schránky.",
+  "share.linkCreated": "Odkaz na zdieľanie bol vytvorený.",
+  "share.revoke": "Zrušiť zdieľanie",
+  "share.revokeConfirm": "Zrušiť zdieľanie? Odkaz prestane fungovať pre každého, komu si ho poslal(a).",
+  "share.revoked": "Zdieľanie bolo zrušené.",
+  "share.pageTitle": "Zdieľaná predikcia",
+  "share.backToApp": "AI Crypto Analytics",
+  "share.notFound": "Táto predikcia neexistuje alebo jej zdieľanie bolo zrušené.",
+  "share.createdAt": "Vytvorená {date}",
+  "share.notEvaluatedYet": "Presnosť sa vyhodnotí po uplynutí horizontu predikcie.",
+  "share.disclaimer": "Predikcia je len informatívna a nie je investičným odporúčaním."
 }

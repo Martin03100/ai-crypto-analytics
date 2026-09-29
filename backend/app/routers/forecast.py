@@ -8,7 +8,9 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+import secrets
+
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -22,6 +24,7 @@ from app.schemas import MAX_DB_ID
 from app.schemas import (
     AIResultOut, CostEstimateOut, ForecastAccuracyOut, ForecastHistoryOut, ForecastRequest, PaginatedForecastHistory, SaveForecastRequest, TipRequest, BulkDeleteRequest,
 )
+from app.services import audit
 from app.services.ai_engine import compute_forecast_accuracy, estimate_forecast_cost, get_coin_forecast
 
 router = APIRouter(prefix="/api/forecast", tags=["forecast"])
@@ -110,6 +113,37 @@ def delete_forecast(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], user: Us
     return {"success": True}
 
 
+def _own_forecast(db: Session, user: User, entry_id: int) -> ForecastHistory:
+    row = db.query(ForecastHistory).filter(ForecastHistory.id == entry_id, ForecastHistory.user_id == user.id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Uložená analýza nebola nájdená.")
+    return row
+
+
+@router.post("/history/{entry_id}/share")
+def share_forecast(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], request: Request,
+                   user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    row = _own_forecast(db, user, entry_id)
+    if row.model_used == "mock":
+        raise HTTPException(status_code=400, detail="Ukážkové dáta sa nedajú zdieľať, nie sú to skutočná predikcia.")
+    if not row.share_token:
+        row.share_token = secrets.token_urlsafe(24)
+        audit.record(db, user.id, "share_created", request, f"{row.crypto_symbol} {row.timeframe}")
+        db.commit()
+    return {"share_token": row.share_token}
+
+
+@router.delete("/history/{entry_id}/share")
+def unshare_forecast(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], request: Request,
+                     user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    row = _own_forecast(db, user, entry_id)
+    if row.share_token:
+        row.share_token = None
+        audit.record(db, user.id, "share_revoked", request, f"{row.crypto_symbol} {row.timeframe}")
+        db.commit()
+    return {"success": True}
+
+
 @router.get("/history/{entry_id}/accuracy", response_model=ForecastAccuracyOut,
             dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
 def get_forecast_accuracy(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], user: User = Depends(get_current_user),
@@ -172,6 +206,7 @@ def get_history(symbol: Optional[str] = Query(default=None, max_length=16),
         items.append(ForecastHistoryOut(
             id=row.id, crypto_symbol=row.crypto_symbol, timeframe=row.timeframe,
             model_used=row.model_used, forecast_data=forecast_data, created_at=row.created_at,
+            share_token=row.share_token,
         ))
     return PaginatedForecastHistory(items=items, total=total, page=page, page_size=page_size)
 

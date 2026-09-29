@@ -64,6 +64,8 @@ class ForecastHistory(Base):
     model_used: Mapped[str] = mapped_column(String(32), nullable=False)
     forecast_json: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, index=True)
+    # Random, unguessable token for the public read-only link; None = not shared.
+    share_token: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, default=None, index=True)
 
     user: Mapped["User"] = relationship(back_populates="forecasts")
 

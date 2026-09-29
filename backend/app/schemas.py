@@ -142,6 +142,7 @@ class ForecastHistoryOut(BaseModel):
     model_used: str
     forecast_data: Dict[str, Any]
     created_at: datetime
+    share_token: Optional[str] = None
 
     @field_serializer("created_at")
     def _utc_created_at(self, value: datetime) -> str:

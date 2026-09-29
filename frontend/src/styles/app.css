@@ -939,3 +939,15 @@ select.select { appearance: none; background-image: url("data:image/svg+xml;utf8
   .activity-row { grid-template-columns: 1fr; gap: 2px; }
   .activity-device { text-align: left; }
 }
+
+/* Standalone public pages (shared forecast, about, status) */
+.standalone-page { min-height: 100vh; padding: 40px 20px 60px; max-width: 860px; margin: 0 auto; }
+.standalone-back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 20px; }
+.standalone-title { font-size: 24px; margin: 0 0 18px; }
+.standalone-disclaimer { margin-top: 18px; font-size: 12px; }
+
+/* Share link row in forecast history */
+.share-row { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 8px 10px;
+  background: var(--bg-inset); border-radius: var(--radius-sm); font-size: 12px; color: var(--text-secondary); }
+.share-url { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--cyan-fg); }
+.btn.is-shared { color: var(--cyan-fg); }

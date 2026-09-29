@@ -14,7 +14,7 @@ from app.config import APP_ENV, APP_TITLE, CORS_ORIGINS, validate_production_con
 from app.csrf import CSRFMiddleware
 from app.database import SessionLocal, init_db
 from app.logging_config import configure_logging
-from app.routers import account, auth, chat, forecast, market, portfolio
+from app.routers import account, auth, chat, forecast, market, portfolio, public
 from app.request_guard import RequestGuardMiddleware
 from app.security_headers import SecurityHeadersMiddleware
 
@@ -64,6 +64,7 @@ app.include_router(forecast.router)
 app.include_router(portfolio.router)
 app.include_router(market.router)
 app.include_router(chat.router)
+app.include_router(public.router)
 
 
 @app.get("/api/health")

@@ -562,5 +562,17 @@
   "activity.action.twofa_disabled": "2FA disabled",
   "activity.action.share_created": "Forecast shared",
   "activity.action.share_revoked": "Forecast sharing revoked",
-  "activity.action.demo_data_loaded": "Demo data loaded"
+  "activity.action.demo_data_loaded": "Demo data loaded",
+  "share.button": "Share link",
+  "share.linkCopied": "Forecast link copied to clipboard.",
+  "share.linkCreated": "Share link created.",
+  "share.revoke": "Stop sharing",
+  "share.revokeConfirm": "Stop sharing? The link will stop working for everyone you sent it to.",
+  "share.revoked": "Sharing stopped.",
+  "share.pageTitle": "Shared forecast",
+  "share.backToApp": "AI Crypto Analytics",
+  "share.notFound": "This forecast does not exist or is no longer shared.",
+  "share.createdAt": "Created {date}",
+  "share.notEvaluatedYet": "Accuracy is evaluated once the forecast horizon has passed.",
+  "share.disclaimer": "This forecast is for information only and is not investment advice."
 }
