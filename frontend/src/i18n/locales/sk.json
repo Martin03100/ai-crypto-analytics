@@ -538,5 +538,10 @@
   "common.loadFailed": "Tieto dáta sa nepodarilo načítať.",
   "errors.aiFallback": "AI provider tentoraz nevrátil výsledok, preto sa zobrazujú ukážkové dáta. Skús to o chvíľu znova.",
   "errors.providerBadRequest": "AI provider odmietol požiadavku. Skontroluj nastavenie modelu alebo skús iného providera.",
-  "forecast.technicalDetail": "Technický detail"
+  "forecast.technicalDetail": "Technický detail",
+  "badge.quantFallback": "ŠTATISTICKÝ MODEL (ZÁLOHA)",
+  "forecast.quantFallback": "AI provider nevrátil výsledok, preto predikciu vytvoril bezplatný štatistický model z reálnych dát.",
+  "onchain.whalesUnavailable": "Údaje o presunoch veľrýb sú momentálne nedostupné.",
+  "market.noEvents": "V najbližšom období nie sú naplánované žiadne sledované udalosti.",
+  "market.eventsSource": "Zdroj: Federal Reserve (FOMC), U.S. Bureau of Labor Statistics (CPI)"
 }

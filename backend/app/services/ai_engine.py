@@ -45,16 +45,19 @@ from app.i18n_content import (
 
 class AIEngineResult:
     def __init__(self, success: bool, data: Optional[Dict[str, Any]], is_mock: bool,
-                 error_message: Optional[str] = None) -> None:
+                 error_message: Optional[str] = None, provider_used: Optional[str] = None) -> None:
         self.success = success
         self.data = data
         self.is_mock = is_mock
         self.error_message = error_message
+        # Set when a different provider than the requested one produced the data (e.g. quant fallback).
+        self.provider_used = provider_used
 
     def as_dict(self) -> Dict[str, Any]:
         return {
             "success": self.success, "data": self.data,
             "is_mock": self.is_mock, "error_message": self.error_message,
+            "provider_used": self.provider_used,
         }
 
 
@@ -588,6 +591,15 @@ def compute_forecast_accuracy(coin: str, timeframe: str, predicted_prices: List[
             "baseline_accuracy_pct": baseline_pct, "direction_correct": direction_correct}
 
 
+def _forecast_fallback(coin: str, horizon: str, lang: str, reason: Optional[str]) -> AIEngineResult:
+    """AI provider failed (quota, outage, unusable output): prefer the free statistical model,
+    which works on real market data, over sample data. Sample data stays the last resort."""
+    ok, data, _quant_error = quant_engine.build_quant_forecast(coin, horizon, lang)
+    if ok and data:
+        return AIEngineResult(True, data, False, reason, provider_used=QUANT_PROVIDER)
+    return AIEngineResult(True, _generate_mock_forecast(coin, horizon, lang), True, reason)
+
+
 def get_coin_forecast(provider: str, coin: str, horizon: str, api_key: Optional[str], lang: str = "en") -> AIEngineResult:
     if provider == QUANT_PROVIDER:
         ok, data, error = quant_engine.build_quant_forecast(coin, horizon, lang)
@@ -604,11 +616,11 @@ def get_coin_forecast(provider: str, coin: str, horizon: str, api_key: Optional[
     prompt = build_forecast_prompt(coin, horizon, points, market_context) + language_instruction(lang)
     success, raw_text, call_error = call_ai_provider(provider, prompt, api_key)
     if not success:
-        return AIEngineResult(True, _generate_mock_forecast(coin, horizon, lang), True, call_error)
+        return _forecast_fallback(coin, horizon, lang, call_error)
 
     is_valid, parsed, validation_error = validate_forecast_payload(raw_text, expected_points=points)
     if not is_valid or parsed is None:
-        return AIEngineResult(True, _generate_mock_forecast(coin, horizon, lang), True, validation_error)
+        return _forecast_fallback(coin, horizon, lang, validation_error)
 
     parsed["zdroje_dat"] = sources_used
     parsed["vytvorene"] = datetime.now(timezone.utc).isoformat()

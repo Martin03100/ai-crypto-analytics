@@ -538,5 +538,10 @@
   "common.loadFailed": "Couldn't load this data.",
   "errors.aiFallback": "The AI provider couldn't produce a result this time, so demo data is shown. Try again in a moment.",
   "errors.providerBadRequest": "The AI provider rejected the request. Check the model settings or try another provider.",
-  "forecast.technicalDetail": "Technical detail"
+  "forecast.technicalDetail": "Technical detail",
+  "badge.quantFallback": "STATISTICAL MODEL (FALLBACK)",
+  "forecast.quantFallback": "The AI provider returned no result, so the free statistical model built this forecast from real market data.",
+  "onchain.whalesUnavailable": "Whale transfer data is currently unavailable.",
+  "market.noEvents": "No tracked events are scheduled in the near future.",
+  "market.eventsSource": "Source: Federal Reserve (FOMC), U.S. Bureau of Labor Statistics (CPI)"
 }

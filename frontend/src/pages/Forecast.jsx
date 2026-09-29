@@ -7,7 +7,7 @@ import {
   Area, AreaChart, CartesianGrid, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 import { api } from "../api";
-import { AccuracyBadge, ConfidenceBadge, MockBadge, RiskBadge } from "../components/Badge";
+import { AccuracyBadge, ConfidenceBadge, FallbackBadge, MockBadge, RiskBadge } from "../components/Badge";
 import { Card } from "../components/Card";
 import CostConfirmModal from "../components/CostConfirmModal";
 import DataSources from "../components/DataSources";
@@ -329,8 +329,13 @@ export default function Forecast() {
         push(res.error_message || t("errors.generic"), "error");
         return;
       }
-      setResult({ ...res, generatedAt: new Date().toISOString(), horizon, coin, provider });
-      if (res.is_mock) push(res.error_message ? humanizeError(res.error_message, lang, "errors.aiFallback") : t("forecast.mockNotice"), "warn");
+      // provider_used is set when the backend fell back to the free statistical model;
+      // the result must then be saved and labelled as that model, not the requested one.
+      const usedProvider = res.provider_used || provider;
+      const fallbackFrom = res.provider_used && res.provider_used !== provider ? provider : null;
+      setResult({ ...res, generatedAt: new Date().toISOString(), horizon, coin, provider: usedProvider, fallbackFrom });
+      if (fallbackFrom) push(t("forecast.quantFallback"), "warn");
+      else if (res.is_mock) push(res.error_message ? humanizeError(res.error_message, lang, "errors.aiFallback") : t("forecast.mockNotice"), "warn");
     } catch (err) {
       push(err, "error");
     } finally {
@@ -414,7 +419,8 @@ export default function Forecast() {
             <div style={{ marginTop: 20 }}>
               <Card title={`${t("forecast.chartTitlePrefix")}: ${result.coin}`} icon={Sparkles} glow="cyan">
                 {result.is_mock && <div style={{ marginBottom: 12 }}><MockBadge /></div>}
-                {result.is_mock && result.error_message && (
+                {result.fallbackFrom && <div style={{ marginBottom: 12 }}><FallbackBadge /></div>}
+                {(result.is_mock || result.fallbackFrom) && result.error_message && (
                   <details className="tech-detail">
                     <summary>{t("forecast.technicalDetail")}</summary>
                     <code>{formatTechDetail(result.error_message)}</code>

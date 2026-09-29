@@ -132,6 +132,7 @@ class AIResultOut(BaseModel):
     data: Optional[Dict[str, Any]] = None
     is_mock: bool = False
     error_message: Optional[str] = None
+    provider_used: Optional[str] = None
 
 
 class ForecastHistoryOut(BaseModel):

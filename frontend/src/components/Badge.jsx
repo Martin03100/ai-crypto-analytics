@@ -68,3 +68,8 @@ export function MockBadge() {
   const { t } = useLanguage();
   return <span className="badge badge-mock">{t("badge.mock")}</span>;
 }
+
+export function FallbackBadge() {
+  const { t } = useLanguage();
+  return <span className="badge badge-hold">{t("badge.quantFallback")}</span>;
+}

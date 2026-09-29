@@ -50,7 +50,10 @@ def generate_forecast(payload: ForecastRequest, user: User = Depends(get_current
     api_key = None if payload.provider == QUANT_PROVIDER else get_decrypted_api_key(db, user.id, payload.provider)
     result = get_coin_forecast(payload.provider, payload.coin, payload.horizon, api_key, payload.lang)
     if result.success and result.data and not result.is_mock:
-        result.data["podpis"] = sign_forecast(user.id, payload.provider, payload.coin, payload.horizon,
+        # Sign for the provider that actually produced the data, so a quant fallback
+        # can only be saved (and scored on the leaderboard) as the quant model.
+        signed_provider = result.provider_used or payload.provider
+        result.data["podpis"] = sign_forecast(user.id, signed_provider, payload.coin, payload.horizon,
                                               result.data["ceny"], str(result.data.get("vytvorene", "")))
     return AIResultOut(**result.as_dict())
 
