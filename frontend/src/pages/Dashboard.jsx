@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import { ConfidenceBadge, RiskBadge } from "../components/Badge";
 import { Card } from "../components/Card";
+import DailyDigest from "../components/DailyDigest";
 import InfoTip from "../components/InfoTip";
 import { SkeletonLines } from "../components/Skeleton";
 import { useAuth } from "../context/AuthContext";
@@ -13,6 +14,7 @@ import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../context/ToastContext";
 import { localeForLang } from "../i18n/locale";
 import { formatPrice } from "../utils/formatPrice";
+import { stripMockTag } from "../utils/mockText";
 import { usePageTitle } from "../hooks/usePageTitle";
 
 function QuickLink({ to, icon: Icon, label, sub }) {
@@ -38,6 +40,7 @@ export default function Dashboard() {
   const [lastForecast, setLastForecast] = useState(null);
   const [lastPortfolio, setLastPortfolio] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [fgError, setFgError] = useState(false);
   const locale = localeForLang(lang);
 
   useEffect(() => {
@@ -47,6 +50,7 @@ export default function Dashboard() {
       api.portfolioHistory(),
     ]).then(([fgRes, forecastRes, portfolioRes]) => {
       if (fgRes.status === "fulfilled") setFg(fgRes.value.data);
+      else setFgError(true);
       if (forecastRes.status === "fulfilled" && forecastRes.value.items.length > 0) setLastForecast(forecastRes.value.items[0]);
       if (portfolioRes.status === "fulfilled" && portfolioRes.value.items.length > 0) setLastPortfolio(portfolioRes.value.items[0]);
     }).finally(() => setLoading(false));
@@ -57,6 +61,7 @@ export default function Dashboard() {
     try {
       const res = await api.fearGreed(true);
       setFg(res.data);
+      setFgError(false);
       push(t("dashboard.fearGreedRefreshed"), "success");
     } catch (err) {
       push(err, "error");
@@ -73,10 +78,12 @@ export default function Dashboard() {
     <div>
       <div className="topbar">
         <div>
-          <h1 className="page-title">{greeting}, {user?.username} 👋</h1>
+          <h1 className="page-title">{greeting}, {user?.username}</h1>
           <p className="page-sub">{t("dashboard.subtitle")}</p>
         </div>
       </div>
+
+      <DailyDigest />
 
       <div className="grid grid-3" style={{ marginBottom: 20 }}>
         <QuickLink to="/forecast" icon={Sparkles} label={t("dashboard.quickForecastLabel")} sub={t("dashboard.quickForecastSub")} />
@@ -109,7 +116,11 @@ export default function Dashboard() {
                 <Link to="/forecast" className="btn btn-ghost btn-sm">{t("dashboard.viewHistory")} <ArrowRight size={13} /></Link>
               </>
             ) : (
-              <p className="empty-state">{t("dashboard.emptyForecast")} <Link to="/forecast" className="key-link">{t("common.createFirst")}</Link></p>
+              <div className="empty-cta">
+                <div className="empty-cta-icon"><Sparkles size={18} /></div>
+                <p>{t("dashboard.emptyForecast")}</p>
+                <Link to="/forecast" className="btn btn-ghost btn-sm">{t("common.createFirst")}</Link>
+              </div>
             )}
           </Card>
 
@@ -124,10 +135,25 @@ export default function Dashboard() {
                 <Link to="/portfolio" className="btn btn-ghost btn-sm">{t("dashboard.viewHistory")} <ArrowRight size={13} /></Link>
               </>
             ) : (
-              <p className="empty-state">{t("dashboard.emptyPortfolio")} <Link to="/portfolio" className="key-link">{t("common.createFirst")}</Link></p>
+              <div className="empty-cta">
+                <div className="empty-cta-icon"><Wallet size={18} /></div>
+                <p>{t("dashboard.emptyPortfolio")}</p>
+                <Link to="/portfolio" className="btn btn-ghost btn-sm">{t("common.createFirst")}</Link>
+              </div>
             )}
           </Card>
         </div>
+      )}
+
+      {!loading && !fg && fgError && (
+        <Card id="tour-feargreed-card" title={t("dashboard.fearGreedTitle")} icon={Gauge}>
+          <div className="inline-error" role="alert">
+            <span>{t("dashboard.fearGreedError")}</span>
+            <button className="btn btn-ghost btn-sm" onClick={handleRefreshFg} disabled={refreshingFg}>
+              <RefreshCw size={13} className={refreshingFg ? "spin" : ""} /> {t("common.retry")}
+            </button>
+          </div>
+        </Card>
       )}
 
       {fg && (
@@ -147,7 +173,7 @@ export default function Dashboard() {
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div className="metric-value mono" style={{ fontSize: 32 }}>{fg.value}</div>
             <div>
-              <div style={{ fontWeight: 600 }}>{fg.classification}</div>
+              <div style={{ fontWeight: 600 }}>{stripMockTag(fg.classification)}</div>
               <Link to="/market" className="key-link">{t("dashboard.detailedMarket")}</Link>
             </div>
           </div>

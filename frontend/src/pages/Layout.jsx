@@ -4,7 +4,6 @@ import { Menu } from "lucide-react";
 import { Suspense, useCallback, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import ChatWidget from "../components/ChatWidget";
-import DailyDigest from "../components/DailyDigest";
 import OnboardingTour from "../components/OnboardingTour";
 import Sidebar from "../components/Sidebar";
 import ShortcutsHelp from "../components/ShortcutsHelp";
@@ -44,8 +43,6 @@ export default function Layout() {
         <button className="mobile-menu-btn" onClick={() => setMenuOpen(true)} aria-label={t("common.openMenu")}>
           <Menu size={18} />
         </button>
-
-        <DailyDigest />
 
         <Suspense fallback={<ContentLoader />}>
           <PageTransition>

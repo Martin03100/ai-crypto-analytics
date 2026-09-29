@@ -1,7 +1,7 @@
 /** Interactive price chart. */
 
 import { priceAxisDecimals } from "../utils/formatPrice";
-import { LineChart } from "lucide-react";
+import { LineChart, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, Bar, Brush, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { macdSeries, rsiSeries } from "../utils/indicators";
@@ -44,20 +44,23 @@ export default function PriceChart() {
   const [raw, setRaw] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isMock, setIsMock] = useState(false);
+  const [error, setError] = useState(false);
+  const [reloadTick, setReloadTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setError(false);
     api.marketChart(coinId, vsCurrency, timeframe)
       .then((res) => {
         if (cancelled) return;
         setRaw(res.prices || []);
         setIsMock(res.is_mock);
       })
-      .catch(() => { if (!cancelled) setRaw([]); })
+      .catch(() => { if (!cancelled) { setRaw([]); setError(true); } })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [coinId, timeframe, vsCurrency]);
+  }, [coinId, timeframe, vsCurrency, reloadTick]);
 
   const chartData = useMemo(() => {
     if (!raw || raw.length === 0) return [];
@@ -94,18 +97,20 @@ export default function PriceChart() {
             </button>
           ))}
         </div>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--text-secondary)", cursor: "pointer", marginLeft: "auto" }}>
-          <input type="checkbox" checked={showSma} onChange={(e) => setShowSma(e.target.checked)} />
-          {t("chart.smaIndicator")} <InfoTip text={t("help.sma")} />
-        </label>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--text-secondary)", cursor: "pointer" }}>
-          <input type="checkbox" checked={showRsi} onChange={(e) => setShowRsi(e.target.checked)} />
-          RSI <InfoTip text={t("help.rsi")} />
-        </label>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--text-secondary)", cursor: "pointer" }}>
-          <input type="checkbox" checked={showMacd} onChange={(e) => setShowMacd(e.target.checked)} />
-          MACD <InfoTip text={t("help.macd")} />
-        </label>
+        <div className="chart-toggles">
+          <label>
+            <input type="checkbox" checked={showSma} onChange={(e) => setShowSma(e.target.checked)} />
+            {t("chart.smaIndicator")} <InfoTip text={t("help.sma")} />
+          </label>
+          <label>
+            <input type="checkbox" checked={showRsi} onChange={(e) => setShowRsi(e.target.checked)} />
+            RSI <InfoTip text={t("help.rsi")} />
+          </label>
+          <label>
+            <input type="checkbox" checked={showMacd} onChange={(e) => setShowMacd(e.target.checked)} />
+            MACD <InfoTip text={t("help.macd")} />
+          </label>
+        </div>
       </div>
 
       {loading && <SkeletonChart />}
@@ -171,7 +176,14 @@ export default function PriceChart() {
           </p>
         </>
       )}
-      {!loading && chartData.length === 0 && <p className="text-sub">{t("chart.loadError")}</p>}
+      {!loading && chartData.length === 0 && (
+        <div className="inline-error" role={error ? "alert" : undefined}>
+          <span>{t("chart.loadError")}</span>
+          <button className="btn btn-ghost btn-sm" onClick={() => setReloadTick((n) => n + 1)}>
+            <RefreshCw size={13} /> {t("common.retry")}
+          </button>
+        </div>
+      )}
     </Card>
   );
 }

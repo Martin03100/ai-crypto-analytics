@@ -347,9 +347,9 @@
   "market.title": "Trhový Sentiment & Komunita",
   "market.trendingTitle": "Trending Narratives",
   "market.updated": "Aktualizované: {date} · index sa prepočítava raz denne",
-  "market.voteBearish": "🔴 Klesajúci",
-  "market.voteBullish": "🟢 Rastúci",
-  "market.voteNeutral": "⚪ Neutrálny",
+  "market.voteBearish": "Klesajúci",
+  "market.voteBullish": "Rastúci",
+  "market.voteNeutral": "Neutrálny",
   "market.voteRecorded": "Tvoj hlas bol zaznamenaný.",
   "market.votedTotal": "Celkovo hlasovalo:",
   "market.votedUsers": "používateľov",
@@ -532,5 +532,7 @@
   "verify.resent": "Poslali sme ti nový kód.",
   "verify.submit": "Overiť",
   "verify.success": "Email overený. Vitaj!",
-  "verify.title": "Over si email"
+  "verify.title": "Over si email",
+  "common.retry": "Skúsiť znova",
+  "dashboard.fearGreedError": "Index strachu a chamtivosti sa nepodarilo načítať."
 }

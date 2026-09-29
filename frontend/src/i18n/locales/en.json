@@ -347,9 +347,9 @@
   "market.title": "Market Sentiment & Community",
   "market.trendingTitle": "Trending Narratives",
   "market.updated": "Updated: {date} · the index recalculates once a day",
-  "market.voteBearish": "🔴 Bearish",
-  "market.voteBullish": "🟢 Bullish",
-  "market.voteNeutral": "⚪ Neutral",
+  "market.voteBearish": "Bearish",
+  "market.voteBullish": "Bullish",
+  "market.voteNeutral": "Neutral",
   "market.voteRecorded": "Your vote has been recorded.",
   "market.votedTotal": "Total votes:",
   "market.votedUsers": "users",
@@ -532,5 +532,7 @@
   "verify.resent": "We sent you a new code.",
   "verify.submit": "Verify",
   "verify.success": "Email verified. Welcome!",
-  "verify.title": "Verify your email"
+  "verify.title": "Verify your email",
+  "common.retry": "Try again",
+  "dashboard.fearGreedError": "Couldn't load the Fear & Greed Index."
 }

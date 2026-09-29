@@ -16,6 +16,7 @@ import { useLanguage } from "../context/LanguageContext";
 import { humanizeError } from "../i18n/errorMessages";
 import { safeUrl } from "../utils/safeUrl";
 import { localeForLang } from "../i18n/locale";
+import { stripMockTag } from "../utils/mockText";
 import { usePageTitle } from "../hooks/usePageTitle";
 
 function FearGreedGauge({ value, classification }) {
@@ -25,10 +26,10 @@ function FearGreedGauge({ value, classification }) {
     <div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 10 }}>
         <span className="metric-value mono" style={{ color }}>{value}/100</span>
-        <span className="text-sub">{classification}</span>
+        <span className="text-sub">{stripMockTag(classification)}</span>
       </div>
       <div style={{ height: 8, borderRadius: 999, background: "var(--bg-inset)", overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 999, transition: "width 0.4s var(--ease)" }} />
+        <div style={{ height: "100%", width: "100%", background: color, borderRadius: 999, transformOrigin: "left", transform: `scaleX(${pct / 100})`, transition: "transform 0.4s var(--ease)" }} />
       </div>
     </div>
   );
@@ -135,9 +136,9 @@ export default function Market() {
         <Card title={t("market.communityTitle")} icon={Vote}>
           {myVote && <p className="text-sub" style={{ marginTop: -4, marginBottom: 10 }}>{t("market.myLastVote")} <SentimentBadge sentiment={myVote} /></p>}
           <div className="grid grid-3" style={{ gap: 8, marginBottom: 14 }}>
-            <button className={`btn btn-sm ${myVote === "Bullish" ? "btn-primary" : "btn-ghost"}`} onClick={() => castVote("Bullish")} aria-pressed={myVote === "Bullish"}>{t("market.voteBullish")}</button>
-            <button className={`btn btn-sm ${myVote === "Neutral" ? "btn-primary" : "btn-ghost"}`} onClick={() => castVote("Neutral")} aria-pressed={myVote === "Neutral"}>{t("market.voteNeutral")}</button>
-            <button className={`btn btn-sm ${myVote === "Bearish" ? "btn-primary" : "btn-ghost"}`} onClick={() => castVote("Bearish")} aria-pressed={myVote === "Bearish"}>{t("market.voteBearish")}</button>
+            <button className={`btn btn-sm ${myVote === "Bullish" ? "btn-primary" : "btn-ghost"}`} onClick={() => castVote("Bullish")} aria-pressed={myVote === "Bullish"}><span className="vote-dot vote-dot-emerald" aria-hidden="true" />{t("market.voteBullish")}</button>
+            <button className={`btn btn-sm ${myVote === "Neutral" ? "btn-primary" : "btn-ghost"}`} onClick={() => castVote("Neutral")} aria-pressed={myVote === "Neutral"}><span className="vote-dot vote-dot-muted" aria-hidden="true" />{t("market.voteNeutral")}</button>
+            <button className={`btn btn-sm ${myVote === "Bearish" ? "btn-primary" : "btn-ghost"}`} onClick={() => castVote("Bearish")} aria-pressed={myVote === "Bearish"}><span className="vote-dot vote-dot-crimson" aria-hidden="true" />{t("market.voteBearish")}</button>
           </div>
           {percentages && percentages.total_votes > 0 ? (
             <>

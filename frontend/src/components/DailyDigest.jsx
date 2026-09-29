@@ -6,6 +6,7 @@ import { api } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { useProviders } from "../context/ProvidersContext";
 import { useLanguage } from "../context/LanguageContext";
+import { stripMockTag } from "../utils/mockText";
 
 const STORAGE_KEY = "aca_daily_digest";
 const keyFor = (userId) => `${STORAGE_KEY}:${userId ?? "anon"}`;
@@ -69,21 +70,21 @@ export default function DailyDigest() {
   return (
     <div className="daily-digest">
       <div className="daily-digest-icon"><Sparkles size={16} /></div>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="daily-digest-body">
         <div className="daily-digest-title">
           {t("digest.title")} {digest?.isMock && <span className="badge badge-mock" style={{ marginLeft: 6 }}>{t("badge.mock")}</span>}
         </div>
         {loading && !digest && <p className="text-sub" style={{ margin: "4px 0 0" }}>{t("digest.preparing")}</p>}
         {digest && (
           <>
-            <p style={{ margin: "4px 0 6px", fontSize: 13, color: "var(--text-secondary)" }}>{digest.data.zhrnutie}</p>
+            <p style={{ margin: "4px 0 6px", fontSize: 13, color: "var(--text-secondary)" }}>{stripMockTag(digest.data.zhrnutie)}</p>
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: "var(--text-tertiary)" }}>
-              {digest.data.kluceve_body?.map((point, i) => <li key={i}>{point}</li>)}
+              {digest.data.kluceve_body?.map((point, i) => <li key={i}>{stripMockTag(point)}</li>)}
             </ul>
           </>
         )}
       </div>
-      <button className="btn btn-ghost btn-sm" onClick={dismiss} title={t("digest.hide")} aria-label={t("digest.hide")}><X size={14} /></button>
+      <button className="btn btn-ghost btn-sm daily-digest-close" onClick={dismiss} title={t("digest.hide")} aria-label={t("digest.hide")}><X size={14} /></button>
     </div>
   );
 }
