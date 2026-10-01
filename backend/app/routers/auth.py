@@ -25,11 +25,12 @@ from app.schemas import (
 )
 from app.security import (
     create_access_token, decrypt_secret, dummy_verify, generate_reset_code, hash_password, hash_reset_token,
-    needs_rehash, sanitize_text, verify_password, verify_totp,
+    needs_rehash, sanitize_text, verify_password,
 )
 from app.services import audit
 from app.services.account_cleanup import release_email_if_unverified
 from app.services.captcha import verify_captcha
+from app.services.totp import consume_totp_code
 from app.services.email_service import (
     is_email_configured, render_lockout_email, render_new_login_email, render_reset_password_email, send_email,
 )
@@ -121,7 +122,7 @@ def login(payload: LoginRequest, response: Response, request: Request, backgroun
             raise HTTPException(status_code=401, detail="Zadaj 6-miestny kód z overovacej aplikácie (2FA).",
                                 headers={"X-Error-Code": "totp_required"})
         secret = decrypt_secret(user.totp_secret or "", user.id)
-        if not secret or not verify_totp(secret, payload.totp_code):
+        if not consume_totp_code(db, user, secret, payload.totp_code):
             _register_failed_attempt(db, user, now, background_tasks, request, details="2fa")
             raise HTTPException(status_code=401, detail="Nesprávny kód z overovacej aplikácie (2FA).")
 

@@ -63,7 +63,7 @@ if APP_ENV == "production" and TRUSTED_PROXY_HOPS == 0:
     logger.warning(
         "TRUSTED_PROXY_HOPS nie je nastavene: IP klienta sa berie z prveho zaznamu X-Forwarded-For, "
         "ktory si moze klient sfalsovat (obchadzanie limitov podla IP). Nastav TRUSTED_PROXY_HOPS "
-        "(napr. 1 pre Render)."
+        "(2 pre Netlify proxy + Render, 1 pre samotny Render)."
     )
 
 

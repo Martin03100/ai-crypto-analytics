@@ -32,13 +32,15 @@ def test_login_finds_user_regardless_of_case(client):
     assert res.status_code == 200
 
 
-def test_old_weak_password_hash_is_upgraded_on_login(client):
-    from passlib.context import CryptContext
+def test_old_weak_password_hash_is_upgraded_on_login(client, monkeypatch):
+    from app import security
     from app.database import SessionLocal
     from app.models import User
     from app.security import needs_rehash
     assert _register(client, "olduser", "old@example.com").status_code == 201
-    weak = CryptContext(schemes=["pbkdf2_sha256"], pbkdf2_sha256__default_rounds=500).hash("TestPass123")
+    with monkeypatch.context() as m:
+        m.setattr(security, "PASSWORD_HASH_ROUNDS", 500)
+        weak = security.hash_password("TestPass123")
     db = SessionLocal()
     try:
         db.query(User).filter(User.username == "olduser").update({"password_hash": weak})
@@ -477,3 +479,49 @@ def test_production_short_custom_secret_only_warns(monkeypatch, caplog):
     monkeypatch.setattr(config, "API_KEY_ENCRYPTION_SECRET", "iny-vlastny-kluc-2024")
     config.validate_production_config()
     assert "kratsi nez 32 znakov" in caplog.text
+
+
+def test_totp_code_cannot_be_replayed(registered):
+    import time
+    from app.database import SessionLocal
+    from app.models import User
+    from app.security import _hotp, encrypt_secret, generate_totp_secret
+    client, username, password = registered
+    secret = generate_totp_secret()
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.username == username).one()
+        user.totp_secret = encrypt_secret(secret, user.id)
+        user.totp_enabled = True
+        db.commit()
+    finally:
+        db.close()
+    code = _hotp(secret, int(time.time() // 30))
+    login = {"username": username, "password": password, "totp_code": code}
+    client.cookies.clear()
+    assert client.post("/api/auth/login", json=login).status_code == 200
+    client.cookies.clear()
+    assert client.post("/api/auth/login", json=login).status_code == 401   # same code, still inside its window
+
+
+def test_totp_code_used_for_login_cannot_disable_2fa(registered):
+    import time
+    from app.database import SessionLocal
+    from app.models import User
+    from app.security import _hotp, encrypt_secret, generate_totp_secret
+    client, username, password = registered
+    secret = generate_totp_secret()
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.username == username).one()
+        user.totp_secret = encrypt_secret(secret, user.id)
+        user.totp_enabled = True
+        db.commit()
+    finally:
+        db.close()
+    code = _hotp(secret, int(time.time() // 30))
+    client.cookies.clear()
+    assert client.post("/api/auth/login", json={"username": username, "password": password, "totp_code": code}).status_code == 200
+    from tests.conftest import csrf_headers
+    res = client.post("/api/account/2fa/disable", json={"password": password, "code": code}, headers=csrf_headers(client))
+    assert res.status_code == 400

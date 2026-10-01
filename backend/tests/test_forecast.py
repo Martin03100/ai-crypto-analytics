@@ -301,3 +301,116 @@ def test_leaderboard_flags_low_sample_and_ranks_reliable_first(registered):
     names = [p["provider"] for p in board["providers"]]
     assert names == ["A", "B"], "a provider with enough samples must rank above one with a single forecast"
     assert board["providers"][0]["low_sample"] is False and board["providers"][1]["low_sample"] is True
+
+
+def _insert_forecast(user_id, timeframe, age_days, prices=(100.0, 110.0)):
+    import json as _json
+    from datetime import datetime, timedelta, timezone
+    from app.database import SessionLocal
+    from app.models import ForecastHistory
+    db = SessionLocal()
+    try:
+        row = ForecastHistory(user_id=user_id, crypto_symbol="BTC", timeframe=timeframe, model_used="Gemini",
+                              forecast_json=_json.dumps({"ceny": list(prices), "casove_body": ["a", "b"]}),
+                              created_at=datetime.now(timezone.utc) - timedelta(days=age_days))
+        db.add(row)
+        db.commit()
+        return row.id
+    finally:
+        db.close()
+
+
+def _user_id(username):
+    from app.database import SessionLocal
+    from app.models import User
+    db = SessionLocal()
+    try:
+        return db.query(User).filter(User.username == username).one().id
+    finally:
+        db.close()
+
+
+_COMPLETED = {"status": "completed", "accuracy_pct": 97.0, "predicted_prices": [100.0, 110.0],
+              "actual_prices": [101.0, 107.0], "time_labels": ["a", "b"], "matures_at": "x",
+              "baseline_accuracy_pct": 95.0, "direction_correct": True}
+
+
+def test_leaderboard_not_blocked_by_unripe_yearly_forecasts(registered, monkeypatch):
+    from app.routers import forecast as forecast_router
+    client, username, _p = registered
+    uid = _user_id(username)
+    for _ in range(60):                       # older than the 24h one, but their year has not passed yet
+        _insert_forecast(uid, "1R", age_days=30)
+    _insert_forecast(uid, "24h", age_days=2)
+    seen = []
+    monkeypatch.setattr(forecast_router, "compute_forecast_accuracy", lambda *a, **k: seen.append(a) or _COMPLETED)
+    board = client.get("/api/forecast/leaderboard").json()
+    assert len(seen) == 1 and board["providers"][0]["evaluated"] == 1
+
+
+def test_leaderboard_gives_up_on_forecasts_that_cannot_be_scored(registered, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    from app.database import SessionLocal
+    from app.models import ForecastHistory
+    from app.routers import forecast as forecast_router
+    client, username, _p = registered
+    uid = _user_id(username)
+    stuck = [_insert_forecast(uid, "24h", age_days=400) for _ in range(5)]
+    good = _insert_forecast(uid, "24h", age_days=3)
+    monkeypatch.setattr(forecast_router, "compute_forecast_accuracy",
+                        lambda coin, tf, prices, labels, created: _COMPLETED
+                        if created > datetime.now(timezone.utc) - timedelta(days=10) else {"status": "unavailable"})
+    client.get("/api/forecast/leaderboard")   # first round: only the 5 oldest (unavailable) fit the batch
+    board = client.get("/api/forecast/leaderboard").json()   # they are now backing off, the good one gets its turn
+    assert board["providers"][0]["evaluated"] == 1
+    db = SessionLocal()
+    try:
+        assert all(db.get(ForecastHistory, i).eval_attempts == 1 for i in stuck)
+        assert db.get(ForecastHistory, good).eval_attempts is None
+        for i in stuck:   # after enough failed rounds the forecast is no longer retried
+            db.get(ForecastHistory, i).eval_attempts = forecast_router._EVAL_MAX_ATTEMPTS
+            db.get(ForecastHistory, i).eval_last_try_at = None
+        db.commit()
+    finally:
+        db.close()
+    calls = []
+    monkeypatch.setattr(forecast_router, "compute_forecast_accuracy", lambda *a, **k: calls.append(a) or _COMPLETED)
+    client.get("/api/forecast/leaderboard")
+    assert calls == []
+
+
+def test_saved_items_are_capped_per_user(registered, monkeypatch):
+    import app.config as config
+    client, _u, _p = registered
+    monkeypatch.setattr(config, "MAX_SAVED_ITEMS_PER_USER", 2)
+    _save_real_forecast(client, is_mock=True)
+    _save_real_forecast(client, is_mock=True)
+    payload = {"provider": "gemini", "coin": "BTC", "horizon": "24h", "is_mock": True,
+               "forecast_data": {"ceny": [1.0], "casove_body": ["a"], "odovodnenie": "x"}}
+    res = client.post("/api/forecast/save", json=payload, headers=csrf_headers(client))
+    assert res.status_code == 400 and "limit 2" in res.json()["detail"]
+
+
+def test_history_csv_export_is_own_and_spreadsheet_safe(registered):
+    import csv
+    import io
+    client, username, _p = registered
+    uid = _user_id(username)
+    _insert_forecast(uid, "1T", age_days=1)
+    from app.database import SessionLocal
+    from app.models import ForecastHistory
+    db = SessionLocal()
+    try:
+        db.add(ForecastHistory(user_id=uid, crypto_symbol="BTC", timeframe="24h", model_used="=HYPERLINK(1)",
+                               forecast_json='{"ceny": [110.0], "aktualna_cena": 100.0}'))
+        db.commit()
+    finally:
+        db.close()
+    res = client.get("/api/forecast/history/export.csv")
+    assert res.status_code == 200 and res.headers["content-type"].startswith("text/csv")
+    rows = list(csv.reader(io.StringIO(res.text.lstrip("\ufeff"))))
+    assert rows[0][0] == "created_at_utc" and len(rows) == 3
+    models = {r[3] for r in rows[1:]}
+    assert "'=HYPERLINK(1)" in models
+    btc = next(r for r in rows[1:] if r[3].startswith("'="))
+    assert btc[6] == "10.0"

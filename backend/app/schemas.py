@@ -265,3 +265,52 @@ class NewsSentimentRequest(BaseModel):
 class DailyDigestRequest(BaseModel):
     provider: str
     lang: str = "en"
+
+
+class ScheduleCreate(BaseModel):
+    provider: str = Field(max_length=32)
+    coin: str = Field(min_length=2, max_length=10)
+    horizon: Literal["24h", "1T", "1M"]
+    frequency: Literal["daily", "weekly"]
+    weekday: Optional[int] = Field(default=None, ge=0, le=6)
+    hour: int = Field(ge=0, le=23)
+    minute: int = Field(default=0, ge=0, le=59)
+    timezone: str = Field(default="UTC", min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_+\-/]+$")
+    lang: Literal["en", "sk", "cs"] = "en"
+
+
+class ScheduleUpdate(BaseModel):
+    active: bool
+
+
+class ScheduleOut(BaseModel):
+    id: int
+    provider: str
+    coin: str
+    horizon: str
+    frequency: str
+    weekday: Optional[int]
+    hour: int
+    minute: int
+    timezone: str
+    active: bool
+    next_run_at: datetime
+    last_run_at: Optional[datetime]
+    last_status: Optional[str]
+    last_error: Optional[str]
+    last_forecast_id: Optional[int]
+
+    @field_serializer("next_run_at", "last_run_at")
+    def _utc(self, value: Optional[datetime]) -> Optional[str]:
+        return None if value is None else (value if value.tzinfo else value.replace(tzinfo=timezone.utc)).isoformat()
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ScheduleList(BaseModel):
+    items: List[ScheduleOut]
+    max: int
+
+
+class WatchlistIn(BaseModel):
+    coins: List[Annotated[str, Field(min_length=2, max_length=10)]] = Field(max_length=12)

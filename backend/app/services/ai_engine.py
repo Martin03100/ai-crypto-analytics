@@ -29,8 +29,6 @@ from app.config import (
     AI_REQUEST_TIMEOUT_SECONDS, SECTOR_CATEGORIES, TIME_HORIZONS,
 )
 from app.services import data_sources, market_data, quant_engine
-
-logger = logging.getLogger("aca.ai")
 from app.services.validators import (
     language_instruction,
     build_daily_digest_prompt, build_forecast_prompt, build_news_prompt, build_portfolio_prompt,
@@ -41,6 +39,8 @@ from app.i18n_content import (
     mock_portfolio_reason, unit_label, MOCK_DIGEST_KEY_POINTS, MOCK_NEWS_TRENDS,
     MOCK_PORTFOLIO_ANALYSIS_TEXT, MOCK_REBALANCING_CHECKLIST, normalize_lang,
 )
+
+logger = logging.getLogger("aca.ai")
 
 
 class AIEngineResult:

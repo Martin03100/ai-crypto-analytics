@@ -1,6 +1,7 @@
 """2FA, email verification and captcha tests."""
 
 import base64
+import time
 
 from app import security
 from tests.conftest import anon_csrf_headers, csrf_headers
@@ -35,7 +36,11 @@ def test_two_factor_login_flow(registered):
     assert res.status_code == 401 and "6-miestny" in res.json()["detail"]
     res = client.post("/api/auth/login", json={**creds, "totp_code": "000000"}, headers=anon_csrf_headers(client))
     assert res.status_code == 401
+    # The code used to turn 2FA on is spent; the next one (accepted within the +-1 step window) signs in.
     res = client.post("/api/auth/login", json={**creds, "totp_code": security.totp_now(secret)}, headers=anon_csrf_headers(client))
+    assert res.status_code == 401
+    next_code = security.totp_now(secret, at=time.time() + 30)
+    res = client.post("/api/auth/login", json={**creds, "totp_code": next_code}, headers=anon_csrf_headers(client))
     assert res.status_code == 200 and res.json()["totp_enabled"] is True
 
 

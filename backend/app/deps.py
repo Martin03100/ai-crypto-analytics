@@ -65,6 +65,20 @@ def get_current_user(
     return user
 
 
+def save_limit_reached(db: Session, model, user_id: int) -> bool:
+    from app import config
+
+    return db.query(model).filter(model.user_id == user_id).count() >= config.MAX_SAVED_ITEMS_PER_USER
+
+
+def ensure_below_save_limit(db: Session, model, user_id: int) -> None:
+    from app.config import MAX_SAVED_ITEMS_PER_USER
+
+    if save_limit_reached(db, model, user_id):
+        raise HTTPException(status_code=400, detail=f"Dosiahol si limit {MAX_SAVED_ITEMS_PER_USER} uložených "
+                                                    "záznamov. Zmaž staršie a skús to znova.")
+
+
 def get_decrypted_api_key(db, user_id: int, provider: str):
     from app.models import ApiKey
     from app.security import decrypt_secret, encrypt_secret, is_legacy_ciphertext

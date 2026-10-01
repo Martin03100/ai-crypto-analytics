@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Dict, Final, List
+from typing import Dict, Final, List, Optional
 
 APP_TITLE: Final[str] = "AI Crypto Analytics"
 REQUEST_TIMEOUT_SECONDS: Final[int] = 12
@@ -45,6 +45,13 @@ PROVIDER_KEYS: Final[List[str]] = list(PROVIDERS.values())
 
 QUANT_PROVIDER: Final[str] = "quant"
 QUANT_LABEL: Final[str] = "Quant (free model)"
+
+
+def provider_label(provider: str) -> Optional[str]:
+    """Display label stored with a forecast, or None for an unknown provider."""
+    if provider == QUANT_PROVIDER:
+        return QUANT_LABEL
+    return PROVIDER_LABELS.get(provider)
 
 SUPPORTED_COINS: Final[List[str]] = [
     "BTC", "ETH", "SOL", "BNB", "XRP",
@@ -124,6 +131,10 @@ PROVIDER_TOKEN_PRICE_USD_PER_1K: Final[Dict[str, float]] = {
 }
 
 MAX_FAILED_LOGIN_ATTEMPTS: Final[int] = 5
+# Background thread that runs users' scheduled forecasts (off in tests).
+SCHEDULER_ENABLED: Final[bool] = os.environ.get("SCHEDULER_ENABLED", "1") != "0"
+# Upper bound on saved forecasts / portfolio analyses per user (keeps one account from filling the database).
+MAX_SAVED_ITEMS_PER_USER: Final[int] = int(os.environ.get("MAX_SAVED_ITEMS_PER_USER", "1000"))
 ACCOUNT_LOCKOUT_MINUTES: Final[int] = 15
 
 RATE_LIMIT_LOGIN: Final[tuple] = (10, 60)
