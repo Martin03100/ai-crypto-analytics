@@ -23,15 +23,10 @@ import { localeForLang } from "../i18n/locale";
 import { usePageTitle } from "../hooks/usePageTitle";
 import { stripMockTag } from "../utils/mockText";
 import { MAX_CSV_BYTES, parsePortfolioCsv } from "../utils/portfolioCsv";
+import { COINS, COIN_IDS } from "../utils/coins";
 
-const COINS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "DOT", "LINK"];
 const PIE_COLORS = ["#22d3ee", "#34d399", "#a78bfa", "#fbbf24", "#fb5a6a"];
 const MAX_HOLDINGS = 30;
-
-const DEFAULT_COIN_IDS = {
-  BTC: "bitcoin", ETH: "ethereum", SOL: "solana", BNB: "binancecoin", XRP: "ripple",
-  ADA: "cardano", DOGE: "dogecoin", AVAX: "avalanche-2", DOT: "polkadot", LINK: "chainlink",
-};
 
 function parseAmountInput(raw, t) {
   const cleaned = String(raw).trim().replace(",", ".");
@@ -107,7 +102,6 @@ export default function Portfolio() {
 
   useEffect(() => {
     if (providersCtx.defaultProvider) setProvider(providersCtx.defaultProvider);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [providersCtx.defaultProvider]);
 
   const coinIds = useMemo(
@@ -137,7 +131,7 @@ export default function Portfolio() {
 
   function selectPresetCoin(i, symbol) {
     updateHolding(i, "minca", symbol);
-    updateHolding(i, "coin_id", DEFAULT_COIN_IDS[symbol] || null);
+    updateHolding(i, "coin_id", COIN_IDS[symbol] || null);
   }
 
   function addRow() {
@@ -166,7 +160,7 @@ export default function Portfolio() {
 
   // Unknown symbols are looked up through the coin search; only an exact symbol match is accepted.
   async function resolveCoinId(symbol) {
-    if (DEFAULT_COIN_IDS[symbol]) return DEFAULT_COIN_IDS[symbol];
+    if (COIN_IDS[symbol]) return COIN_IDS[symbol];
     try {
       const res = await api.searchCoins(symbol);
       return res.results.find((c) => c.symbol === symbol)?.id || null;
@@ -245,7 +239,7 @@ export default function Portfolio() {
       const cleanHoldings = holdings.map(({ minca, mnozstvo, coin_id }) => ({ minca, mnozstvo, coin_id }));
       const est = await api.estimatePortfolioCost(provider, cleanHoldings);
       setCostEstimate(est);
-    } catch (err) {
+    } catch {
       doAnalyze();
     } finally {
       setEstimating(false);

@@ -1,10 +1,11 @@
 fastapi==0.141.1
 uvicorn[standard]==0.53.0
 sqlalchemy==2.0.54
+alembic==1.20.0
+tzdata==2026.4
 pydantic==2.13.5
 PyJWT==2.15.0
 defusedxml==0.7.1
-passlib==1.7.4
 cryptography==50.0.1
 requests==2.34.2
 python-multipart==0.0.32

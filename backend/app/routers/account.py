@@ -11,20 +11,22 @@ from sqlalchemy.orm import Session
 
 from app.config import (
     AUTH_COOKIE_MAX_AGE_SECONDS, AUTH_COOKIE_NAME, AUTH_COOKIE_SAMESITE, AUTH_COOKIE_SECURE,
-    PROVIDER_KEY_LINKS, PROVIDERS, RATE_LIMIT_ACCOUNT_SENSITIVE, RATE_LIMIT_API_KEY_TEST,
+    DEFAULT_COIN_IDS, PROVIDER_KEY_LINKS, PROVIDERS, RATE_LIMIT_ACCOUNT_SENSITIVE, RATE_LIMIT_API_KEY_TEST,
 )
 from app.deps import get_current_user, get_db, get_decrypted_api_key
 from app.models import ApiKey, AuditEvent, User
 from app.rate_limit import rate_limit_by_user
 from app.schemas import (
     ApiKeyIn, ApiKeyStatus, ChangePasswordRequest, DeleteAccountRequest, TotpCodeRequest, TotpDisableRequest, UpdateEmailRequest,
+    WatchlistIn,
 )
 from app.security import (
     create_access_token, decrypt_secret, encrypt_secret, generate_totp_secret, hash_password, mask_key, sanitize_text,
-    totp_uri, verify_password, verify_totp,
+    totp_uri, verify_password,
 )
 from app.services import audit
 from app.services.demo_data import create_demo_data, remove_demo_data
+from app.services.totp import consume_totp_code
 from app.services.account_cleanup import delete_user_data, release_email_if_unverified
 from app.services.email_service import is_email_configured
 from app.services.verification import send_verification_code
@@ -197,7 +199,7 @@ def totp_enable(payload: TotpCodeRequest, request: Request, user: User = Depends
     secret = decrypt_secret(user.totp_pending_secret or "", user.id)
     if not secret:
         raise HTTPException(status_code=400, detail="Najprv spusti nastavenie 2FA.")
-    if not verify_totp(secret, payload.code):
+    if not consume_totp_code(db, user, secret, payload.code):
         raise HTTPException(status_code=400, detail="Nesprávny kód z overovacej aplikácie (2FA).")
     user.totp_secret, user.totp_pending_secret, user.totp_enabled = user.totp_pending_secret, None, True
     audit.record(db, user.id, "twofa_enabled", request)
@@ -213,7 +215,7 @@ def totp_disable(payload: TotpDisableRequest, request: Request, user: User = Dep
     if not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=400, detail="Aktuálne heslo nie je správne.")
     secret = decrypt_secret(user.totp_secret or "", user.id)
-    if not secret or not verify_totp(secret, payload.code):
+    if not consume_totp_code(db, user, secret, payload.code):
         raise HTTPException(status_code=400, detail="Nesprávny kód z overovacej aplikácie (2FA).")
     user.totp_secret, user.totp_pending_secret, user.totp_enabled = None, None, False
     audit.record(db, user.id, "twofa_disabled", request)
@@ -247,3 +249,30 @@ def delete_demo_data(user: User = Depends(get_current_user), db: Session = Depen
     removed = remove_demo_data(db, user.id)
     db.commit()
     return {"removed": removed["forecasts"] + removed["portfolios"], **removed}
+
+
+DEFAULT_WATCHLIST = ["BTC", "ETH", "SOL"]
+MAX_WATCHLIST = 12
+
+
+def _watchlist(user: User) -> List[str]:
+    try:
+        coins = json.loads(user.watchlist_json) if user.watchlist_json else DEFAULT_WATCHLIST
+    except json.JSONDecodeError:
+        coins = DEFAULT_WATCHLIST
+    return [c for c in coins if isinstance(c, str) and c in DEFAULT_COIN_IDS]
+
+
+@router.get("/watchlist")
+def get_watchlist(user: User = Depends(get_current_user)) -> dict:
+    return {"coins": _watchlist(user), "available": list(DEFAULT_COIN_IDS), "max": MAX_WATCHLIST}
+
+
+@router.put("/watchlist", dependencies=[Depends(rate_limit_by_user(30, 60))])
+def set_watchlist(payload: WatchlistIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    coins = list(dict.fromkeys(c.upper() for c in payload.coins))[:MAX_WATCHLIST]
+    if any(c not in DEFAULT_COIN_IDS for c in coins):
+        raise HTTPException(status_code=400, detail="Watchlist podporuje len základné mince.")
+    user.watchlist_json = json.dumps(coins)
+    db.commit()
+    return {"coins": coins, "available": list(DEFAULT_COIN_IDS), "max": MAX_WATCHLIST}

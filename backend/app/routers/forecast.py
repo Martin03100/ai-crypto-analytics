@@ -5,18 +5,20 @@ from __future__ import annotations
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeout
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, List, Optional
 
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
+from fastapi.responses import Response
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.config import DEFAULT_COIN_IDS, PROVIDER_LABELS, PROVIDERS, QUANT_LABEL, QUANT_PROVIDER, RATE_LIMIT_AI_ENDPOINT
-from app.deps import get_current_user, get_db, get_decrypted_api_key
+from app.config import DEFAULT_COIN_IDS, QUANT_PROVIDER, RATE_LIMIT_AI_ENDPOINT, provider_label
+from app.deps import ensure_below_save_limit, get_current_user, get_db, get_decrypted_api_key
 from app.models import ForecastEvaluation, ForecastHistory, PriceTip, User
 from app.rate_limit import rate_limit_by_user
 from app.security import sign_forecast, verify_forecast_signature
@@ -41,10 +43,7 @@ def _numeric_prices(value) -> List[float]:
     return [float(p) for p in value]
 
 
-def _provider_label(provider: str) -> Optional[str]:
-    if provider == QUANT_PROVIDER:
-        return QUANT_LABEL
-    return PROVIDER_LABELS.get(provider) if provider in PROVIDERS.values() else None
+_provider_label = provider_label
 
 
 @router.post("", response_model=AIResultOut, dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
@@ -101,6 +100,7 @@ def save_forecast(payload: SaveForecastRequest, user: User = Depends(get_current
                                                  payload.horizon, prices, created)):
             raise HTTPException(status_code=400, detail="Predikciu sa nepodarilo overiť. Vygeneruj ju znova a ulož ju bez úprav.")
         model_label = label
+    ensure_below_save_limit(db, ForecastHistory, user.id)
     entry = ForecastHistory(
         user_id=user.id, crypto_symbol=payload.coin.upper(), timeframe=payload.horizon,
         model_used=model_label, forecast_json=json.dumps(payload.forecast_data, ensure_ascii=False),
@@ -194,6 +194,56 @@ def get_forecast_accuracy(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], us
     )
 
 
+_UTF8_BOM = chr(0xFEFF)  # lets Excel detect UTF-8 (diacritics in model names)
+
+
+def _csv_cell(value) -> str:
+    """Spreadsheet-safe cell: text starting with a formula character is prefixed so it is never evaluated."""
+    text = "" if value is None else str(value)
+    return "'" + text if text[:1] in ("=", "+", "-", "@", chr(9), chr(13)) and not _is_number(text) else text
+
+
+def _is_number(text: str) -> bool:
+    try:
+        float(text)
+        return True
+    except ValueError:
+        return False
+
+
+@router.get("/history/export.csv", dependencies=[Depends(rate_limit_by_user(10, 60))])
+def export_history_csv(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Response:
+    import csv
+    import io
+
+    rows = (db.query(ForecastHistory).filter(ForecastHistory.user_id == user.id)
+            .order_by(ForecastHistory.created_at.desc()).all())
+    evaluations = {e.forecast_id: e for e in db.query(ForecastEvaluation).filter(ForecastEvaluation.user_id == user.id)}
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow(["created_at_utc", "coin", "horizon", "model", "price_at_forecast", "predicted_final_price",
+                     "predicted_change_pct", "actual_final_price", "accuracy_pct", "direction_correct"])
+    for row in rows:
+        try:
+            data = json.loads(row.forecast_json)
+        except json.JSONDecodeError:
+            data = {}
+        data = data if isinstance(data, dict) else {}
+        prices = _numeric_prices(data.get("ceny"))
+        start = data.get("aktualna_cena") if isinstance(data.get("aktualna_cena"), (int, float)) else None
+        final = prices[-1] if prices else None
+        change = round((final - start) / start * 100, 2) if start and final is not None else None
+        ev = evaluations.get(row.id)
+        created = row.created_at.replace(tzinfo=timezone.utc) if row.created_at.tzinfo is None else row.created_at
+        writer.writerow([_csv_cell(v) for v in (
+            created.isoformat(timespec="seconds"), row.crypto_symbol, row.timeframe, row.model_used, start, final, change,
+            ev.actual_final_price if ev else None, ev.accuracy_pct if ev else None,
+            (ev.direction_correct if ev else None),
+        )])
+    return Response(content=_UTF8_BOM + out.getvalue(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="forecast-history.csv"'})
+
+
 @router.get("/history", response_model=PaginatedForecastHistory)
 def get_history(symbol: Optional[str] = Query(default=None, max_length=16),
                 days_back: Optional[int] = Query(default=None, ge=1, le=3650),
@@ -276,28 +326,46 @@ def _settle_tip(tip, result: dict) -> None:
     tip.outcome = "tie" if abs(user_error - ai_error) < 1e-9 else ("win" if user_error < ai_error else "loss")
 
 
+_EVAL_MAX_ATTEMPTS = 8
+_EVAL_RETRY_AFTER = timedelta(hours=6)
+
+
+def _matured(now: datetime):
+    """SQL condition: the forecast horizon has passed, so unripe long-horizon forecasts never fill the batch."""
+    return or_(
+        *[(ForecastHistory.timeframe == tf) & (ForecastHistory.created_at <= now - timedelta(days=days))
+          for tf, days in _HORIZON_DAYS.items()],
+        ForecastHistory.timeframe.not_in(list(_HORIZON_DAYS)) & (ForecastHistory.created_at <= now - timedelta(days=7)),
+    )
+
+
+def _mark_attempt(row: ForecastHistory, now: datetime, give_up: bool = False) -> None:
+    row.eval_attempts = _EVAL_MAX_ATTEMPTS if give_up else (row.eval_attempts or 0) + 1
+    row.eval_last_try_at = now
+
+
 def _evaluate_pending(db: Session, limit: int = 5, deadline_seconds: float = 8.0) -> None:
+    now = datetime.now(timezone.utc)
     candidates = (
         db.query(ForecastHistory)
         .filter(ForecastHistory.model_used != "mock", ForecastHistory.id.not_in(select(ForecastEvaluation.forecast_id)),
-                ForecastHistory.model_used.notlike(DEMO_LABEL_LIKE))
-        .order_by(ForecastHistory.created_at.asc()).limit(50).all()
+                ForecastHistory.model_used.notlike(DEMO_LABEL_LIKE), _matured(now),
+                or_(ForecastHistory.eval_attempts.is_(None), ForecastHistory.eval_attempts < _EVAL_MAX_ATTEMPTS),
+                or_(ForecastHistory.eval_last_try_at.is_(None), ForecastHistory.eval_last_try_at <= now - _EVAL_RETRY_AFTER))
+        .order_by(ForecastHistory.created_at.asc()).limit(limit).all()
     )
-    now = datetime.now(timezone.utc)
     ready = []
     for row in candidates:
         try:
             data = json.loads(row.forecast_json)
         except json.JSONDecodeError:
+            data = None
+        if not isinstance(data, dict) or not _numeric_prices(data.get("ceny")):
+            _mark_attempt(row, now, give_up=True)  # can never be scored
             continue
-        if not isinstance(data, dict):
-            continue
-        created = _created_at(row, data)
-        if _numeric_prices(data.get("ceny")) and now >= created + timedelta(days=_HORIZON_DAYS.get(row.timeframe, 7)):
-            ready.append((row, data, created))
-        if len(ready) >= limit:
-            break
+        ready.append((row, data, _created_at(row, data)))
     if not ready:
+        _commit_ignoring_duplicates(db)
         return
     pool = ThreadPoolExecutor(max_workers=limit)
     try:
@@ -308,7 +376,13 @@ def _evaluate_pending(db: Session, limit: int = 5, deadline_seconds: float = 8.0
         for row, future in jobs:
             try:
                 result = future.result(timeout=max(0.1, end - time.monotonic()))
+            except FuturesTimeout:
+                continue                  # just slow (e.g. a rate-limited price API): try again without a penalty
             except Exception:  # noqa: BLE001
+                _mark_attempt(row, now)
+                continue
+            if result.get("status") != "completed":
+                _mark_attempt(row, now)  # e.g. price history unavailable: retry later, give up after a few tries
                 continue
             _record_evaluation(db, row, result)
             _settle_tip(db.query(PriceTip).filter(PriceTip.forecast_id == row.id).first(), result)

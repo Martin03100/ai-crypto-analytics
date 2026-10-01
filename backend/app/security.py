@@ -3,50 +3,78 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
+import hmac
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
 from cryptography.fernet import Fernet, InvalidToken
 import jwt
-from passlib.context import CryptContext
 
 from app.config import (
     API_KEY_ENCRYPTION_SECRET, JWT_ALGORITHM, JWT_EXPIRE_MINUTES, JWT_SECRET_KEY, PASSWORD_HASH_ROUNDS,
 )
 
-_pwd_context = CryptContext(
-    schemes=["pbkdf2_sha256"], deprecated="auto",
-    pbkdf2_sha256__default_rounds=PASSWORD_HASH_ROUNDS, pbkdf2_sha256__min_rounds=PASSWORD_HASH_ROUNDS,
-)
+# Password hashes use the "$pbkdf2-sha256$<rounds>$<salt>$<checksum>" format (adapted base64, no padding),
+# byte-for-byte compatible with the hashes the app stored earlier through passlib.
+_PBKDF2_PREFIX = "$pbkdf2-sha256$"
+_SALT_BYTES = 16
+
+
+def _ab64_encode(data: bytes) -> str:
+    return base64.b64encode(data).decode("ascii").rstrip("=").replace("+", ".")
+
+
+def _ab64_decode(text: str) -> bytes:
+    text = text.replace(".", "+")
+    return base64.b64decode(text + "=" * (-len(text) % 4), validate=True)
+
+
+def _pbkdf2(password: str, salt: bytes, rounds: int) -> bytes:
+    return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, rounds)
+
+
+def _parse_hash(password_hash: str) -> Optional[tuple]:
+    if not isinstance(password_hash, str) or not password_hash.startswith(_PBKDF2_PREFIX):
+        return None
+    parts = password_hash[len(_PBKDF2_PREFIX):].split("$")
+    if len(parts) != 3 or not parts[0].isdigit():
+        return None
+    try:
+        rounds, salt, checksum = int(parts[0]), _ab64_decode(parts[1]), _ab64_decode(parts[2])
+    except (ValueError, binascii.Error):
+        return None
+    if rounds < 1 or len(checksum) != 32:
+        return None
+    return rounds, salt, checksum
 
 
 def hash_password(password: str) -> str:
-    return _pwd_context.hash(password)
+    salt = secrets.token_bytes(_SALT_BYTES)
+    checksum = _pbkdf2(password, salt, PASSWORD_HASH_ROUNDS)
+    return f"{_PBKDF2_PREFIX}{PASSWORD_HASH_ROUNDS}${_ab64_encode(salt)}${_ab64_encode(checksum)}"
 
 
 def needs_rehash(password_hash: str) -> bool:
-    try:
-        return _pwd_context.needs_update(password_hash)
-    except ValueError:
-        return False
+    parsed = _parse_hash(password_hash)
+    return parsed is not None and parsed[0] < PASSWORD_HASH_ROUNDS
 
 
-_DUMMY_HASH = _pwd_context.hash("aca-timing-equalizer")
+_DUMMY_HASH = hash_password("aca-timing-equalizer")
 
 
 def dummy_verify(password: str) -> None:
-    try:
-        _pwd_context.verify(password, _DUMMY_HASH)
-    except ValueError:
-        pass
+    verify_password(password, _DUMMY_HASH)
 
 
 def verify_password(password: str, password_hash: str) -> bool:
-    try:
-        return _pwd_context.verify(password, password_hash)
-    except ValueError:
+    parsed = _parse_hash(password_hash)
+    if parsed is None:
         return False
+    rounds, salt, checksum = parsed
+    return hmac.compare_digest(_pbkdf2(password, salt, rounds), checksum)
 
 
 def create_access_token(subject: int, username: str, token_version: int = 0) -> str:
@@ -107,7 +135,6 @@ def mask_key(plain_text: str) -> str:
     return f"{cleaned[:4]}...{cleaned[-4:]}"
 
 
-import secrets  # noqa: E402
 
 
 def generate_reset_code() -> tuple[str, str]:
@@ -132,7 +159,6 @@ def sanitize_text(value: str, max_length: int = 500) -> str:
 
 
 
-import hmac  # noqa: E402
 import struct  # noqa: E402
 import time as _time  # noqa: E402
 from urllib.parse import quote as _quote  # noqa: E402
@@ -154,12 +180,20 @@ def totp_now(secret_b32: str, at: Optional[float] = None) -> str:
     return _hotp(secret_b32, int((at if at is not None else _time.time()) // 30))
 
 
-def verify_totp(secret_b32: str, code: str, at: Optional[float] = None, window: int = 1) -> bool:
+def totp_matching_step(secret_b32: str, code: str, at: Optional[float] = None, window: int = 1) -> Optional[int]:
+    """The 30 s time step the code belongs to, or None when it does not match (callers use it to block replays)."""
     code = (code or "").strip().replace(" ", "")
     if not (code.isdigit() and len(code) == 6):
-        return False
+        return None
     counter = int((at if at is not None else _time.time()) // 30)
-    return any(hmac.compare_digest(_hotp(secret_b32, counter + d), code) for d in range(-window, window + 1))
+    for step in range(counter - window, counter + window + 1):
+        if hmac.compare_digest(_hotp(secret_b32, step), code):
+            return step
+    return None
+
+
+def verify_totp(secret_b32: str, code: str, at: Optional[float] = None, window: int = 1) -> bool:
+    return totp_matching_step(secret_b32, code, at, window) is not None
 
 
 def totp_uri(secret_b32: str, username: str) -> str:

@@ -1,0 +1,15 @@
+# Lint rules for the backend: `ruff check .` (runs in CI).
+line-length = 150
+target-version = "py312"
+extend-exclude = [".venv"]
+
+[lint]
+select = ["E", "F", "W", "B"]
+ignore = [
+    "B008",  # FastAPI's Depends()/Query() in argument defaults is the intended pattern
+    "B905",  # zip() without strict= is fine where lengths are checked beforehand
+    "E501",  # long lines are left to review, not enforced
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["E401", "E402", "E702", "E731"]

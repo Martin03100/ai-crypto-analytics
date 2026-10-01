@@ -10,7 +10,8 @@ const SYMBOLS = { USD: "$", EUR: "€", CZK: "Kč", BTC: "₿" };
 const LOCALE_MAP = { USD: "en-US", EUR: "sk-SK", CZK: "cs-CZ", BTC: "en-US" };
 
 function loadCurrency() {
-  const stored = localStorage.getItem(STORAGE_KEY);
+  let stored = null;
+  try { stored = localStorage.getItem(STORAGE_KEY); } catch { /* storage blocked */ }
   return CURRENCIES.includes(stored) ? stored : "USD";
 }
 
@@ -19,7 +20,7 @@ export function CurrencyProvider({ children }) {
 
   const setCurrency = useCallback((next) => {
     if (!CURRENCIES.includes(next)) return;
-    localStorage.setItem(STORAGE_KEY, next);
+    try { localStorage.setItem(STORAGE_KEY, next); } catch { /* storage blocked */ }
     setCurrencyState(next);
   }, []);
 

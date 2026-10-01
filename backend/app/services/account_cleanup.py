@@ -5,12 +5,13 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.models import (
-    ApiKey, AuditEvent, CommunityVote, EmailVerificationCode, ForecastEvaluation, ForecastHistory, PasswordResetToken,
+    ApiKey, AuditEvent, CommunityVote, EmailVerificationCode, ForecastEvaluation, ForecastHistory, ForecastSchedule,
+    PasswordResetToken,
     PortfolioHistory, PriceTip, User,
 )
 
 _USER_TABLES = (ApiKey, ForecastHistory, PortfolioHistory, CommunityVote, PasswordResetToken, ForecastEvaluation,
-                PriceTip, EmailVerificationCode, AuditEvent)
+                PriceTip, EmailVerificationCode, AuditEvent, ForecastSchedule)
 
 
 def delete_user_data(db: Session, user: User) -> None:

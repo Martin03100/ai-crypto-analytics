@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Card } from "../components/Card";
 import DemoDataCard from "../components/DemoDataCard";
+import InstallAppCard from "../components/InstallAppCard";
 import { resetOnboarding } from "../components/OnboardingTour";
 import PasswordInput from "../components/PasswordInput";
 import TwoFactorSettings from "../components/TwoFactorSettings";
@@ -108,38 +109,40 @@ export default function Settings() {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <Card title={t("settings.language")} icon={Languages}>
-          <p className="text-sub" style={{ marginTop: 0 }}>{t("settings.languageDesc")}</p>
-          <div className="tabs">
-            {LANGUAGES.map((l) => (
-              <button key={l.code} className={`tab ${lang === l.code ? "active" : ""}`} onClick={() => setLang(l.code)}>
-                {l.label}
-              </button>
-            ))}
-          </div>
-        </Card>
+        <div className="settings-prefs">
+          <Card title={t("settings.language")} icon={Languages}>
+            <p className="text-sub" style={{ marginTop: 0 }}>{t("settings.languageDesc")}</p>
+            <div className="tabs">
+              {LANGUAGES.map((l) => (
+                <button key={l.code} className={`tab ${lang === l.code ? "active" : ""}`} onClick={() => setLang(l.code)}>
+                  {l.label}
+                </button>
+              ))}
+            </div>
+          </Card>
 
-        <Card title={t("settings.appearance")} icon={theme === "dark" ? Moon : Sun}>
-          <div className="tabs">
-            <button className={`tab ${theme === "dark" ? "active" : ""}`} onClick={() => setTheme("dark")}>
-              <Moon size={14} style={{ marginRight: 6 }} /> {t("settings.dark")}
-            </button>
-            <button className={`tab ${theme === "light" ? "active" : ""}`} onClick={() => setTheme("light")}>
-              <Sun size={14} style={{ marginRight: 6 }} /> {t("settings.light")}
-            </button>
-          </div>
-        </Card>
-
-        <Card title={t("settings.currency")} icon={Wallet2}>
-          <p className="text-sub" style={{ marginTop: 0 }}>{t("settings.currencyDesc")}</p>
-          <div className="tabs">
-            {CURRENCIES.map((c) => (
-              <button key={c} className={`tab ${currency === c ? "active" : ""}`} onClick={() => setCurrency(c)}>
-                {c}
+          <Card title={t("settings.appearance")} icon={theme === "dark" ? Moon : Sun}>
+            <div className="tabs">
+              <button className={`tab ${theme === "dark" ? "active" : ""}`} onClick={() => setTheme("dark")}>
+                <Moon size={14} style={{ marginRight: 6 }} /> {t("settings.dark")}
               </button>
-            ))}
-          </div>
-        </Card>
+              <button className={`tab ${theme === "light" ? "active" : ""}`} onClick={() => setTheme("light")}>
+                <Sun size={14} style={{ marginRight: 6 }} /> {t("settings.light")}
+              </button>
+            </div>
+          </Card>
+
+          <Card title={t("settings.currency")} icon={Wallet2}>
+            <p className="text-sub" style={{ marginTop: 0 }}>{t("settings.currencyDesc")}</p>
+            <div className="tabs">
+              {CURRENCIES.map((c) => (
+                <button key={c} className={`tab ${currency === c ? "active" : ""}`} onClick={() => setCurrency(c)}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          </Card>
+        </div>
 
         <Card title={t("settings.security")} icon={ShieldCheck}>
           <p className="text-sub" style={{ marginTop: 0 }}>{t("settings.sessionInfo")}</p>
@@ -184,16 +187,7 @@ export default function Settings() {
           </button>
         </Card>
 
-        <Card title={t("settings.deleteAccountTitle")} icon={Trash2}>
-          <p className="text-sub" style={{ marginBottom: 10 }}>{t("settings.deleteAccountDesc")}</p>
-          <div className="field">
-            <label>{t("settings.currentPassword")}</label>
-            <PasswordInput value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} />
-          </div>
-          <button className="btn btn-ghost btn-sm" style={{ color: "var(--crimson-fg)" }} onClick={handleDeleteAccount} disabled={deleting || !deletePassword}>
-            <Trash2 size={14} /> {t("settings.deleteAccountButton")}
-          </button>
-        </Card>
+        <InstallAppCard />
 
         <DemoDataCard />
 
@@ -217,6 +211,17 @@ export default function Settings() {
             </button>
             <p className="text-sub" style={{ marginTop: 8 }}>{t("shortcuts.hint")}</p>
           </div>
+        </Card>
+
+        <Card title={t("settings.deleteAccountTitle")} icon={Trash2} className="danger-zone">
+          <p className="text-sub" style={{ marginBottom: 10 }}>{t("settings.deleteAccountDesc")}</p>
+          <div className="field">
+            <label>{t("settings.currentPassword")}</label>
+            <PasswordInput value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} />
+          </div>
+          <button className="btn btn-danger-ghost btn-sm" onClick={handleDeleteAccount} disabled={deleting || !deletePassword}>
+            <Trash2 size={14} /> {t("settings.deleteAccountButton")}
+          </button>
         </Card>
       </div>
     </div>

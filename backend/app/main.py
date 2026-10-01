@@ -10,14 +10,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from app.config import APP_ENV, APP_TITLE, CORS_ORIGINS, validate_production_config
+from app.config import APP_ENV, APP_TITLE, CORS_ORIGINS, SCHEDULER_ENABLED, validate_production_config
 from app.csrf import CSRFMiddleware
 from app.database import SessionLocal, init_db
 from app.logging_config import configure_logging
 from app.monitoring import capture_exception, init_monitoring
-from app.routers import account, auth, chat, forecast, market, portfolio, public
+from app.routers import account, auth, chat, forecast, market, portfolio, public, schedules
 from app.request_guard import RequestGuardMiddleware
 from app.security_headers import SecurityHeadersMiddleware
+from app.services.schedules import start_scheduler, stop_scheduler
 
 configure_logging()
 init_monitoring()
@@ -29,8 +30,11 @@ validate_production_config()
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
+    if SCHEDULER_ENABLED:
+        start_scheduler()
     logger.info("AI Crypto Analytics backend spusteny.")
     yield
+    stop_scheduler()
 
 
 _docs_enabled = APP_ENV != "production"
@@ -68,10 +72,11 @@ app.include_router(portfolio.router)
 app.include_router(market.router)
 app.include_router(chat.router)
 app.include_router(public.router)
+app.include_router(schedules.router)
 
 
 @app.get("/api/health")
-def health() -> dict:
+def health() -> JSONResponse:
     try:
         db = SessionLocal()
         try:

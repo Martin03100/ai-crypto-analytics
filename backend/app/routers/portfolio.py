@@ -8,7 +8,7 @@ from typing import Annotated, List
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.orm import Session
 
-from app.deps import get_current_user, get_db, get_decrypted_api_key
+from app.deps import ensure_below_save_limit, get_current_user, get_db, get_decrypted_api_key
 from app.models import PortfolioHistory, User
 from app.rate_limit import rate_limit_by_user
 from app.config import RATE_LIMIT_AI_ENDPOINT
@@ -47,6 +47,7 @@ def save_portfolio_analysis(payload: SavePortfolioRequest, user: User = Depends(
                              db: Session = Depends(get_db)) -> PortfolioHistoryOut:
     holdings = [h.model_dump() for h in payload.holdings]
     model_label = "mock" if payload.is_mock else payload.provider
+    ensure_below_save_limit(db, PortfolioHistory, user.id)
     entry = PortfolioHistory(
         user_id=user.id, holdings_json=json.dumps(holdings, ensure_ascii=False),
         analysis_json=json.dumps(payload.analysis_data, ensure_ascii=False), model_used=model_label,

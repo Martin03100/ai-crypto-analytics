@@ -151,6 +151,11 @@ function fearGreed(res) {
   return { ...r, data: valid ? { ...d, value: Math.min(100, Math.max(0, Math.round(Number(d.value)))) } : null, is_mock: Boolean(r.is_mock) };
 }
 
+function watchlist(res) {
+  const r = obj(res);
+  return { coins: arr(r.coins), available: arr(r.available), max: Number(r.max) || 12 };
+}
+
 export const api = {
   register: (username, password, email, captcha_token) => request("/auth/register", { method: "POST", body: { username, password, email, captcha_token } }),
   login: (username, password, totp_code) => request("/auth/login", { method: "POST", body: { username, password, totp_code } }),
@@ -225,6 +230,15 @@ export const api = {
     request(`/market/chart?coin_id=${encodeURIComponent(coinId)}&vs_currency=${vsCurrency}&days=${days}`).then(chartPoints),
   searchCoins: (q) => request(`/market/coins/search?q=${encodeURIComponent(q)}`).then((r) => withArrays(r, ["results"])),
   dailyDigest: (provider) => request("/market/daily-digest", { method: "POST", body: { provider, lang: currentLang() }, timeoutMs: AI_TIMEOUT_MS }).then(aiResult),
+
+  watchlist: () => request("/account/watchlist").then(watchlist),
+  setWatchlist: (coins) => request("/account/watchlist", { method: "PUT", body: { coins } }).then(watchlist),
+
+  schedules: () => request("/schedules").then((r) => ({ items: objArr(obj(r).items), max: Number(obj(r).max) || 0 })),
+  createSchedule: (schedule) => request("/schedules", { method: "POST", body: { ...schedule, lang: currentLang() } }).then(obj),
+  setScheduleActive: (id, active) => request(`/schedules/${id}`, { method: "PATCH", body: { active } }).then(obj),
+  deleteSchedule: (id) => request(`/schedules/${id}`, { method: "DELETE" }),
+  historyCsvUrl: () => `${BASE}/forecast/history/export.csv`,
 
   sendChatMessage: (provider, messages) => request("/chat", { method: "POST", body: { provider, messages, lang: currentLang() }, timeoutMs: AI_TIMEOUT_MS }).then(aiResult),
 };

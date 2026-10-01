@@ -43,9 +43,6 @@ export default function App() {
 
   return (
     <>
-      <div className="grid-layer" aria-hidden="true" />
-      <div className="aurora-layer" aria-hidden="true"><div className="aurora-blob-3" /></div>
-      <div className="grain-layer" aria-hidden="true" />
       <Routes>
         <Route path="/auth" element={user ? <Navigate to="/forecast" replace /> : <Auth />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />

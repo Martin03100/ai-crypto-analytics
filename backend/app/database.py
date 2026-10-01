@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
@@ -68,8 +69,44 @@ def auto_migrate() -> None:
                 logger.warning("auto_migrate: nepodarilo sa pridat %s.%s (%s)", table_name, column.name, exc)
 
 
+_ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
+
+
+def _alembic_config():
+    from alembic.config import Config
+
+    cfg = Config(str(_ALEMBIC_INI))
+    cfg.attributes["configure_logging"] = False
+    return cfg
+
+
+def _create_missing_indexes() -> None:
+    inspector = inspect(engine)
+    for table in Base.metadata.sorted_tables:
+        existing = {i["name"] for i in inspector.get_indexes(table.name)}
+        for index in table.indexes:
+            if index.name not in existing:
+                index.create(bind=engine)
+                logger.info("init_db: pridany index %s", index.name)
+
+
 def init_db() -> None:
+    """Bring the database schema to the latest Alembic revision.
+
+    A database created before Alembic was introduced (create_all + auto_migrate, no alembic_version table) is
+    completed to the current models once (tables, columns, indexes) and stamped as the latest revision.
+    """
+    from alembic import command
+
     from app import models  # noqa: F401
 
-    Base.metadata.create_all(bind=engine)
-    auto_migrate()
+    cfg = _alembic_config()
+    existing = set(inspect(engine).get_table_names())
+    if "alembic_version" not in existing and existing & set(Base.metadata.tables):
+        logger.info("init_db: databaza bez Alembic verzie - doplnam schemu a oznacujem ju ako aktualnu")
+        Base.metadata.create_all(bind=engine)
+        auto_migrate()
+        _create_missing_indexes()
+        command.stamp(cfg, "head")
+        return
+    command.upgrade(cfg, "head")

@@ -37,6 +37,10 @@ class User(Base):
     totp_secret: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
     totp_pending_secret: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
     totp_enabled: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=None)
+    # Time step of the last accepted sign-in code; a code is accepted only once.
+    totp_last_step: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=None)
+    # JSON list of coin symbols the user follows on the dashboard; None = the default set.
+    watchlist_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
 
     reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
@@ -58,7 +62,7 @@ class ForecastHistory(Base):
     __tablename__ = "forecast_history"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     crypto_symbol: Mapped[str] = mapped_column(String(16), nullable=False)
     timeframe: Mapped[str] = mapped_column(String(8), nullable=False)
     model_used: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -66,6 +70,9 @@ class ForecastHistory(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, index=True)
     # Random, unguessable token for the public read-only link; None = not shared.
     share_token: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, default=None, index=True)
+    # Background evaluation bookkeeping: failed attempts and when the last one ran (for back-off / giving up).
+    eval_attempts: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=None)
+    eval_last_try_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, default=None)
 
     user: Mapped["User"] = relationship(back_populates="forecasts")
 
@@ -161,3 +168,28 @@ class AuditEvent(Base):
     user_agent: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     details: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, index=True)
+
+
+class ForecastSchedule(Base):
+    """A forecast the server creates and saves for the user on a regular basis."""
+    __tablename__ = "forecast_schedules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    coin: Mapped[str] = mapped_column(String(16), nullable=False)
+    horizon: Mapped[str] = mapped_column(String(8), nullable=False)
+    frequency: Mapped[str] = mapped_column(String(8), nullable=False)  # "daily" | "weekly"
+    # The user's wall-clock time in their own time zone; next_run_at (UTC) is derived from it, so DST is handled.
+    weekday: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # 0 = Monday, for weekly schedules
+    hour: Mapped[int] = mapped_column(Integer, nullable=False)
+    minute: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="UTC")
+    lang: Mapped[str] = mapped_column(String(4), nullable=False, default="en")
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    next_run_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    last_run_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_status: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)  # ok | fallback | error
+    last_error: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    last_forecast_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)

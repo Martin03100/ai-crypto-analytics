@@ -13,6 +13,7 @@ if os.path.exists(_TEST_DB_PATH):
     os.remove(_TEST_DB_PATH)
 os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{_TEST_DB_PATH}"
 os.environ.setdefault("APP_ENV", "development")
+os.environ["SCHEDULER_ENABLED"] = "0"
 os.environ.setdefault("PASSWORD_HASH_ROUNDS", "1000")
 os.environ.setdefault("JWT_SECRET_KEY", "test-only-jwt-secret-do-not-use-in-production")
 os.environ.setdefault("API_KEY_ENCRYPTION_SECRET", "test-only-fernet-secret-do-not-use-in-prod")
