@@ -88,7 +88,6 @@ export default function Market() {
 
   useEffect(() => {
     if (providersCtx.defaultProvider) setProvider(providersCtx.defaultProvider);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [providersCtx.defaultProvider]);
 
   async function runNewsAnalysis() {

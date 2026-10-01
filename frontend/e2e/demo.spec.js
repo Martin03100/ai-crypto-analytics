@@ -17,7 +17,7 @@ test("demo data fills history, leaderboard, portfolio and dashboard with test mo
   await expect(page.getByText("DEMO").first()).toBeVisible();
 
   // A matured forecast shows its real (here: synthetic) outcome as a second line next to the prediction
-  await page.getByRole("button", { name: /XRP.*24h.*Claude test/ }).click();
+  await page.getByRole("button", { name: /XRP.*24H.*Claude test/ }).click();
   await expect(page.getByText("Actual price")).toBeVisible();
   await expect(page.getByText(/Accuracy: \d+/)).toBeVisible();
 

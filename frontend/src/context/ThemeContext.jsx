@@ -5,9 +5,13 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 const ThemeContext = createContext(null);
 const STORAGE_KEY = "aca_theme";
 
+const THEME_COLORS = { dark: "#09090b", light: "#f7f7f8" };
+
 function loadTheme() {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  return stored === "light" || stored === "dark" ? stored : "dark";
+  let stored = null;
+  try { stored = localStorage.getItem(STORAGE_KEY); } catch { /* storage blocked */ }
+  if (stored === "light" || stored === "dark") return stored;
+  return window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
 }
 
 export function ThemeProvider({ children }) {
@@ -15,10 +19,11 @@ export function ThemeProvider({ children }) {
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", THEME_COLORS[theme]);
   }, [theme]);
 
   const setTheme = useCallback((next) => {
-    localStorage.setItem(STORAGE_KEY, next);
+    try { localStorage.setItem(STORAGE_KEY, next); } catch { /* storage blocked: keep it for this session */ }
     setThemeState(next);
   }, []);
 

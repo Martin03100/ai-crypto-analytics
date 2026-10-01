@@ -8,9 +8,26 @@ const STORAGE_KEY = "aca_lang";
 const VALID = ["sk", "cs", "en"];
 const DEFAULT_LANG = "en";
 
+function readStored() {
+  try { return localStorage.getItem(STORAGE_KEY); } catch { return null; }
+}
+
+function writeStored(value) {
+  try { localStorage.setItem(STORAGE_KEY, value); } catch { /* storage blocked: the choice lasts this session */ }
+}
+
+/** First visit: follow the browser language (Slovak and Czech users get their language right away). */
+export function detectLang(languages = typeof navigator === "undefined" ? [] : navigator.languages || [navigator.language]) {
+  for (const tag of languages) {
+    const base = String(tag || "").toLowerCase().split("-")[0];
+    if (VALID.includes(base)) return base;
+  }
+  return DEFAULT_LANG;
+}
+
 function loadLang() {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  return VALID.includes(stored) ? stored : DEFAULT_LANG;
+  const stored = readStored();
+  return VALID.includes(stored) ? stored : detectLang();
 }
 
 export function LanguageProvider({ children }) {
@@ -18,14 +35,12 @@ export function LanguageProvider({ children }) {
 
   useEffect(() => {
     document.documentElement.setAttribute("lang", lang);
-    if (!localStorage.getItem(STORAGE_KEY)) {
-      localStorage.setItem(STORAGE_KEY, DEFAULT_LANG);
-    }
+    if (!readStored()) writeStored(lang);
   }, [lang]);
 
   const setLang = useCallback((next) => {
     if (!VALID.includes(next)) return;
-    localStorage.setItem(STORAGE_KEY, next);
+    writeStored(next);
     setLangState(next);
   }, []);
 

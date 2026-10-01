@@ -35,6 +35,10 @@ const KNOWN_BACKEND_PATTERNS = [
   { test: /najprv ulo[zž] api kl[uú][cč] pre tohto providera/i, key: "errors.noKeyToTest" },
   { test: /pou[zž][ií]vate[lľ]sk[eé] meno mus[ií] ma[tť] 3/i, key: "errors.usernameInvalid" },
   { test: /predikciu sa nepodarilo overi[tť]/i, key: "errors.forecastUnverified" },
+  { test: /dosiahol si limit (\d+) ulo[zž]en[yý]ch/i, key: "errors.savedLimit", params: (m) => ({ limit: m[1] }) },
+  { test: /m[oô][zž]e[sš] ma[tť] najviac (\d+) pl[aá]nov/i, key: "errors.scheduleLimit", params: (m) => ({ max: m[1] }) },
+  { test: /podporuje len z[aá]kladn[eé] mince/i, key: "errors.basicCoinsOnly" },
+  { test: /pl[aá]n predikcie nebol n[aá]jden[yý]/i, key: "errors.scheduleNotFound" },
   { test: /bezplatn[yý] model|chyba pri na[cč][ií]tan[ií] historick[yý]ch d[aá]t|nedostatok historick[yý]ch d[aá]t|trhov[eé] d[aá]ta moment[aá]lne|trhove data sa nepodarilo/i, key: "errors.quantUnavailable" },
 ];
 

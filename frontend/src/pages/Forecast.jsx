@@ -1,6 +1,6 @@
 /** Forecast page. */
 
-import { Brain, CheckCircle2, ChevronDown, Copy, Link2, Loader2, RefreshCw, Rocket, Save, Share2, Sparkles, Trash2 } from "lucide-react";
+import { Brain, CheckCircle2, ChevronDown, Copy, Download, Link2, Loader2, RefreshCw, Rocket, Save, Share2, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api";
@@ -17,6 +17,7 @@ import TipBox from "../components/TipBox";
 import { useCurrency } from "../context/CurrencyContext";
 import { SkeletonChart, SkeletonLines } from "../components/Skeleton";
 import ProviderSelect from "../components/ProviderSelect";
+import SchedulePanel from "../components/SchedulePanel";
 import { useToast } from "../context/ToastContext";
 import { useProviders } from "../context/ProvidersContext";
 import { useConfirm } from "../context/ConfirmContext";
@@ -27,8 +28,10 @@ import { copyToClipboard } from "../utils/copyToClipboard";
 import { usePageTitle } from "../hooks/usePageTitle";
 import { stripMockTag } from "../utils/mockText";
 import { formatTechDetail } from "../utils/techDetail";
+import { COINS } from "../utils/coins";
+import { predictedChangePct } from "../utils/forecastMath";
 
-const COINS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "DOT", "LINK"];
+
 const HORIZONS = ["24h", "1T", "1M", "1R"];
 
 function HistoryItem({ entry, onDelete }) {
@@ -43,6 +46,7 @@ function HistoryItem({ entry, onDelete }) {
   const hasChart = hasForecastSeries(entry.forecast_data);
   const canShare = entry.model_used !== "mock" && !entry.forecast_data?.demo;
   const shareUrl = shareToken ? `${window.location.origin}/share/${shareToken}` : null;
+  const change = predictedChangePct(entry.forecast_data);
 
   useEffect(() => {
     if (!open || accuracy || accuracyLoading) return;
@@ -106,31 +110,32 @@ function HistoryItem({ entry, onDelete }) {
   }
 
   return (
-    <div className="card" style={{ marginBottom: 12, padding: 0, overflow: "hidden" }}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        style={{
-          width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "14px 18px", background: "transparent", border: "none", color: "var(--text-primary)",
-          cursor: "pointer", fontSize: 13,
-        }}
-      >
-        <span>
-          <strong>{entry.crypto_symbol}</strong> · {entry.timeframe} · {entry.model_used} ·{" "}
-          {entry.forecast_data?.demo && <span className="badge badge-hold" style={{ marginRight: 6 }} title={t("demo.badgeHelp")}>{t("demo.badge")}</span>}
-          <span className="text-sub">{new Date(entry.created_at).toLocaleString(locale)}</span>
-        </span>
-        <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <span className="btn btn-ghost btn-sm" onClick={handleCopy} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleCopy(e); } }} title={t("common.copy")} aria-label={t("common.copy")} role="button" tabIndex={0}><Copy size={12} /></span>
-          {canShare && (
-            <span className={`btn btn-ghost btn-sm ${shareToken ? "is-shared" : ""}`} onClick={handleShare} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleShare(e); } }} title={t("share.button")} aria-label={t("share.button")} role="button" tabIndex={0}><Share2 size={12} /></span>
+    <div className={`card hist-item ${open ? "is-open" : ""}`}>
+      <div className="hist-head">
+        <button className="hist-toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+          <span className="hist-coin">{entry.crypto_symbol}</span>
+          <span className="hist-meta">
+            {t(`forecast.horizon${entry.timeframe}`)} · {entry.model_used}
+            {entry.forecast_data?.demo && <span className="badge badge-neutral" style={{ marginLeft: 6 }} title={t("demo.badgeHelp")}>{t("demo.badge")}</span>}
+          </span>
+          {change != null && (
+            <span className={`hist-change num ${change > 0 ? "up" : change < 0 ? "down" : ""}`} title={t("forecast.predictedChange")}>
+              {change > 0 ? "+" : ""}{change.toFixed(1)} %
+            </span>
           )}
-          <span className="btn btn-danger-ghost btn-sm" onClick={handleDelete} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleDelete(e); } }} title={t("common.delete")} aria-label={t("common.delete")} role="button" tabIndex={0}><Trash2 size={12} /></span>
-          <ChevronDown size={16} style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
-        </span>
-      </button>
+          <span className="hist-date">{new Date(entry.created_at).toLocaleString(locale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+          <ChevronDown size={15} className="hist-chevron" aria-hidden="true" />
+        </button>
+        <div className="hist-actions">
+          <button className="btn btn-ghost btn-sm btn-icon" onClick={handleCopy} title={t("common.copy")} aria-label={t("common.copy")}><Copy size={13} /></button>
+          {canShare && (
+            <button className={`btn btn-ghost btn-sm btn-icon ${shareToken ? "is-shared" : ""}`} onClick={handleShare} title={t("share.button")} aria-label={t("share.button")}><Share2 size={13} /></button>
+          )}
+          <button className="btn btn-ghost btn-sm btn-icon hist-delete" onClick={handleDelete} title={t("common.delete")} aria-label={t("common.delete")}><Trash2 size={13} /></button>
+        </div>
+      </div>
       {open && (
-        <div style={{ padding: "0 18px 18px" }}>
+        <div className="hist-body">
           {shareUrl && (
             <div className="share-row">
               <Link2 size={13} />
@@ -187,7 +192,7 @@ export default function Forecast() {
   usePageTitle("forecast.title");
   const { currency } = useCurrency();
   const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState(() => (["history", "leaderboard", "compare", "backtest"].includes(searchParams.get("tab")) ? searchParams.get("tab") : "new"));
+  const [tab, setTab] = useState(() => (["history", "schedule", "leaderboard", "compare", "backtest"].includes(searchParams.get("tab")) ? searchParams.get("tab") : "new"));
   const providersCtx = useProviders();
   const providers = useMemo(
     () => [...providersCtx.providers, { provider: "quant", label: t("provider.quantLabel"), connected: true }],
@@ -196,7 +201,7 @@ export default function Forecast() {
   const hasAiProvider = providersCtx.providers.some((p) => p.connected);
   const canGenerate = providers.some((p) => p.connected);
   const [provider, setProvider] = useState(null);
-  const [coin, setCoin] = useState("BTC");
+  const [coin, setCoin] = useState(() => (COINS.includes(searchParams.get("coin")) ? searchParams.get("coin") : "BTC"));
   const [horizon, setHorizon] = useState("1T");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -215,7 +220,6 @@ export default function Forecast() {
 
   useEffect(() => {
     setProvider(providersCtx.defaultProvider || "quant");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [providersCtx.defaultProvider]);
 
   useEffect(() => {
@@ -276,7 +280,7 @@ export default function Forecast() {
     try {
       const est = await api.estimateForecastCost(provider, coin, horizon);
       setCostEstimate(est);
-    } catch (err) {
+    } catch {
       doGenerate();
     } finally {
       setEstimating(false);
@@ -334,6 +338,7 @@ export default function Forecast() {
       <div className="tabs">
         <button className={`tab ${tab === "new" ? "active" : ""}`} onClick={() => setTab("new")}>{t("forecast.tabNew")}</button>
         <button className={`tab ${tab === "history" ? "active" : ""}`} onClick={() => setTab("history")}>{t("forecast.tabHistory")}</button>
+        <button className={`tab ${tab === "schedule" ? "active" : ""}`} onClick={() => setTab("schedule")}>{t("forecast.tabSchedule")}</button>
         <button className={`tab ${tab === "leaderboard" ? "active" : ""}`} onClick={() => setTab("leaderboard")}>{t("forecast.tabLeaderboard")}</button>
         <button className={`tab ${tab === "compare" ? "active" : ""}`} onClick={() => setTab("compare")}>{t("forecast.tabCompare")}</button>
         <button className={`tab ${tab === "backtest" ? "active" : ""}`} onClick={() => setTab("backtest")}>{t("forecast.tabBacktest")}</button>
@@ -419,33 +424,39 @@ export default function Forecast() {
         </>
       )}
 
+      {tab === "schedule" && <SchedulePanel onOpenHistory={() => setTab("history")} />}
       {tab === "leaderboard" && <Leaderboard />}
       {tab === "compare" && <ComparePanel />}
       {tab === "backtest" && <BacktestPanel />}
 
       {tab === "history" && (
         <div>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
-            <button className="btn btn-ghost btn-sm" onClick={loadHistory}>
-              <RefreshCw size={13} /> {t("common.refresh")}
-            </button>
+          <div className="bulk-toolbar">
+            <label className="bulk-select-all">
+              {history.length > 0 && (
+                <><input type="checkbox" checked={selectedIds.length === history.length}
+                  onChange={(e) => setSelectedIds(e.target.checked ? history.map((h) => h.id) : [])} /> {t("common.selectAll")}</>
+              )}
+            </label>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              {selectedIds.length > 0 && (
+                <button className="btn btn-danger-ghost btn-sm" onClick={bulkDeleteForecasts}>
+                  <Trash2 size={13} /> {t("common.deleteSelected", { n: selectedIds.length })}
+                </button>
+              )}
+              {history.length > 0 && (
+                <a className="btn btn-ghost btn-sm" href={api.historyCsvUrl()} download>
+                  <Download size={13} /> {t("forecast.exportCsv")}
+                </a>
+              )}
+              <button className="btn btn-ghost btn-sm" onClick={loadHistory}>
+                <RefreshCw size={13} /> {t("common.refresh")}
+              </button>
+            </div>
           </div>
           {historyLoading && <SkeletonLines count={4} />}
           {!historyLoading && history.length === 0 && (
             <div className="empty-state">{t("forecast.emptyHistory")}</div>
-          )}
-          {!historyLoading && history.length > 0 && (
-            <div className="bulk-toolbar">
-              <label className="bulk-select-all">
-                <input type="checkbox" checked={selectedIds.length === history.length}
-                  onChange={(e) => setSelectedIds(e.target.checked ? history.map((h) => h.id) : [])} /> {t("common.selectAll")}
-              </label>
-              {selectedIds.length > 0 && (
-                <button className="btn btn-ghost btn-sm" style={{ color: "var(--crimson-fg)" }} onClick={bulkDeleteForecasts}>
-                  <Trash2 size={13} /> {t("common.deleteSelected", { n: selectedIds.length })}
-                </button>
-              )}
-            </div>
           )}
           {!historyLoading && history.map((entry) => (
             <div key={entry.id} className="selectable-row">

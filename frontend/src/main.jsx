@@ -14,10 +14,14 @@ import { ThemeProvider } from "./context/ThemeContext";
 import { CurrencyProvider } from "./context/CurrencyContext";
 import { startLabelAssociation } from "./utils/a11yLabels";
 import { initMonitoring } from "./utils/monitoring";
+import "@fontsource-variable/inter";
+import "@fontsource/jetbrains-mono/400.css";
 import "./styles/app.css";
+import { initPwa } from "./pwa";
 
 startLabelAssociation();
 initMonitoring();
+initPwa();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

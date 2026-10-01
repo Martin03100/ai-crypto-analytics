@@ -1,6 +1,6 @@
 /** Dashboard page. */
 
-import { ArrowRight, Gauge, RefreshCw, Sparkles, TrendingUp, Wallet } from "lucide-react";
+import { ArrowRight, CalendarClock, Gauge, RefreshCw, Sparkles, Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
@@ -9,25 +9,30 @@ import { Card } from "../components/Card";
 import DailyDigest from "../components/DailyDigest";
 import InfoTip from "../components/InfoTip";
 import { SkeletonLines } from "../components/Skeleton";
+import Watchlist from "../components/Watchlist";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../context/ToastContext";
 import { localeForLang } from "../i18n/locale";
+import { finalForecastPrice, predictedChangePct } from "../utils/forecastMath";
 import { formatPrice } from "../utils/formatPrice";
 import { stripMockTag } from "../utils/mockText";
 import { usePageTitle } from "../hooks/usePageTitle";
 
-function QuickLink({ to, icon: Icon, label, sub }) {
+function EmptyCta({ icon: Icon, text, to, action }) {
   return (
-    <Link to={to} className="quick-link-card">
-      <div className="quick-link-icon"><Icon size={18} /></div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 600, fontSize: 13.5 }}>{label}</div>
-        <div className="text-sub" style={{ marginTop: 2 }}>{sub}</div>
-      </div>
-      <ArrowRight size={15} style={{ opacity: 0.5 }} />
-    </Link>
+    <div className="empty-cta">
+      <div className="empty-cta-icon"><Icon size={16} /></div>
+      <p>{text}</p>
+      <Link to={to} className="btn btn-ghost btn-sm">{action}</Link>
+    </div>
   );
+}
+
+function fearGreedTone(value) {
+  if (value >= 55) return "up";
+  if (value <= 45) return "down";
+  return "";
 }
 
 export default function Dashboard() {
@@ -39,6 +44,7 @@ export default function Dashboard() {
   const [refreshingFg, setRefreshingFg] = useState(false);
   const [lastForecast, setLastForecast] = useState(null);
   const [lastPortfolio, setLastPortfolio] = useState(null);
+  const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fgError, setFgError] = useState(false);
   const locale = localeForLang(lang);
@@ -48,11 +54,13 @@ export default function Dashboard() {
       api.fearGreed(),
       api.forecastHistory(undefined, null, 1, 1),
       api.portfolioHistory(1, 1),
-    ]).then(([fgRes, forecastRes, portfolioRes]) => {
+      api.schedules(),
+    ]).then(([fgRes, forecastRes, portfolioRes, schedulesRes]) => {
       if (fgRes.status === "fulfilled" && fgRes.value.data) setFg(fgRes.value.data);
       else setFgError(true);
       if (forecastRes.status === "fulfilled" && forecastRes.value.items.length > 0) setLastForecast(forecastRes.value.items[0]);
       if (portfolioRes.status === "fulfilled" && portfolioRes.value.items.length > 0) setLastPortfolio(portfolioRes.value.items[0]);
+      if (schedulesRes.status === "fulfilled") setSchedules(schedulesRes.value.items.filter((s) => s.active));
     }).finally(() => setLoading(false));
   }, []);
 
@@ -73,112 +81,125 @@ export default function Dashboard() {
 
   const hour = new Date().getHours();
   const greetingKey = hour < 5 ? "dashboard.greetingNight" : hour < 12 ? "dashboard.greetingMorning" : hour < 18 ? "dashboard.greetingDay" : "dashboard.greetingEvening";
-  const greeting = t(greetingKey);
+  const today = new Date().toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" });
+
+  const fd = lastForecast?.forecast_data;
+  const finalPrice = finalForecastPrice(fd);
+  const change = predictedChangePct(fd);
+  const nextSchedule = [...schedules].sort((a, b) => new Date(a.next_run_at) - new Date(b.next_run_at))[0];
 
   return (
     <div>
       <div className="topbar">
         <div>
-          <h1 className="page-title">{greeting}, {user?.username}</h1>
-          <p className="page-sub">{t("dashboard.subtitle")}</p>
+          <p className="eyebrow">{today}</p>
+          <h1 className="page-title">{t(greetingKey)}, {user?.username}</h1>
         </div>
+        <Link to="/forecast" className="btn btn-primary"><Sparkles size={15} /> {t("dashboard.quickForecastLabel")}</Link>
       </div>
 
       <DailyDigest />
 
-      <div className="grid grid-3" style={{ marginBottom: 20 }}>
-        <QuickLink to="/forecast" icon={Sparkles} label={t("dashboard.quickForecastLabel")} sub={t("dashboard.quickForecastSub")} />
-        <QuickLink to="/portfolio" icon={Wallet} label={t("dashboard.quickPortfolioLabel")} sub={t("dashboard.quickPortfolioSub")} />
-        <QuickLink to="/market" icon={TrendingUp} label={t("dashboard.quickMarketLabel")} sub={t("dashboard.quickMarketSub")} />
-      </div>
+      <Watchlist />
 
       {loading ? (
-        <div className="grid grid-2"><Card><SkeletonLines count={4} /></Card><Card><SkeletonLines count={4} /></Card></div>
+        <div className="grid grid-2" style={{ marginTop: 16 }}><Card><SkeletonLines count={4} /></Card><Card><SkeletonLines count={4} /></Card></div>
       ) : (
-        <div className="grid grid-2" style={{ marginBottom: 16 }}>
+        <div className="dash-grid">
           <Card title={t("dashboard.lastForecastTitle")} icon={Sparkles}>
             {lastForecast ? (
               <>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                  <strong style={{ fontSize: 15 }}>{lastForecast.crypto_symbol} · {lastForecast.timeframe}</strong>
+                <div className="kv-head">
+                  <span className="kv-title">{lastForecast.crypto_symbol} · {t(`forecast.horizon${lastForecast.timeframe}`)}</span>
                   <span className="text-sub">{new Date(lastForecast.created_at).toLocaleDateString(locale)}</span>
                 </div>
-                <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-                  {lastForecast.forecast_data?.confidence_score !== undefined && <ConfidenceBadge score={lastForecast.forecast_data.confidence_score} />}
-                  {lastForecast.forecast_data?.risk_level && <RiskBadge level={lastForecast.forecast_data.risk_level} />}
-                </div>
-                {Array.isArray(lastForecast.forecast_data?.ceny) && lastForecast.forecast_data.ceny.length > 0 && (
-                  <div className="metric-value mono" style={{ fontSize: 20, marginBottom: 10 }}>
-                    {formatPrice(lastForecast.forecast_data.ceny[lastForecast.forecast_data.ceny.length - 1])}
-                    <span className="text-sub" style={{ fontSize: 12, fontWeight: 400, marginLeft: 6 }}>{t("dashboard.predictedPriceLabel")}</span>
+                {finalPrice != null && (
+                  <div className="big-figure">
+                    <span className="metric-value">{formatPrice(finalPrice)}</span>
+                    {change != null && (
+                      <span className={`metric-delta ${change >= 0 ? "up" : "down"}`}>{change >= 0 ? "+" : ""}{change.toFixed(1)} %</span>
+                    )}
                   </div>
                 )}
-                <p className="text-sub" style={{ marginBottom: 12 }}>{lastForecast.forecast_data?.odovodnenie?.slice(0, 160)}…</p>
-                <Link to="/forecast" className="btn btn-ghost btn-sm">{t("dashboard.viewHistory")} <ArrowRight size={13} /></Link>
+                <div className="metric-label" style={{ marginBottom: 12 }}>{t("dashboard.predictedPriceLabel")} · {lastForecast.model_used}</div>
+                <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+                  {fd?.confidence_score !== undefined && <ConfidenceBadge score={fd.confidence_score} />}
+                  {fd?.risk_level && <RiskBadge level={fd.risk_level} />}
+                </div>
+                {fd?.odovodnenie && <p className="text-sub clamp-3" style={{ margin: "0 0 14px" }}>{stripMockTag(fd.odovodnenie)}</p>}
+                <Link to="/forecast?tab=history" className="text-link">{t("dashboard.viewHistory")} <ArrowRight size={13} /></Link>
               </>
             ) : (
-              <div className="empty-cta">
-                <div className="empty-cta-icon"><Sparkles size={18} /></div>
-                <p>{t("dashboard.emptyForecast")}</p>
-                <Link to="/forecast" className="btn btn-ghost btn-sm">{t("common.createFirst")}</Link>
+              <EmptyCta icon={Sparkles} text={t("dashboard.emptyForecast")} to="/forecast" action={t("common.createFirst")} />
+            )}
+          </Card>
+
+          {fg ? (
+            <Card id="tour-feargreed-card">
+              <div className="card-head">
+                <h2 className="card-title" style={{ margin: 0 }}><Gauge size={14} /> {t("dashboard.fearGreedTitle")} <InfoTip text={t("help.fearGreed")} /></h2>
+                <button className="btn btn-ghost btn-sm btn-icon" onClick={handleRefreshFg} disabled={refreshingFg}
+                        aria-label={t("dashboard.fearGreedRefresh")} title={t("dashboard.fearGreedRefresh")}>
+                  <RefreshCw size={13} className={refreshingFg ? "spin" : ""} />
+                </button>
               </div>
+              <div className="big-figure">
+                <span className={`metric-value ${fearGreedTone(fg.value)}`}>{fg.value}</span>
+                <span className="text-sub">/ 100 · {stripMockTag(fg.classification)}</span>
+              </div>
+              <div className="fg-meter" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={fg.value} aria-label={t("dashboard.fearGreedTitle")}>
+                <div className="fg-meter-thumb" style={{ left: `${fg.value}%` }} />
+              </div>
+              <div className="fg-scale"><span>{t("dashboard.fearLabel")}</span><span>{t("dashboard.greedLabel")}</span></div>
+              <Link to="/market" className="text-link" style={{ marginTop: 14 }}>{t("dashboard.detailedMarket")}</Link>
+            </Card>
+          ) : (
+            <Card id="tour-feargreed-card" title={t("dashboard.fearGreedTitle")} icon={Gauge}>
+              {fgError && (
+                <div className="inline-error" role="alert">
+                  <span>{t("dashboard.fearGreedError")}</span>
+                  <button className="btn btn-ghost btn-sm" onClick={handleRefreshFg} disabled={refreshingFg}>
+                    <RefreshCw size={13} className={refreshingFg ? "spin" : ""} /> {t("common.retry")}
+                  </button>
+                </div>
+              )}
+            </Card>
+          )}
+
+          <Card title={t("schedule.dashboardTitle")} icon={CalendarClock}>
+            {nextSchedule ? (
+              <>
+                <div className="kv-head">
+                  <span className="kv-title">{nextSchedule.coin} · {t(`forecast.horizon${nextSchedule.horizon}`)}</span>
+                  <span className="badge badge-neutral">{t("schedule.activeCount", { n: schedules.length })}</span>
+                </div>
+                <p className="text-sub" style={{ margin: "0 0 14px" }}>
+                  {t("schedule.nextRun", { when: new Date(nextSchedule.next_run_at).toLocaleString(locale, { weekday: "long", hour: "2-digit", minute: "2-digit" }) })}
+                </p>
+                <Link to="/forecast?tab=schedule" className="text-link">{t("schedule.manage")} <ArrowRight size={13} /></Link>
+              </>
+            ) : (
+              <EmptyCta icon={CalendarClock} text={t("schedule.dashboardEmpty")} to="/forecast?tab=schedule" action={t("schedule.create")} />
             )}
           </Card>
 
           <Card title={t("dashboard.lastPortfolioTitle")} icon={Wallet}>
             {lastPortfolio ? (
               <>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                  <strong style={{ fontSize: 15 }}>{lastPortfolio.holdings.map((h) => h.minca).join(", ")}</strong>
+                <div className="kv-head">
+                  <span className="kv-title">{lastPortfolio.holdings.map((h) => h.minca).join(", ")}</span>
                   <span className="text-sub">{new Date(lastPortfolio.created_at).toLocaleDateString(locale)}</span>
                 </div>
-                <p className="text-sub" style={{ marginBottom: 12 }}>{lastPortfolio.analysis_data?.odborna_analyza?.slice(0, 160)}…</p>
-                <Link to="/portfolio" className="btn btn-ghost btn-sm">{t("dashboard.viewHistory")} <ArrowRight size={13} /></Link>
+                {lastPortfolio.analysis_data?.odborna_analyza && (
+                  <p className="text-sub clamp-3" style={{ margin: "0 0 14px" }}>{stripMockTag(lastPortfolio.analysis_data.odborna_analyza)}</p>
+                )}
+                <Link to="/portfolio" className="text-link">{t("dashboard.viewHistory")} <ArrowRight size={13} /></Link>
               </>
             ) : (
-              <div className="empty-cta">
-                <div className="empty-cta-icon"><Wallet size={18} /></div>
-                <p>{t("dashboard.emptyPortfolio")}</p>
-                <Link to="/portfolio" className="btn btn-ghost btn-sm">{t("common.createFirst")}</Link>
-              </div>
+              <EmptyCta icon={Wallet} text={t("dashboard.emptyPortfolio")} to="/portfolio" action={t("common.createFirst")} />
             )}
           </Card>
         </div>
-      )}
-
-      {!loading && !fg && fgError && (
-        <Card id="tour-feargreed-card" title={t("dashboard.fearGreedTitle")} icon={Gauge}>
-          <div className="inline-error" role="alert">
-            <span>{t("dashboard.fearGreedError")}</span>
-            <button className="btn btn-ghost btn-sm" onClick={handleRefreshFg} disabled={refreshingFg}>
-              <RefreshCw size={13} className={refreshingFg ? "spin" : ""} /> {t("common.retry")}
-            </button>
-          </div>
-        </Card>
-      )}
-
-      {fg && (
-        <Card id="tour-feargreed-card" glow={fg.value >= 55 ? "emerald" : fg.value <= 45 ? "crimson" : undefined}>
-          <div className="card-title" style={{ justifyContent: "space-between" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Gauge size={15} /> {t("dashboard.fearGreedTitle")} <InfoTip text={t("help.fearGreed")} /></span>
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={handleRefreshFg}
-              disabled={refreshingFg}
-              aria-label={t("dashboard.fearGreedRefresh")}
-              title={t("dashboard.fearGreedRefresh")}
-            >
-              <RefreshCw size={13} className={refreshingFg ? "spin" : ""} />
-            </button>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <div className="metric-value mono" style={{ fontSize: 32 }}>{fg.value}</div>
-            <div>
-              <div style={{ fontWeight: 600 }}>{stripMockTag(fg.classification)}</div>
-              <Link to="/market" className="key-link">{t("dashboard.detailedMarket")}</Link>
-            </div>
-          </div>
-        </Card>
       )}
     </div>
   );

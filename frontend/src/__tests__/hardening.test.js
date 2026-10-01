@@ -2,6 +2,7 @@
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import en from "../i18n/locales/en.json";
 import sk from "../i18n/locales/sk.json";
@@ -91,7 +92,7 @@ describe("translations", () => {
       if (statSync(p).isDirectory()) return f === "__tests__" ? [] : walk(p);
       return /\.(jsx?|js)$/.test(f) ? [p] : [];
     });
-    const root = new URL("..", import.meta.url).pathname;
+    const root = fileURLToPath(new URL("..", import.meta.url));
     const used = new Set();
     for (const file of walk(root)) {
       for (const m of readFileSync(file, "utf8").matchAll(/\bt\(\s*"([\w.]+)"/g)) used.add(m[1]);
