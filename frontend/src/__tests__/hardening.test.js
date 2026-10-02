@@ -108,3 +108,12 @@ describe("new backend error messages are translated", () => {
     expect(humanizeError("Nedostatok historickych dat na odhad volatility.", "cs")).toBe(cz["errors.quantUnavailable"]);
   });
 });
+
+describe("AI provider errors are attributed to the provider", () => {
+  it("does not blame our server for a Gemini 500 and explains a used-up daily quota", () => {
+    expect(humanizeError("Gemini API chyba: 500 INTERNAL. {'error': {'code': 500}}", "en")).toBe(en["errors.providerServerError"]);
+    expect(humanizeError("Gemini API chyba: 429 RESOURCE_EXHAUSTED quotaId: GenerateRequestsPerDayPerProjectPerModel-FreeTier", "sk"))
+      .toBe(sk["errors.providerDailyQuota"]);
+    expect(humanizeError("Gemini API chyba: 503 UNAVAILABLE. The model is overloaded.", "en")).toBe(en["errors.providerOverloaded"]);
+  });
+});

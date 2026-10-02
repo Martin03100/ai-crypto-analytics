@@ -43,6 +43,8 @@ const KNOWN_BACKEND_PATTERNS = [
 ];
 
 const TECHNICAL_PATTERNS = [
+  { test: /per ?day|perday/i, key: "errors.providerDailyQuota" },
+  { test: /(gemini|openai|anthropic|deepseek|grok|x\.ai)[\s\S]{0,40}(\b500\b|internal)/i, key: "errors.providerServerError" },
   { test: /api[ _-]?key[ _-]?(not valid|invalid)|api_key_invalid|permission_denied|invalid x-api-key|authentication/i, key: "errors.providerInvalidKey" },
   { test: /name resolution|getaddrinfo|nodename nor servname|max retries exceeded|proxyerror/i, key: "errors.networkError" },
   { test: /503|overloaded|service unavailable/i, key: "errors.providerOverloaded" },
