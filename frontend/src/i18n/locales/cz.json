@@ -747,5 +747,7 @@
   "pwa.updateButton": "Obnovit",
   "errors.scheduleLimit": "Můžeš mít nejvýše {max} plánů predikcí.",
   "errors.basicCoinsOnly": "Zde jsou podporovány jen základní mince.",
-  "errors.scheduleNotFound": "Plán predikce nebyl nalezen."
+  "errors.scheduleNotFound": "Plán predikce nebyl nalezen.",
+  "errors.providerServerError": "AI provider měl dočasnou chybu na své straně. Zkus to za chvíli znovu.",
+  "errors.providerDailyQuota": "Tvůj API klíč vyčerpal dnešní bezplatný limit pro tento AI model. Zkus to zítra, použij jiného providera nebo si pro klíč zapni platby."
 }

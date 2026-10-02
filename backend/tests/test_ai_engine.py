@@ -323,3 +323,70 @@ def test_custom_provider_inner_key_never_logged(monkeypatch, caplog):
     with caplog.at_level("WARNING", logger="aca.ai"):
         ai_engine.call_ai_provider("custom", "p", secret)
     assert "SUPER-TAJNY" not in caplog.text
+
+
+def _scripted_gemini(monkeypatch, script):
+    """Fake Gemini answering per model from `script[model]` (list of exceptions / texts, consumed in order)."""
+    from google import genai
+    calls, sleeps = [], []
+
+    class FakeModels:
+        def generate_content(self, model, contents, config):
+            calls.append(model)
+            outcome = script[model].pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+
+            class Resp:
+                text = outcome
+            return Resp()
+
+    class FakeClient:
+        def __init__(self, api_key, http_options=None):
+            self.models = FakeModels()
+
+    monkeypatch.setattr(genai, "Client", FakeClient)
+    monkeypatch.setattr(ai_engine.time, "sleep", lambda s: sleeps.append(s))
+    monkeypatch.setattr(ai_engine, "GEMINI_MODEL", "main-model")
+    monkeypatch.setattr(ai_engine, "GEMINI_FALLBACK_MODELS", ["lite-model"])
+    return calls, sleeps
+
+
+OVERLOADED = RuntimeError("503 UNAVAILABLE. {'error': {'code': 503, 'message': 'The model is overloaded.'}}")
+INTERNAL = RuntimeError("500 INTERNAL. {'error': {'code': 500, 'message': 'Internal error encountered.'}}")
+
+
+def test_gemini_retries_transient_errors_with_backoff(monkeypatch):
+    calls, sleeps = _scripted_gemini(monkeypatch, {"main-model": [INTERNAL, OVERLOADED, '{"ok": 1}']})
+    ok, text, err = ai_engine._call_gemini("p", "k")
+    assert ok and text == '{"ok": 1}' and calls == ["main-model"] * 3 and sleeps == [2, 5]
+
+
+def test_gemini_switches_to_the_fallback_model_when_the_main_one_stays_overloaded(monkeypatch):
+    calls, _ = _scripted_gemini(monkeypatch, {"main-model": [OVERLOADED] * 4, "lite-model": ['{"ok": 2}']})
+    ok, text, _err = ai_engine._call_gemini("p", "k")
+    assert ok and text == '{"ok": 2}' and calls[-1] == "lite-model"
+
+
+def test_gemini_waits_the_suggested_delay_once_on_rate_limit(monkeypatch):
+    rate = RuntimeError("429 RESOURCE_EXHAUSTED. {'details': [{'@type': 'type.googleapis.com/google.rpc.RetryInfo', "
+                        "'retryDelay': '12s'}]}")
+    calls, sleeps = _scripted_gemini(monkeypatch, {"main-model": [rate, '{"ok": 3}']})
+    ok, _text, _err = ai_engine._call_gemini("p", "k")
+    assert ok and sleeps == [12.0] and calls == ["main-model", "main-model"]
+
+
+def test_gemini_daily_quota_goes_straight_to_the_fallback_model(monkeypatch):
+    daily = RuntimeError("429 RESOURCE_EXHAUSTED. quotaId: GenerateRequestsPerDayPerProjectPerModel-FreeTier, "
+                         "'retryDelay': '20s'")
+    calls, sleeps = _scripted_gemini(monkeypatch, {"main-model": [daily], "lite-model": [daily]})
+    ok, _text, err = ai_engine._call_gemini("p", "k")
+    assert not ok and sleeps == [] and calls == ["main-model", "lite-model"]
+    assert err.startswith("Gemini API chyba: 429")
+
+
+def test_gemini_invalid_key_is_not_retried_on_other_models(monkeypatch):
+    bad_key = RuntimeError("400 INVALID_ARGUMENT. API key not valid. Please pass a valid API key.")
+    calls, sleeps = _scripted_gemini(monkeypatch, {"main-model": [bad_key], "lite-model": ['{"x": 1}']})
+    ok, _text, err = ai_engine._call_gemini("p", "k")
+    assert not ok and calls == ["main-model"] and sleeps == [] and "API key not valid" in err

@@ -81,6 +81,10 @@ CRYPTO_NEWS_RSS_URLS: Final[List[str]] = [
 REDDIT_CRYPTO_URL: Final[str] = "https://www.reddit.com/r/CryptoCurrency/hot.json"
 
 GEMINI_MODEL: Final[str] = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
+# Tried in order when the main model is overloaded, failing or out of quota (comma separated; empty = none).
+GEMINI_FALLBACK_MODELS: Final[List[str]] = [
+    m.strip() for m in os.environ.get("GEMINI_FALLBACK_MODELS", "gemini-flash-lite-latest").split(",") if m.strip()
+]
 OPENAI_API_URL: Final[str] = "https://api.openai.com/v1/chat/completions"
 OPENAI_MODEL: Final[str] = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 ANTHROPIC_API_URL: Final[str] = "https://api.anthropic.com/v1/messages"

@@ -10,6 +10,7 @@ import socket
 import statistics
 from concurrent.futures import ThreadPoolExecutor
 import random
+import re
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -23,7 +24,7 @@ from urllib3.connectionpool import HTTPSConnectionPool
 
 from app.config import (
     ANTHROPIC_API_URL, ANTHROPIC_API_VERSION, ANTHROPIC_MODEL,
-    DEEPSEEK_API_URL, DEEPSEEK_MODEL, DEFAULT_COIN_IDS, GEMINI_MODEL, GROK_API_URL, GROK_MODEL, QUANT_PROVIDER,
+    DEEPSEEK_API_URL, DEEPSEEK_MODEL, DEFAULT_COIN_IDS, GEMINI_FALLBACK_MODELS, GEMINI_MODEL, GROK_API_URL, GROK_MODEL, QUANT_PROVIDER,
     MOCK_BASE_PRICES, OPENAI_API_URL, OPENAI_MODEL,
     PROVIDER_TOKEN_PRICE_USD_PER_1K,
     AI_REQUEST_TIMEOUT_SECONDS, SECTOR_CATEGORIES, TIME_HORIZONS,
@@ -94,37 +95,94 @@ _MARKET_CONTEXT_TIMEOUT = 5
 _GEMINI_MAX_OUTPUT_TOKENS = 4096
 
 
-def _call_gemini(prompt: str, api_key: str) -> tuple[bool, str, Optional[str]]:
-    last_error = ""
+# Gemini (above all on free keys) regularly answers 500 INTERNAL, 503 UNAVAILABLE ("model is overloaded") or
+# 429 RESOURCE_EXHAUSTED. AI calls run as background jobs, so there is time to retry with back-off, honour the
+# retry delay Google suggests, and finally switch to a lighter model, which has its own capacity and quota.
+_GEMINI_TRANSIENT_MARKERS = ("500", "internal", "503", "overloaded", "unavailable", "timeout", "timed out", "deadline")
+_GEMINI_RATE_MARKERS = ("429", "resource_exhausted", "rate limit", "quota")
+_GEMINI_BACKOFF_SECONDS = (2, 5, 10)
+_GEMINI_BUDGET_SECONDS = 110          # all attempts and models together
+_GEMINI_MAX_RATE_WAIT_SECONDS = 30
+
+
+def _gemini_error_kind(message: str) -> Optional[str]:
+    text = message.lower()
+    if any(m in text for m in _GEMINI_RATE_MARKERS):
+        return "rate"
+    if any(m in text for m in _GEMINI_TRANSIENT_MARKERS):
+        return "transient"
+    return None
+
+
+def _gemini_retry_delay(message: str) -> Optional[float]:
+    """Seconds Google asks to wait (RetryInfo.retryDelay, e.g. '37s'), if present."""
+    match = re.search(r"retryDelay['\"]?\s*:\s*['\"]?(\d+(?:\.\d+)?)s", message)
+    return float(match.group(1)) if match else None
+
+
+def _call_gemini_model(model: str, prompt: str, api_key: str, deadline: float) -> tuple[bool, str, Optional[str]]:
+    from google import genai
+    from google.genai import types
+
     use_thinking_config = True
-    for attempt in range(_MAX_RETRIES + 2):
-        if attempt > _MAX_RETRIES and use_thinking_config:
-            break
+    transient_retries = 0
+    waited_for_rate = False
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 1:
+            return False, "", "timeout: casovy limit na odpoved AI vyprsal"
         try:
-            from google import genai
-            from google.genai import types
-            client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=AI_REQUEST_TIMEOUT_SECONDS * 1000))
+            timeout_ms = int(min(AI_REQUEST_TIMEOUT_SECONDS, remaining) * 1000)
+            client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=timeout_ms))
             config_kwargs: Dict[str, Any] = {"max_output_tokens": _GEMINI_MAX_OUTPUT_TOKENS}
             if use_thinking_config:
                 config_kwargs["thinking_config"] = types.ThinkingConfig(thinking_level="low")
             response = client.models.generate_content(
-                model=GEMINI_MODEL, contents=prompt, config=types.GenerateContentConfig(**config_kwargs),
+                model=model, contents=prompt, config=types.GenerateContentConfig(**config_kwargs),
             )
             text = response.text or ""
             if not text.strip():
                 return False, "", "Gemini vratil prazdnu odpoved (limit vystupu bol vycerpany premyslanim modelu)."
             return True, text, None
         except Exception as exc:  # noqa: BLE001
-            last_error = str(exc)
-            if use_thinking_config and "thinking" in last_error.lower():
+            message = str(exc)
+            if use_thinking_config and "thinking" in message.lower():
                 # Models without thinking-level support reject the option; retry once without it.
                 use_thinking_config = False
                 continue
-            is_retryable = any(marker in last_error.lower() for marker in ("503", "overloaded", "429", "rate limit", "unavailable", "timeout"))
-            if is_retryable and attempt < _MAX_RETRIES:
-                time.sleep(_BACKOFF_BASE_SECONDS * (2 ** attempt))
-                continue
-            return False, "", f"Gemini API chyba: {exc}"
+            kind = _gemini_error_kind(message)
+            if kind == "rate":
+                delay = _gemini_retry_delay(message)
+                per_day = "perday" in message.lower().replace("_", "").replace(" ", "")
+                if (not waited_for_rate and not per_day and delay is not None
+                        and delay <= _GEMINI_MAX_RATE_WAIT_SECONDS and time.monotonic() + delay + 5 < deadline):
+                    waited_for_rate = True
+                    time.sleep(delay)
+                    continue
+                return False, "", message
+            if kind == "transient" and transient_retries < len(_GEMINI_BACKOFF_SECONDS):
+                pause = _GEMINI_BACKOFF_SECONDS[transient_retries]
+                if time.monotonic() + pause + 5 < deadline:
+                    transient_retries += 1
+                    time.sleep(pause)
+                    continue
+            return False, "", message
+
+
+def _call_gemini(prompt: str, api_key: str) -> tuple[bool, str, Optional[str]]:
+    deadline = time.monotonic() + _GEMINI_BUDGET_SECONDS
+    last_error = ""
+    for model in dict.fromkeys([GEMINI_MODEL, *GEMINI_FALLBACK_MODELS]):
+        ok, text, error = _call_gemini_model(model, prompt, api_key, deadline)
+        if ok:
+            if model != GEMINI_MODEL:
+                logger.info("Gemini: odpoved od zalozneho modelu %s", model)
+            return True, text, None
+        last_error = error or ""
+        if last_error.startswith("Gemini vratil"):
+            return False, "", last_error
+        if _gemini_error_kind(last_error) is None or time.monotonic() >= deadline - 5:
+            break                      # e.g. an invalid key: another model would fail the same way
     return False, "", f"Gemini API chyba: {last_error}"
 
 
