@@ -37,8 +37,9 @@ export const SESSION_EXPIRED_EVENT = "aca:session-expired";
 
 // Generous on purpose: a sleeping free-tier backend can take close to a minute to wake up.
 const DEFAULT_TIMEOUT_MS = 60_000;
-// AI calls wait for the model to finish generating.
-export const AI_TIMEOUT_MS = 90_000;
+// AI calls run as background jobs on the server; the client polls until the model has finished.
+export const AI_TIMEOUT_MS = 150_000;
+const JOB_POLL_MS = 1_000;
 
 function apiError(message, extra = {}) {
   const err = new Error(message);
@@ -46,8 +47,8 @@ function apiError(message, extra = {}) {
   return err;
 }
 
-async function request(path, { method = "GET", body, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
-  const headers = { "Content-Type": "application/json" };
+async function request(path, { method = "GET", body, timeoutMs = DEFAULT_TIMEOUT_MS, extraHeaders } = {}) {
+  const headers = { "Content-Type": "application/json", ...extraHeaders };
   if (method !== "GET") {
     const csrfToken = readCookie(CSRF_COOKIE_NAME);
     if (csrfToken) headers["X-CSRF-Token"] = csrfToken;
@@ -89,6 +90,31 @@ async function request(path, { method = "GET", body, timeoutMs = DEFAULT_TIMEOUT
   } catch {
     throw apiError(`Server error (${res.status}): invalid response`, { status: 502, code: "bad_response" });
   }
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Start an AI request as a background job and wait for its result. Each HTTP call stays short, so the
+ * ~26 s limit of the hosting proxy no longer cuts off slow models. A server that answers inline still works.
+ */
+async function requestJob(path, options = {}) {
+  const started = await request(path, { method: "POST", ...options, extraHeaders: { Prefer: "respond-async" } });
+  if (!started || typeof started.job_id !== "string") return started;
+  const deadline = Date.now() + AI_TIMEOUT_MS;
+  let networkErrors = 0;
+  while (Date.now() < deadline) {
+    await sleep(JOB_POLL_MS);
+    try {
+      const job = await request(`/jobs/${encodeURIComponent(started.job_id)}`);
+      networkErrors = 0;
+      if (job?.status === "done") return job.result;
+    } catch (err) {
+      // A brief connection drop while polling is not a failure of the job itself.
+      if (err?.code !== "network" || ++networkErrors > 3) throw err;
+    }
+  }
+  throw apiError("Request timed out", { code: "timeout" });
 }
 
 /* ---------- response normalizers: the UI can rely on these shapes ---------- */
@@ -171,7 +197,7 @@ export const api = {
   saveApiKey: (provider, api_key, extra = {}) => request("/account/api-keys", { method: "PUT", body: { provider, api_key, ...extra } }),
   deleteApiKey: (provider) => request(`/account/api-keys/${encodeURIComponent(provider)}`, { method: "DELETE" }),
   apiKeyLinks: () => request("/account/api-keys/links").then(obj),
-  testApiKey: (provider) => request(`/account/api-keys/${encodeURIComponent(provider)}/test`, { method: "POST", timeoutMs: AI_TIMEOUT_MS }).then(obj),
+  testApiKey: (provider) => requestJob(`/account/api-keys/${encodeURIComponent(provider)}/test`).then(obj),
   changePassword: (current_password, new_password) =>
     request("/account/change-password", { method: "POST", body: { current_password, new_password } }),
   logoutAllDevices: () => request("/account/logout-all-devices", { method: "POST" }),
@@ -191,7 +217,7 @@ export const api = {
   accountActivity: () => request("/account/activity").then((r) => withArrays(r, ["events"])),
 
   generateForecast: (provider, coin, horizon) =>
-    request("/forecast", { method: "POST", body: { provider, coin, horizon, lang: currentLang() }, timeoutMs: AI_TIMEOUT_MS }).then(aiResult),
+    requestJob("/forecast", { body: { provider, coin, horizon, lang: currentLang() } }).then(aiResult),
   estimateForecastCost: (provider, coin, horizon) =>
     request("/forecast/estimate-cost", { method: "POST", body: { provider, coin, horizon, lang: currentLang() } }),
   saveForecast: (provider, coin, horizon, forecast_data, is_mock) =>
@@ -208,7 +234,7 @@ export const api = {
   submitTip: (id, price) => request(`/forecast/history/${id}/tip`, { method: "POST", body: { price } }),
 
   analyzePortfolio: (provider, holdings) =>
-    request("/portfolio/analyze", { method: "POST", body: { provider, holdings, lang: currentLang() }, timeoutMs: AI_TIMEOUT_MS }).then(aiResult),
+    requestJob("/portfolio/analyze", { body: { provider, holdings, lang: currentLang() } }).then(aiResult),
   estimatePortfolioCost: (provider, holdings) =>
     request("/portfolio/estimate-cost", { method: "POST", body: { provider, holdings, lang: currentLang() } }),
   savePortfolio: (provider, holdings, analysis_data, is_mock) =>
@@ -219,7 +245,7 @@ export const api = {
 
   fearGreed: (refresh = false) => request(`/market/fear-greed${refresh ? "?refresh=true" : ""}`).then(fearGreed),
   headlines: () => request("/market/headlines").then((r) => withArrays(r, ["headlines"])),
-  newsSentiment: (provider, titles) => request("/market/news-sentiment", { method: "POST", body: { provider, titles, lang: currentLang() }, timeoutMs: AI_TIMEOUT_MS }).then(aiResult),
+  newsSentiment: (provider, titles) => requestJob("/market/news-sentiment", { body: { provider, titles, lang: currentLang() } }).then(aiResult),
   events: () => request(`/market/events?lang=${currentLang()}`).then((r) => withArrays(r, ["events"])),
   vote: (sentiment_vote) => request("/market/vote", { method: "POST", body: { sentiment_vote } }),
   myVote: () => request("/market/vote/mine").then(obj),
@@ -229,7 +255,7 @@ export const api = {
   marketChart: (coinId, vsCurrency = "usd", days = "7") =>
     request(`/market/chart?coin_id=${encodeURIComponent(coinId)}&vs_currency=${vsCurrency}&days=${days}`).then(chartPoints),
   searchCoins: (q) => request(`/market/coins/search?q=${encodeURIComponent(q)}`).then((r) => withArrays(r, ["results"])),
-  dailyDigest: (provider) => request("/market/daily-digest", { method: "POST", body: { provider, lang: currentLang() }, timeoutMs: AI_TIMEOUT_MS }).then(aiResult),
+  dailyDigest: (provider) => requestJob("/market/daily-digest", { body: { provider, lang: currentLang() } }).then(aiResult),
 
   watchlist: () => request("/account/watchlist").then(watchlist),
   setWatchlist: (coins) => request("/account/watchlist", { method: "PUT", body: { coins } }).then(watchlist),
@@ -240,5 +266,5 @@ export const api = {
   deleteSchedule: (id) => request(`/schedules/${id}`, { method: "DELETE" }),
   historyCsvUrl: () => `${BASE}/forecast/history/export.csv`,
 
-  sendChatMessage: (provider, messages) => request("/chat", { method: "POST", body: { provider, messages, lang: currentLang() }, timeoutMs: AI_TIMEOUT_MS }).then(aiResult),
+  sendChatMessage: (provider, messages) => requestJob("/chat", { body: { provider, messages, lang: currentLang() } }).then(aiResult),
 };

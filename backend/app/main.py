@@ -15,7 +15,7 @@ from app.csrf import CSRFMiddleware
 from app.database import SessionLocal, init_db
 from app.logging_config import configure_logging
 from app.monitoring import capture_exception, init_monitoring
-from app.routers import account, auth, chat, forecast, market, portfolio, public, schedules
+from app.routers import account, auth, chat, forecast, jobs, market, portfolio, public, schedules
 from app.request_guard import RequestGuardMiddleware
 from app.security_headers import SecurityHeadersMiddleware
 from app.services.schedules import start_scheduler, stop_scheduler
@@ -73,6 +73,7 @@ app.include_router(market.router)
 app.include_router(chat.router)
 app.include_router(public.router)
 app.include_router(schedules.router)
+app.include_router(jobs.router)
 
 
 @app.get("/api/health")
