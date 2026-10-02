@@ -26,7 +26,7 @@ from app.schemas import MAX_DB_ID
 from app.schemas import (
     AIResultOut, CostEstimateOut, ForecastAccuracyOut, ForecastHistoryOut, ForecastRequest, PaginatedForecastHistory, SaveForecastRequest, TipRequest, BulkDeleteRequest,
 )
-from app.services import audit
+from app.services import audit, jobs
 from app.services.backtest import BACKTEST_SETUP, run_backtest
 from app.services.demo_data import DEMO_LABEL_LIKE, demo_accuracy, is_demo_label
 from app.services.ai_engine import compute_forecast_accuracy, estimate_forecast_cost, get_coin_forecast
@@ -47,19 +47,24 @@ _provider_label = provider_label
 
 
 @router.post("", response_model=AIResultOut, dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
-def generate_forecast(payload: ForecastRequest, user: User = Depends(get_current_user),
-                       db: Session = Depends(get_db)) -> AIResultOut:
+def generate_forecast(payload: ForecastRequest, request: Request, user: User = Depends(get_current_user),
+                      db: Session = Depends(get_db)):
     if _provider_label(payload.provider) is None:
         raise HTTPException(status_code=400, detail="Neznamy AI provider.")
     api_key = None if payload.provider == QUANT_PROVIDER else get_decrypted_api_key(db, user.id, payload.provider)
-    result = get_coin_forecast(payload.provider, payload.coin, payload.horizon, api_key, payload.lang)
-    if result.success and result.data and not result.is_mock:
-        # Sign for the provider that actually produced the data, so a quant fallback
-        # can only be saved (and scored on the leaderboard) as the quant model.
-        signed_provider = result.provider_used or payload.provider
-        result.data["podpis"] = sign_forecast(user.id, signed_provider, payload.coin, payload.horizon,
-                                              result.data["ceny"], str(result.data.get("vytvorene", "")))
-    return AIResultOut(**result.as_dict())
+    user_id = user.id
+
+    def compute() -> dict:
+        result = get_coin_forecast(payload.provider, payload.coin, payload.horizon, api_key, payload.lang)
+        if result.success and result.data and not result.is_mock:
+            # Sign for the provider that actually produced the data, so a quant fallback
+            # can only be saved (and scored on the leaderboard) as the quant model.
+            signed_provider = result.provider_used or payload.provider
+            result.data["podpis"] = sign_forecast(user_id, signed_provider, payload.coin, payload.horizon,
+                                                  result.data["ceny"], str(result.data.get("vytvorene", "")))
+        return AIResultOut(**result.as_dict()).model_dump()
+
+    return jobs.respond(request, user_id, compute)
 
 
 @router.get("/backtest", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])

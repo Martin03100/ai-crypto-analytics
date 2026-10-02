@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,7 @@ from app.deps import get_current_user, get_db, get_decrypted_api_key
 from app.models import CommunityVote, User
 from app.rate_limit import rate_limit_by_ip, rate_limit_by_user, rate_limit_global
 from app.schemas import AIResultOut, DailyDigestRequest, NewsSentimentRequest, VoteRequest
+from app.services import jobs
 from app.services.ai_engine import get_daily_digest, get_news_sentiment_summary
 from app.services.market_data import (
     VALID_CHART_DAYS, VALID_VS_CURRENCIES, is_valid_coin_id,
@@ -52,14 +53,14 @@ def headlines() -> dict:
 
 
 @router.post("/news-sentiment", response_model=AIResultOut, dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
-def news_sentiment(payload: NewsSentimentRequest, user: User = Depends(get_current_user),
-                    db: Session = Depends(get_db)) -> AIResultOut:
+def news_sentiment(payload: NewsSentimentRequest, request: Request, user: User = Depends(get_current_user),
+                   db: Session = Depends(get_db)):
     provider = payload.provider
     titles: List[str] = [title[:300] for title in payload.titles]
     lang = payload.lang
     api_key = get_decrypted_api_key(db, user.id, provider) if provider else None
-    result = get_news_sentiment_summary(provider, titles, api_key, lang)
-    return AIResultOut(**result.as_dict())
+    return jobs.respond(request, user.id, lambda: AIResultOut(
+        **get_news_sentiment_summary(provider, titles, api_key, lang).as_dict()).model_dump())
 
 
 @router.get("/prices", dependencies=_PUBLIC_LIMITS)
@@ -93,9 +94,13 @@ def coins_search(q: str) -> dict:
 
 
 @router.post("/daily-digest", response_model=AIResultOut, dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
-def daily_digest(payload: DailyDigestRequest, user: User = Depends(get_current_user),
-                  db: Session = Depends(get_db)) -> AIResultOut:
+def daily_digest(payload: DailyDigestRequest, request: Request, user: User = Depends(get_current_user),
+                 db: Session = Depends(get_db)):
     api_key = get_decrypted_api_key(db, user.id, payload.provider)
+    return jobs.respond(request, user.id, lambda: _daily_digest(payload, api_key))
+
+
+def _daily_digest(payload: DailyDigestRequest, api_key) -> dict:
     fg_success, fg_data, _ = get_fear_greed_index()
     fg_value = fg_data["value"] if fg_success and fg_data else 50
     fg_classification = fg_data["classification"] if fg_success and fg_data else "Neutral"
@@ -104,7 +109,7 @@ def daily_digest(payload: DailyDigestRequest, user: User = Depends(get_current_u
     headlines = [h["title"] for h in headlines_raw] if news_success else []
 
     result = get_daily_digest(payload.provider, fg_value, fg_classification, headlines, api_key, payload.lang)
-    return AIResultOut(**result.as_dict())
+    return AIResultOut(**result.as_dict()).model_dump()
 
 
 @router.get("/events", dependencies=_PUBLIC_LIMITS)

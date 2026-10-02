@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Annotated, List
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from sqlalchemy.orm import Session
 
 from app.deps import ensure_below_save_limit, get_current_user, get_db, get_decrypted_api_key
@@ -16,18 +16,19 @@ from app.schemas import MAX_DB_ID
 from app.schemas import (
     AIResultOut, BulkDeleteRequest, CostEstimateOut, PaginatedPortfolioHistory, PortfolioHistoryOut, PortfolioRequest, SavePortfolioRequest,
 )
+from app.services import jobs
 from app.services.ai_engine import estimate_portfolio_cost, get_portfolio_analysis
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
 
 
 @router.post("/analyze", response_model=AIResultOut, dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
-def analyze_portfolio(payload: PortfolioRequest, user: User = Depends(get_current_user),
-                       db: Session = Depends(get_db)) -> AIResultOut:
+def analyze_portfolio(payload: PortfolioRequest, request: Request, user: User = Depends(get_current_user),
+                      db: Session = Depends(get_db)):
     api_key = get_decrypted_api_key(db, user.id, payload.provider)
     holdings = [h.model_dump() for h in payload.holdings]
-    result = get_portfolio_analysis(payload.provider, holdings, api_key, payload.lang)
-    return AIResultOut(**result.as_dict())
+    return jobs.respond(request, user.id, lambda: AIResultOut(
+        **get_portfolio_analysis(payload.provider, holdings, api_key, payload.lang).as_dict()).model_dump())
 
 
 @router.post("/estimate-cost", response_model=CostEstimateOut,

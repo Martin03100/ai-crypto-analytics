@@ -8,9 +8,9 @@ from typing import Dict, Final, List, Optional
 
 APP_TITLE: Final[str] = "AI Crypto Analytics"
 REQUEST_TIMEOUT_SECONDS: Final[int] = 12
-# Per-attempt timeout for AI provider calls. The default keeps two attempts (+ backoff) under the ~26 s limit
-# of the Netlify /api proxy; raise it only when the backend is reached without that proxy.
-AI_REQUEST_TIMEOUT_SECONDS: Final[int] = int(os.environ.get("AI_REQUEST_TIMEOUT_SECONDS", "12"))
+# Per-attempt timeout for AI provider calls. The web app runs AI requests as background jobs (app/services/jobs.py)
+# and polls for the result, so the ~26 s limit of the Netlify /api proxy does not apply to the model call.
+AI_REQUEST_TIMEOUT_SECONDS: Final[int] = int(os.environ.get("AI_REQUEST_TIMEOUT_SECONDS", "45"))
 
 BASE_DIR: Final[Path] = Path(__file__).resolve().parent.parent
 DATA_DIR: Final[Path] = BASE_DIR / "data"

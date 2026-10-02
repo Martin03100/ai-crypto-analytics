@@ -130,3 +130,28 @@ describe("AI failure messages", () => {
     expect(humanizeError("some brand new provider error", "en")).toMatch(/something went wrong/i);
   });
 });
+
+describe("background AI jobs", () => {
+  it("starts the forecast as a job and polls until it is done", async () => {
+    vi.useFakeTimers();
+    const calls = [];
+    let polls = 0;
+    const api = await loadApi(async (url, init) => {
+      calls.push([url, init?.method || "GET", init?.headers?.Prefer]);
+      if (url === "/api/forecast") return jsonResponse({ job_id: "job-123" }, { status: 202 });
+      polls += 1;
+      return jsonResponse(polls < 3 ? { status: "running" } : { status: "done", result: { success: true, data: { ceny: [1] } } });
+    });
+    const pending = api.generateForecast("gemini", "BTC", "1T");
+    await vi.advanceTimersByTimeAsync(3_500);
+    const res = await pending;
+    expect(res.success).toBe(true);
+    expect(calls[0]).toEqual(["/api/forecast", "POST", "respond-async"]);
+    expect(calls.slice(1).every(([url]) => url === "/api/jobs/job-123")).toBe(true);
+  });
+
+  it("still accepts an inline answer from a server without jobs", async () => {
+    const api = await loadApi(async () => jsonResponse({ success: true, data: { reply: "hi" } }));
+    expect((await api.sendChatMessage("gemini", [])).data.reply).toBe("hi");
+  });
+});

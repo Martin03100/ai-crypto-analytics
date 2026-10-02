@@ -24,7 +24,7 @@ from app.security import (
     create_access_token, decrypt_secret, encrypt_secret, generate_totp_secret, hash_password, mask_key, sanitize_text,
     totp_uri, verify_password,
 )
-from app.services import audit
+from app.services import audit, jobs
 from app.services.demo_data import create_demo_data, remove_demo_data
 from app.services.totp import consume_totp_code
 from app.services.account_cleanup import delete_user_data, release_email_if_unverified
@@ -62,15 +62,19 @@ def api_key_links() -> dict:
 
 
 @router.post("/api-keys/{provider}/test", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_API_KEY_TEST))])
-def test_api_key_endpoint(provider: str, user: User = Depends(get_current_user),
-                           db: Session = Depends(get_db)) -> dict:
+def test_api_key_endpoint(provider: str, request: Request, user: User = Depends(get_current_user),
+                          db: Session = Depends(get_db)):
     if provider not in PROVIDERS.values():
         raise HTTPException(status_code=400, detail="Neznamy AI provider.")
     api_key = get_decrypted_api_key(db, user.id, provider)
     if not api_key:
         return {"valid": False, "message": "Najprv ulož API kľúč pre tohto providera."}
-    ok, error = test_api_key(provider, api_key)
-    return {"valid": ok, "message": "Kľúč je platný a funkčný." if ok else (error or "Kľúč sa nepodarilo overiť.")}
+
+    def compute() -> dict:
+        ok, error = test_api_key(provider, api_key)
+        return {"valid": ok, "message": "Kľúč je platný a funkčný." if ok else (error or "Kľúč sa nepodarilo overiť.")}
+
+    return jobs.respond(request, user.id, compute)
 
 
 @router.put("/email", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
