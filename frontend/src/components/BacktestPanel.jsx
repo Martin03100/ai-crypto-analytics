@@ -13,8 +13,8 @@ import { humanizeError } from "../i18n/errorMessages";
 import { localeForLang } from "../i18n/locale";
 import { axisDecimals, formatPrice, formatUsd } from "../utils/formatPrice";
 import { backtestVerdicts } from "../utils/backtest";
+import { COINS } from "../utils/coins";
 
-const COINS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "DOT", "LINK"];
 const HORIZONS = ["24h", "1T", "1M"];
 
 function Metric({ value, label, help, tone }) {

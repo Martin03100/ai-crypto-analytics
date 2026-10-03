@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path
 from sqlalchemy.orm import Session
 
-from app.config import DEFAULT_COIN_IDS, PROVIDERS, QUANT_PROVIDER
+from app.config import DEFAULT_COIN_IDS, provider_label
 from app.deps import get_current_user, get_db
 from app.models import ForecastSchedule, User
 from app.rate_limit import rate_limit_by_user
@@ -35,7 +35,7 @@ def list_schedules(user: User = Depends(get_current_user), db: Session = Depends
 def create_schedule(payload: ScheduleCreate, user: User = Depends(get_current_user),
                     db: Session = Depends(get_db)) -> ScheduleOut:
     coin = payload.coin.upper()
-    if payload.provider != QUANT_PROVIDER and payload.provider not in PROVIDERS.values():
+    if provider_label(payload.provider) is None:
         raise HTTPException(status_code=400, detail="Neznamy AI provider.")
     if coin not in DEFAULT_COIN_IDS:
         raise HTTPException(status_code=400, detail="Plán predikcie podporuje len základné mince.")

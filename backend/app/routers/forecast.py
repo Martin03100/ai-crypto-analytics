@@ -43,13 +43,12 @@ def _numeric_prices(value) -> List[float]:
     return [float(p) for p in value]
 
 
-_provider_label = provider_label
 
 
 @router.post("", response_model=AIResultOut, dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
 def generate_forecast(payload: ForecastRequest, request: Request, user: User = Depends(get_current_user),
                       db: Session = Depends(get_db)):
-    if _provider_label(payload.provider) is None:
+    if provider_label(payload.provider) is None:
         raise HTTPException(status_code=400, detail="Neznamy AI provider.")
     api_key = None if payload.provider == QUANT_PROVIDER else get_decrypted_api_key(db, user.id, payload.provider)
     user_id = user.id
@@ -92,7 +91,7 @@ def estimate_forecast_cost_endpoint(payload: ForecastRequest, user: User = Depen
 @router.post("/save", response_model=ForecastHistoryOut, status_code=201)
 def save_forecast(payload: SaveForecastRequest, user: User = Depends(get_current_user),
                    db: Session = Depends(get_db)) -> ForecastHistoryOut:
-    label = _provider_label(payload.provider)
+    label = provider_label(payload.provider)
     if label is None:
         raise HTTPException(status_code=400, detail="Neznamy AI provider.")
     if payload.is_mock:
@@ -382,7 +381,8 @@ def _evaluate_pending(db: Session, limit: int = 5, deadline_seconds: float = 8.0
             try:
                 result = future.result(timeout=max(0.1, end - time.monotonic()))
             except FuturesTimeout:
-                continue                  # just slow (e.g. a rate-limited price API): try again without a penalty
+                row.eval_last_try_at = now   # just slow: retry later (no lost attempt) and let others have a turn
+                continue
             except Exception:  # noqa: BLE001
                 _mark_attempt(row, now)
                 continue

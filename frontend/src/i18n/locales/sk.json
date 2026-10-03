@@ -749,5 +749,6 @@
   "errors.basicCoinsOnly": "Tu sú podporované len základné mince.",
   "errors.scheduleNotFound": "Plán predikcie nebol nájdený.",
   "errors.providerServerError": "AI provider mal dočasnú chybu na svojej strane. Skús to o chvíľu znova.",
-  "errors.providerDailyQuota": "Tvoj API kľúč vyčerpal dnešný bezplatný limit pre tento AI model. Skús to zajtra, použi iného providera alebo si pre kľúč zapni platby."
+  "errors.providerDailyQuota": "Tvoj API kľúč vyčerpal dnešný bezplatný limit pre tento AI model. Skús to zajtra, použi iného providera alebo si pre kľúč zapni platby.",
+  "errors.totpReused": "Tento kód z overovacej aplikácie už bol použitý. Počkaj na ďalší."
 }

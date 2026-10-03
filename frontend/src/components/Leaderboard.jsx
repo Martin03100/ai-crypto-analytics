@@ -26,7 +26,7 @@ export default function Leaderboard() {
   const everyone = data.challenge?.everyone;
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div style={{ display: "grid", gap: 16, gridTemplateColumns: "minmax(0, 1fr)" }}>
       <Card title={t("leaderboard.title")} icon={Trophy}>
         <p className="text-sub" style={{ marginBottom: 12 }}>{t("leaderboard.desc")}</p>
         {hasQuant && <p className="text-sub" style={{ marginBottom: 12 }}>{t("leaderboard.quantNote")}</p>}

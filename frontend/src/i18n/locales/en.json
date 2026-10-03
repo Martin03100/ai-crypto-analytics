@@ -749,5 +749,6 @@
   "errors.basicCoinsOnly": "Only the main coins are supported here.",
   "errors.scheduleNotFound": "The schedule was not found.",
   "errors.providerServerError": "The AI provider had a temporary error on its side. Try again in a moment.",
-  "errors.providerDailyQuota": "Your API key has used up today's free limit for this AI model. Try tomorrow, use another provider, or enable billing for the key."
+  "errors.providerDailyQuota": "Your API key has used up today's free limit for this AI model. Try tomorrow, use another provider, or enable billing for the key.",
+  "errors.totpReused": "This authenticator code has already been used. Wait for the next one."
 }

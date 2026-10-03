@@ -1,7 +1,7 @@
 /** Authentication context. */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { api, SESSION_EXPIRED_EVENT } from "../api";
+import { api, isTransient, SESSION_EXPIRED_EVENT } from "../api";
 import { clearOfflineData, offlineSessionUser, rememberOfflineSession } from "../pwa";
 
 const AuthContext = createContext(null);
@@ -25,9 +25,9 @@ export function AuthProvider({ children }) {
         setUser(next);
       })
       .catch((err) => {
-        // Server unreachable (offline, cold start): reuse the account confirmed online in the last 24 h, so the
+        // Server unreachable (offline, cold start, proxy 502-504): reuse the account confirmed online in the last 24 h, so the
         // installed app opens with its cached data. A rejected session (401) or an expired window signs out.
-        const offlineUser = err?.code === "network" || err?.code === "timeout" ? offlineSessionUser() : null;
+        const offlineUser = isTransient(err) ? offlineSessionUser() : null;
         if (!offlineUser) clearOfflineData();
         setUser(offlineUser);
       })

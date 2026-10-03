@@ -525,3 +525,30 @@ def test_totp_code_used_for_login_cannot_disable_2fa(registered):
     from tests.conftest import csrf_headers
     res = client.post("/api/account/2fa/disable", json={"password": password, "code": code}, headers=csrf_headers(client))
     assert res.status_code == 400
+
+
+def test_reused_totp_code_is_not_counted_as_a_failed_attempt(registered):
+    import time
+    from app.database import SessionLocal
+    from app.models import User
+    from app.security import _hotp, encrypt_secret, generate_totp_secret
+    client, username, password = registered
+    secret = generate_totp_secret()
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.username == username).one()
+        user.totp_secret, user.totp_enabled = encrypt_secret(secret, user.id), True
+        db.commit()
+    finally:
+        db.close()
+    login = {"username": username, "password": password, "totp_code": _hotp(secret, int(time.time() // 30))}
+    client.cookies.clear()
+    assert client.post("/api/auth/login", json=login).status_code == 200
+    client.cookies.clear()
+    res = client.post("/api/auth/login", json=login)
+    assert res.status_code == 401 and "už bol použitý" in res.json()["detail"]
+    db = SessionLocal()
+    try:
+        assert db.query(User).filter(User.username == username).one().failed_login_attempts == 0
+    finally:
+        db.close()
