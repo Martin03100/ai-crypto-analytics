@@ -103,8 +103,11 @@ alembic upgrade head
 - **`TRUSTED_PROXY_HOPS` must match the deployment.** Behind the Netlify `/api` proxy and Render it is `2`;
   otherwise rate limits and the activity log see a proxy's IP instead of the user's (see `backend/.env.example`).
 - **Scheduled forecasts run inside the backend process** (a background thread polling every minute; each run is
-  claimed in the database, so several workers never run it twice). On Render's free plan the keep-warm workflow keeps
-  the service awake; a sleeping service runs overdue schedules as soon as it wakes. Set `SCHEDULER_ENABLED=0` to turn it off.
+  claimed in the database, so several workers never run it twice). Set `SCHEDULER_ENABLED=0` to turn it off.
+- **Render free plan sleeps after ~15 minutes without traffic.** The backend pings its own public URL
+  (`RENDER_EXTERNAL_URL`, set by Render) every 10 minutes to stay awake (`KEEP_AWAKE=0` turns it off); GitHub's
+  scheduled keep-warm workflow is only a backup, as GitHub runs it every few hours at best. A running service uses
+  about 744 of the 750 free instance hours per month. A sleeping service runs overdue schedules as soon as it wakes.
 - Free-tier market APIs (CoinGecko) limit history to about a year, so very old forecasts may no longer be scorable.
 
 ## Disclaimer
