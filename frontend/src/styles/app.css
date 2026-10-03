@@ -218,7 +218,7 @@
 }
 .card-title svg { color: var(--text-tertiary); }
 
-.grid { display: grid; gap: 16px; }
+.grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }  /* never wider than its container */
 .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 760px) { .grid-2, .grid-3 { grid-template-columns: minmax(0, 1fr); } }
@@ -655,7 +655,7 @@ input[type="checkbox"] { accent-color: var(--cyan); }
   .daily-digest { padding: 12px; gap: 10px; }
   .chart-toggles { margin-left: 0; width: 100%; }
   .daily-digest-icon { width: 26px; height: 26px; }
-  .grid-2, .grid-3 { grid-template-columns: 1fr !important; }
+  .grid-2, .grid-3 { grid-template-columns: minmax(0, 1fr) !important; }
   .card { padding: 16px; }
 }
 @media (max-width: 400px) {

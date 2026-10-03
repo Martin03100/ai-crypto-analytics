@@ -23,8 +23,10 @@ from fastapi.responses import JSONResponse
 logger = logging.getLogger("aca.jobs")
 
 JOB_TTL_SECONDS = 15 * 60
-MAX_RUNNING_PER_USER = 4
-_executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="ai-job")
+MAX_RUNNING_PER_USER = 6          # a model comparison starts up to 5 forecasts at once
+# Jobs mostly wait on provider APIs (I/O), so threads are cheap; enough of them that jobs start right away
+# instead of queueing past the client's polling deadline.
+_executor = ThreadPoolExecutor(max_workers=32, thread_name_prefix="ai-job")
 _lock = threading.Lock()
 
 

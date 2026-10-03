@@ -11,8 +11,8 @@ import { useProviders } from "../context/ProvidersContext";
 import { humanizeError } from "../i18n/errorMessages";
 import { COMPARE_COLORS, buildComparisonRows, changePct } from "../utils/compare";
 import { axisDecimals, formatPrice, formatUsd } from "../utils/formatPrice";
+import { COINS } from "../utils/coins";
 
-const COINS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "DOT", "LINK"];
 const HORIZONS = ["24h", "1T", "1M", "1R"];
 const MAX_PROVIDERS = COMPARE_COLORS.length;
 

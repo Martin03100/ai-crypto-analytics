@@ -24,6 +24,7 @@ const KNOWN_BACKEND_PATTERNS = [
   { test: /kluc sa nepodarilo overit/i, key: "errors.keyVerificationFailed" },
   { test: /najprv si over email/i, key: "errors.emailNotVerified" },
   { test: /zadaj 6-miestny k[oó]d z overovacej aplik/i, key: "errors.totpRequired" },
+  { test: /k[oó]d z overovacej aplik[aá]cie u[zž] bol pou[zž]it[yý]/i, key: "errors.totpReused" },
   { test: /nespr[aá]vny k[oó]d z overovacej aplik/i, key: "errors.totpInvalid" },
   { test: /overenie, [zž]e nie si robot/i, key: "errors.captchaFailed" },
   { test: /2fa u[zž] m[aá][sš] zapnut|najprv spusti nastavenie 2fa/i, key: "errors.totpSetupState" },

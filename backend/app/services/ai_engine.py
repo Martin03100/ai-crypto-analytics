@@ -107,6 +107,8 @@ _GEMINI_MAX_RATE_WAIT_SECONDS = 30
 
 def _gemini_error_kind(message: str) -> Optional[str]:
     text = message.lower()
+    if "404" in text or "not_found" in text or "is not found" in text:
+        return "model"          # retired or misspelled model name: retrying is pointless, another model may work
     if any(m in text for m in _GEMINI_RATE_MARKERS):
         return "rate"
     if any(m in text for m in _GEMINI_TRANSIENT_MARKERS):

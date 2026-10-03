@@ -21,17 +21,19 @@ import { stripMockTag } from "../utils/mockText";
 import { usePageTitle } from "../hooks/usePageTitle";
 
 function FearGreedGauge({ value, classification }) {
+  const { t } = useLanguage();
   const pct = Math.min(Math.max(value, 0), 100);
-  const color = pct <= 25 ? "var(--crimson)" : pct <= 45 ? "#fb923c" : pct <= 55 ? "var(--text-secondary)" : pct <= 75 ? "var(--amber)" : "var(--emerald)";
+  const tone = pct >= 55 ? "up" : pct <= 45 ? "down" : "";
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 10 }}>
-        <span className="metric-value mono" style={{ color }}>{value}/100</span>
-        <span className="text-sub">{stripMockTag(classification)}</span>
+      <div className="big-figure">
+        <span className={`metric-value ${tone}`}>{value}</span>
+        <span className="text-sub">/ 100 · {stripMockTag(classification)}</span>
       </div>
-      <div style={{ height: 8, borderRadius: 999, background: "var(--bg-inset)", overflow: "hidden" }}>
-        <div style={{ height: "100%", width: "100%", background: color, borderRadius: 999, transformOrigin: "left", transform: `scaleX(${pct / 100})`, transition: "transform 0.4s var(--ease)" }} />
+      <div className="fg-meter" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label="Fear & Greed">
+        <div className="fg-meter-thumb" style={{ left: `${pct}%` }} />
       </div>
+      <div className="fg-scale"><span>{t("dashboard.fearLabel")}</span><span>{t("dashboard.greedLabel")}</span></div>
     </div>
   );
 }

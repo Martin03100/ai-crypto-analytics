@@ -18,6 +18,7 @@ from app.monitoring import capture_exception, init_monitoring
 from app.routers import account, auth, chat, forecast, jobs, market, portfolio, public, schedules
 from app.request_guard import RequestGuardMiddleware
 from app.security_headers import SecurityHeadersMiddleware
+from app.services import keep_awake
 from app.services.schedules import start_scheduler, stop_scheduler
 
 configure_logging()
@@ -32,9 +33,11 @@ async def lifespan(_app: FastAPI):
     init_db()
     if SCHEDULER_ENABLED:
         start_scheduler()
+    keep_awake.start()
     logger.info("AI Crypto Analytics backend spusteny.")
     yield
     stop_scheduler()
+    keep_awake.stop()
 
 
 _docs_enabled = APP_ENV != "production"

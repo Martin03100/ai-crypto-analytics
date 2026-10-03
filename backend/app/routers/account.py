@@ -26,7 +26,7 @@ from app.security import (
 )
 from app.services import audit, jobs
 from app.services.demo_data import create_demo_data, remove_demo_data
-from app.services.totp import consume_totp_code
+from app.services.totp import OK, consume_totp_code
 from app.services.account_cleanup import delete_user_data, release_email_if_unverified
 from app.services.email_service import is_email_configured
 from app.services.verification import send_verification_code
@@ -203,7 +203,7 @@ def totp_enable(payload: TotpCodeRequest, request: Request, user: User = Depends
     secret = decrypt_secret(user.totp_pending_secret or "", user.id)
     if not secret:
         raise HTTPException(status_code=400, detail="Najprv spusti nastavenie 2FA.")
-    if not consume_totp_code(db, user, secret, payload.code):
+    if consume_totp_code(db, user, secret, payload.code) != OK:
         raise HTTPException(status_code=400, detail="Nesprávny kód z overovacej aplikácie (2FA).")
     user.totp_secret, user.totp_pending_secret, user.totp_enabled = user.totp_pending_secret, None, True
     audit.record(db, user.id, "twofa_enabled", request)
@@ -219,7 +219,7 @@ def totp_disable(payload: TotpDisableRequest, request: Request, user: User = Dep
     if not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=400, detail="Aktuálne heslo nie je správne.")
     secret = decrypt_secret(user.totp_secret or "", user.id)
-    if not consume_totp_code(db, user, secret, payload.code):
+    if consume_totp_code(db, user, secret, payload.code) != OK:
         raise HTTPException(status_code=400, detail="Nesprávny kód z overovacej aplikácie (2FA).")
     user.totp_secret, user.totp_pending_secret, user.totp_enabled = None, None, False
     audit.record(db, user.id, "twofa_disabled", request)

@@ -48,6 +48,8 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      - name: No inlined fonts (the production CSP allows fonts only from 'self')
+        run: "! grep -l 'data:font' dist/assets/*.css"
 
   e2e:
     name: End-to-end tests (Playwright)

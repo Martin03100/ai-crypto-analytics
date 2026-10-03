@@ -38,8 +38,9 @@ export const SESSION_EXPIRED_EVENT = "aca:session-expired";
 // Generous on purpose: a sleeping free-tier backend can take close to a minute to wake up.
 const DEFAULT_TIMEOUT_MS = 60_000;
 // AI calls run as background jobs on the server; the client polls until the model has finished.
-export const AI_TIMEOUT_MS = 150_000;
+export const AI_TIMEOUT_MS = 180_000;
 const JOB_POLL_MS = 1_000;
+const COLD_START_RETRY_MS = 2_000;
 
 function apiError(message, extra = {}) {
   const err = new Error(message);
@@ -47,7 +48,21 @@ function apiError(message, extra = {}) {
   return err;
 }
 
-async function request(path, { method = "GET", body, timeoutMs = DEFAULT_TIMEOUT_MS, extraHeaders } = {}) {
+/**
+ * A read that hits a gateway error (502-504) is retried once: on the free hosting plan the first request after a
+ * pause only wakes the backend and the proxy gives up before it is ready; the second one then succeeds.
+ */
+async function request(path, options = {}) {
+  try {
+    return await requestOnce(path, options);
+  } catch (err) {
+    if ((options.method || "GET") !== "GET" || ![502, 503, 504].includes(err?.status)) throw err;
+    await sleep(COLD_START_RETRY_MS);
+    return requestOnce(path, options);
+  }
+}
+
+async function requestOnce(path, { method = "GET", body, timeoutMs = DEFAULT_TIMEOUT_MS, extraHeaders } = {}) {
   const headers = { "Content-Type": "application/json", ...extraHeaders };
   if (method !== "GET") {
     const csrfToken = readCookie(CSRF_COOKIE_NAME);
@@ -94,6 +109,11 @@ async function request(path, { method = "GET", body, timeoutMs = DEFAULT_TIMEOUT
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** The server could not be reached or answered through the proxy with a gateway error (cold start, redeploy). */
+export function isTransient(err) {
+  return err?.code === "network" || err?.code === "timeout" || [502, 503, 504].includes(err?.status);
+}
+
 /**
  * Start an AI request as a background job and wait for its result. Each HTTP call stays short, so the
  * ~26 s limit of the hosting proxy no longer cuts off slow models. A server that answers inline still works.
@@ -102,16 +122,16 @@ async function requestJob(path, options = {}) {
   const started = await request(path, { method: "POST", ...options, extraHeaders: { Prefer: "respond-async" } });
   if (!started || typeof started.job_id !== "string") return started;
   const deadline = Date.now() + AI_TIMEOUT_MS;
-  let networkErrors = 0;
+  let hiccups = 0;
   while (Date.now() < deadline) {
     await sleep(JOB_POLL_MS);
     try {
       const job = await request(`/jobs/${encodeURIComponent(started.job_id)}`);
-      networkErrors = 0;
+      hiccups = 0;
       if (job?.status === "done") return job.result;
     } catch (err) {
-      // A brief connection drop while polling is not a failure of the job itself.
-      if (err?.code !== "network" || ++networkErrors > 3) throw err;
+      // A dropped connection or a proxy/backend blip (502-504) while polling is not a failure of the job itself.
+      if (!isTransient(err) || ++hiccups > 5) throw err;
     }
   }
   throw apiError("Request timed out", { code: "timeout" });

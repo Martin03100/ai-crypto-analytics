@@ -390,3 +390,10 @@ def test_gemini_invalid_key_is_not_retried_on_other_models(monkeypatch):
     calls, sleeps = _scripted_gemini(monkeypatch, {"main-model": [bad_key], "lite-model": ['{"x": 1}']})
     ok, _text, err = ai_engine._call_gemini("p", "k")
     assert not ok and calls == ["main-model"] and sleeps == [] and "API key not valid" in err
+
+
+def test_gemini_unknown_model_falls_back_without_retrying(monkeypatch):
+    gone = RuntimeError("404 NOT_FOUND. models/main-model is not found for API version v1beta")
+    calls, sleeps = _scripted_gemini(monkeypatch, {"main-model": [gone], "lite-model": ['{"ok": 4}']})
+    ok, text, _err = ai_engine._call_gemini("p", "k")
+    assert ok and text == '{"ok": 4}' and calls == ["main-model", "lite-model"] and sleeps == []

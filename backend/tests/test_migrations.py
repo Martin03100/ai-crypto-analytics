@@ -78,3 +78,15 @@ def test_downgrade_and_upgrade_roundtrip(tmp_path, monkeypatch):
     assert set(sa.inspect(engine).get_table_names()) <= {"alembic_version"}
     command.upgrade(cfg, "head")
     assert _current(engine) == _head()
+
+
+def test_legacy_database_is_not_stamped_when_a_column_could_not_be_added(tmp_path, monkeypatch):
+    import pytest
+    engine = _use_engine(tmp_path, monkeypatch)
+    command.upgrade(database._alembic_config(), "0001")
+    with engine.begin() as conn:
+        conn.execute(sa.text("DROP TABLE alembic_version"))
+    monkeypatch.setattr(database, "auto_migrate", lambda: None)     # every ALTER "failed"
+    with pytest.raises(RuntimeError, match="chybaju stlpce"):
+        database.init_db()
+    assert "alembic_version" not in sa.inspect(engine).get_table_names()

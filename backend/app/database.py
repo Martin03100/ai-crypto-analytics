@@ -90,6 +90,15 @@ def _create_missing_indexes() -> None:
                 logger.info("init_db: pridany index %s", index.name)
 
 
+def _require_complete_schema() -> None:
+    """auto_migrate only logs failed ALTERs; stamping such a database would hide the gap forever."""
+    inspector = inspect(engine)
+    missing = [f"{name}.{col.name}" for name, table in Base.metadata.tables.items()
+               for col in table.columns if col.name not in {c["name"] for c in inspector.get_columns(name)}]
+    if missing:
+        raise RuntimeError("Databazu sa nepodarilo doplnit, chybaju stlpce: " + ", ".join(missing))
+
+
 def init_db() -> None:
     """Bring the database schema to the latest Alembic revision.
 
@@ -107,6 +116,7 @@ def init_db() -> None:
         Base.metadata.create_all(bind=engine)
         auto_migrate()
         _create_missing_indexes()
+        _require_complete_schema()
         command.stamp(cfg, "head")
         return
     command.upgrade(cfg, "head")

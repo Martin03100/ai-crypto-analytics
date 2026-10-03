@@ -61,6 +61,8 @@ export default defineConfig({
     },
   },
   build: {
+    // Fonts are never inlined as data: URLs: the production CSP allows fonts only from 'self'.
+    assetsInlineLimit: (file) => (/\.(woff2?|ttf|otf)$/.test(file) ? false : undefined),
     rollupOptions: {
       output: {
         manualChunks(id) {

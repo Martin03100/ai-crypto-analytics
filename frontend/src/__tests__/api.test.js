@@ -155,3 +155,37 @@ describe("background AI jobs", () => {
     expect((await api.sendChatMessage("gemini", [])).data.reply).toBe("hi");
   });
 });
+
+describe("job polling resilience", () => {
+  it("keeps waiting through a proxy 502 while the job finishes", async () => {
+    vi.useFakeTimers();
+    let polls = 0;
+    const api = await loadApi(async (url) => {
+      if (url === "/api/forecast") return jsonResponse({ job_id: "job-9" }, { status: 202 });
+      polls += 1;
+      if (polls === 1) return jsonResponse("<html>Bad gateway</html>", { status: 502 });
+      return jsonResponse({ status: "done", result: { success: true, data: { ceny: [2] } } });
+    });
+    const pending = api.generateForecast("gemini", "BTC", "1T");
+    await vi.advanceTimersByTimeAsync(6_000);
+    expect((await pending).success).toBe(true);
+  });
+});
+
+describe("cold start", () => {
+  it("retries a read once after a gateway timeout, but never a write", async () => {
+    vi.useFakeTimers();
+    let n = 0;
+    const api = await loadApi(async () => (++n === 1 ? jsonResponse("<html>", { status: 504 }) : jsonResponse({ headlines: [] })));
+    const pending = api.headlines();
+    await vi.advanceTimersByTimeAsync(2_100);
+    expect((await pending).headlines).toEqual([]);
+    expect(n).toBe(2);
+
+    let writes = 0;
+    const api2 = await loadApi(async () => { writes += 1; return jsonResponse("<html>", { status: 504 }); });
+    const err = await api2.vote("Bullish").catch((e) => e);
+    expect(err.status).toBe(504);
+    expect(writes).toBe(1);
+  });
+});
