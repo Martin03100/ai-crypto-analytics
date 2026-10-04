@@ -1,4 +1,4 @@
-/** Card and metric components. */
+/** Card component. */
 
 export function Card({ title, icon: Icon, glow, children, style, id, className = "" }) {
   return (
@@ -10,18 +10,6 @@ export function Card({ title, icon: Icon, glow, children, style, id, className =
         </p>
       )}
       {children}
-    </div>
-  );
-}
-
-export function Metric({ label, value, delta, direction }) {
-  return (
-    <div>
-      <div className="metric-value mono">{value}</div>
-      <div className="metric-label">{label}</div>
-      {delta && (
-        <div className={`metric-delta ${direction === "down" ? "down" : "up"}`}>{delta}</div>
-      )}
     </div>
   );
 }
