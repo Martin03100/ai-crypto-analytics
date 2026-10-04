@@ -518,7 +518,7 @@ export default function Portfolio() {
                   onChange={(e) => setSelectedIds(e.target.checked ? pfHistory.map((h) => h.id) : [])} /> {t("common.selectAll")}
               </label>
               {selectedIds.length > 0 && (
-                <button className="btn btn-ghost btn-sm" style={{ color: "var(--crimson-fg)" }} onClick={bulkDeletePortfolio}>
+                <button className="btn btn-danger-ghost btn-sm" onClick={bulkDeletePortfolio}>
                   <Trash2 size={13} /> {t("common.deleteSelected", { n: selectedIds.length })}
                 </button>
               )}
