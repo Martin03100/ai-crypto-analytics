@@ -18,6 +18,8 @@ const Settings = lazy(() => import("./pages/Settings"));
 const SharedForecast = lazy(() => import("./pages/SharedForecast"));
 const StatusPage = lazy(() => import("./pages/StatusPage"));
 const About = lazy(() => import("./pages/About"));
+const TrackRecord = lazy(() => import("./pages/TrackRecord"));
+const Links = lazy(() => import("./pages/Links"));
 
 function FullScreenLoader() {
   const { t } = useLanguage();
@@ -49,6 +51,8 @@ export default function App() {
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/about" element={<Suspense fallback={<FullScreenLoader />}><About /></Suspense>} />
         <Route path="/status" element={<Suspense fallback={<FullScreenLoader />}><StatusPage /></Suspense>} />
+        <Route path="/track-record" element={<Suspense fallback={<FullScreenLoader />}><TrackRecord /></Suspense>} />
+        <Route path="/links" element={<Suspense fallback={<FullScreenLoader />}><Links /></Suspense>} />
         <Route path="/share/:token" element={<Suspense fallback={<FullScreenLoader />}><SharedForecast /></Suspense>} />
         <Route
           path="/"

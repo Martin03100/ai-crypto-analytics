@@ -432,6 +432,30 @@ def submit_tip(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], payload: TipR
 _MIN_SAMPLE = 5
 
 
+def provider_stats(db: Session, visibility) -> list[dict]:
+    """Accuracy per AI provider over the evaluations matching `visibility`, best first."""
+    beats_expr = case(
+        ((ForecastEvaluation.baseline_accuracy_pct.isnot(None))
+         & (ForecastEvaluation.accuracy_pct > ForecastEvaluation.baseline_accuracy_pct), 1), else_=0)
+    rows = (
+        db.query(
+            ForecastEvaluation.provider, func.count().label("n"),
+            func.sum(case((ForecastEvaluation.direction_correct == True, 1), else_=0)).label("hits"),  # noqa: E712
+            func.avg(ForecastEvaluation.accuracy_pct).label("acc"), func.sum(beats_expr).label("beats"),
+        ).filter(visibility)
+        .group_by(ForecastEvaluation.provider).all()
+    )
+    providers = [
+        {"provider": name, "evaluated": n, "direction_hit_pct": round((hits or 0) / n * 100, 1),
+         "avg_accuracy_pct": round(acc or 0.0, 1), "beats_baseline_pct": round((beats or 0) / n * 100, 1),
+         "low_sample": n < _MIN_SAMPLE}
+        for name, n, hits, acc, beats in rows
+    ]
+    providers.sort(key=lambda p: (not p["low_sample"], p["direction_hit_pct"], p["beats_baseline_pct"],
+                                  p["avg_accuracy_pct"]), reverse=True)
+    return providers
+
+
 def _tip_summary(db: Session, user_id: Optional[int] = None) -> dict:
     query = db.query(PriceTip.outcome, func.count()).filter(PriceTip.outcome.isnot(None))
     if user_id is not None:
@@ -446,25 +470,7 @@ def _tip_summary(db: Session, user_id: Optional[int] = None) -> dict:
 @router.get("/leaderboard", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
 def leaderboard(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     _evaluate_pending(db)
-    beats_expr = case(
-        ((ForecastEvaluation.baseline_accuracy_pct.isnot(None))
-         & (ForecastEvaluation.accuracy_pct > ForecastEvaluation.baseline_accuracy_pct), 1), else_=0)
-    rows = (
-        db.query(
-            ForecastEvaluation.provider, func.count().label("n"),
-            func.sum(case((ForecastEvaluation.direction_correct == True, 1), else_=0)).label("hits"),  # noqa: E712
-            func.avg(ForecastEvaluation.accuracy_pct).label("acc"), func.sum(beats_expr).label("beats"),
-        ).filter(or_(ForecastEvaluation.is_demo.isnot(True), ForecastEvaluation.user_id == user.id))
-        .group_by(ForecastEvaluation.provider).all()
-    )
-    providers = [
-        {"provider": name, "evaluated": n, "direction_hit_pct": round((hits or 0) / n * 100, 1),
-         "avg_accuracy_pct": round(acc or 0.0, 1), "beats_baseline_pct": round((beats or 0) / n * 100, 1),
-         "low_sample": n < _MIN_SAMPLE}
-        for name, n, hits, acc, beats in rows
-    ]
-    providers.sort(key=lambda p: (not p["low_sample"], p["direction_hit_pct"], p["beats_baseline_pct"],
-                                  p["avg_accuracy_pct"]), reverse=True)
+    providers = provider_stats(db, or_(ForecastEvaluation.is_demo.isnot(True), ForecastEvaluation.user_id == user.id))
 
     pending = db.query(PriceTip).filter(PriceTip.user_id == user.id, PriceTip.outcome.is_(None)).count()
     return {

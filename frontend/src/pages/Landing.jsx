@@ -1,8 +1,10 @@
 /** Landing page. */
 
 import { ArrowRight, BarChart3, Brain, Database, ShieldCheck, Trophy, Users } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import CandlestickArt from "../components/CandlestickArt";
+import WaitlistForm from "../components/WaitlistForm";
 import { useLanguage } from "../context/LanguageContext";
 import { usePageTitle } from "../hooks/usePageTitle";
 import { LANGUAGES } from "../i18n/translations";
@@ -17,6 +19,10 @@ const FEATURES = [
 export default function Landing() {
   const { t, lang, setLang } = useLanguage();
   usePageTitle("landing.pageTitle");
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (hash === "#waitlist") document.getElementById("waitlist")?.scrollIntoView({ behavior: "smooth" });
+  }, [hash]);
   return (
     <main className="landing">
       <header className="landing-nav">
@@ -47,6 +53,9 @@ export default function Landing() {
             <div className="landing-feature-icon"><Icon size={18} /></div>
             <h2>{t(title)}</h2>
             <p className="text-sub">{t(text)}</p>
+            {title === "landing.f3Title" && (
+              <Link to="/track-record" className="key-link landing-feature-link">{t("track.landingLink")} <ArrowRight size={13} /></Link>
+            )}
           </div>
         ))}
       </section>
@@ -60,6 +69,8 @@ export default function Landing() {
         </ol>
       </section>
 
+      <WaitlistForm />
+
       <section className="card landing-honest">
         <ShieldCheck size={18} />
         <div>
@@ -69,7 +80,7 @@ export default function Landing() {
       </section>
 
       <footer className="landing-footer">
-        <Link to="/about">{t("about.title")}</Link> · <Link to="/status">{t("status.title")}</Link> ·{" "}
+        <Link to="/about">{t("about.title")}</Link> · <Link to="/track-record">{t("track.title")}</Link> · <Link to="/status">{t("status.title")}</Link> ·{" "}
         <Link to="/privacy">{t("privacy.title")}</Link> · <Link to="/terms">{t("terms.title")}</Link>
       </footer>
     </main>

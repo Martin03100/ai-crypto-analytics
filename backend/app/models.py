@@ -193,3 +193,16 @@ class ForecastSchedule(Base):
     last_error: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     last_forecast_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class WaitlistEntry(Base):
+    """E-mail sign-ups for the upcoming Premium plan (no account needed)."""
+
+    __tablename__ = "waitlist_entries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    lang: Mapped[str] = mapped_column(String(4), nullable=False, default="en")
+    # utm_source of the visit (e.g. "tiktok"), so it is clear which channel brings interested users.
+    source: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)

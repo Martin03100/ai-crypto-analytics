@@ -231,6 +231,12 @@ export const api = {
   shareForecast: (id) => request(`/forecast/history/${id}/share`, { method: "POST" }).then(obj),
   unshareForecast: (id) => request(`/forecast/history/${id}/share`, { method: "DELETE" }),
   serviceStatus: () => request("/public/status").then((r) => withArrays(r, ["services"])),
+  trackRecord: () => request("/public/track-record").then((r) => withArrays(r, ["providers", "recent"])),
+  joinWaitlist: async (email, lang, source) => {
+    // A first-time visitor may not have the CSRF cookie yet; any API response sets it.
+    if (!readCookie(CSRF_COOKIE_NAME)) await request("/health").catch(() => {});
+    return request("/public/waitlist", { method: "POST", body: { email, lang, source: source || undefined } });
+  },
   sharedForecast: (token) => request(`/public/forecasts/${encodeURIComponent(token)}`).then(obj),
   loadDemoData: () => request(`/account/demo-data?lang=${currentLang()}`, { method: "POST", timeoutMs: AI_TIMEOUT_MS }).then(obj),
   removeDemoData: () => request("/account/demo-data", { method: "DELETE" }).then(obj),
