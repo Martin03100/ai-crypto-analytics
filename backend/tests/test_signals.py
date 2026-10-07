@@ -116,7 +116,8 @@ def test_events_regulators_and_polymarket(monkeypatch):
     monkeypatch.setattr(signals, "_get", fake_get({
         "sec.gov": rss, "cftc.gov": "<not xml",
         "polymarket": [{"question": "Will Bitcoin hit $150k in 2026?", "outcomes": '["Yes","No"]', "outcomePrices": '["0.23","0.77"]'},
-                       {"question": "Will it rain in Paris?", "outcomes": '["Yes","No"]', "outcomePrices": '["0.5","0.5"]'}],
+                       {"question": "Will it rain in Paris?", "outcomes": '["Yes","No"]', "outcomePrices": '["0.5","0.5"]'},
+                       {"question": "Will the Fed hike 100 bps?", "outcomes": '["Yes","No"]', "outcomePrices": '["0.001","0.999"]'}],
     }))
     reg = signals.regulation()
     assert [r["display"] for r in reg] == ["SEC charges crypto exchange"] and reg[0]["source"] == "sec"

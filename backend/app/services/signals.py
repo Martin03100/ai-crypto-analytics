@@ -70,13 +70,21 @@ def signal(group: str, key: str, value: Optional[float], display: str, tone: str
     return {"group": group, "key": key, "value": value, "display": display, "tone": tone, "source": source, "note": note}
 
 
+def _headers(url: str) -> Dict[str, str]:
+    if "coingecko.com" in url:
+        from app.config import COINGECKO_API_KEY
+        if COINGECKO_API_KEY:
+            return {**_UA, "x-cg-demo-api-key": COINGECKO_API_KEY}
+    return _UA
+
+
 def _get(url: str, cache: TTLCache, params: Optional[dict] = None, as_text: bool = False) -> Any:
     key = url + json.dumps(params or {}, sort_keys=True)
     hit = cache.get(key)
     if hit is not None:
         return hit
     try:
-        res = requests.get(url, params=params, headers=_UA, timeout=_TIMEOUT)
+        res = requests.get(url, params=params, headers=_headers(url), timeout=_TIMEOUT)
         res.raise_for_status()
         data = res.text if as_text else res.json()
     except Exception as exc:  # noqa: BLE001 - any failure just skips the source
@@ -464,8 +472,8 @@ def prediction_markets(symbol: str) -> List[Dict[str, Any]]:
             yes = _f(prices[outcomes.index("Yes")]) if "Yes" in outcomes else None
         except (ValueError, TypeError, IndexError):
             continue
-        if yes is None:
-            continue
+        if yes is None or not 0.03 <= yes <= 0.97:
+            continue                      # settled-looking markets say nothing new
         out.append(signal("predictions", "polymarket", round(yes * 100), f"{question[:90]} · {yes * 100:.0f}% yes",
                           "neutral", "polymarket", f"Polymarket odds: \"{question}\" - {yes * 100:.0f}% yes"))
         if len(out) >= 3:
