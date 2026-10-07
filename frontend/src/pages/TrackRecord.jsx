@@ -7,6 +7,7 @@ import { api } from "../api";
 import { Card } from "../components/Card";
 import InfoTip from "../components/InfoTip";
 import LoadError from "../components/LoadError";
+import ShareBar from "../components/ShareBar";
 import { SkeletonLines } from "../components/Skeleton";
 import { useLanguage } from "../context/LanguageContext";
 import { localeForLang } from "../i18n/locale";
@@ -132,6 +133,7 @@ export default function TrackRecord() {
             </p>
           )}
 
+          <ShareBar text={t("track.shareText")} />
           <div style={{ marginTop: 20 }}>
             <Link to="/auth?tab=register" className="btn btn-primary">{t("track.cta")} <ArrowRight size={15} /></Link>
           </div>

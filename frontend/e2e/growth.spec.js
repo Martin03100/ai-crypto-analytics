@@ -32,3 +32,17 @@ test("privacy policy describes analytics and the waitlist", async ({ page }) => 
   await expect(page.getByRole("heading", { name: "Analytics" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Premium waitlist" })).toBeVisible();
 });
+
+test("track record offers sharing and SEO files are served", async ({ page, request }) => {
+  await page.goto("/track-record");
+  await expect(page.getByRole("link", { name: "Reddit" })).toHaveAttribute("href", /reddit\.com\/submit/);
+  await expect(page.getByRole("button", { name: "Copy link" })).toBeVisible();
+  expect((await (await request.get("/robots.txt")).text())).toContain("Sitemap:");
+  expect((await (await request.get("/sitemap.xml")).text())).toContain("/track-record");
+});
+
+test("about page does not mention the thesis", async ({ page }) => {
+  await page.goto("/about");
+  await expect(page.getByText("student developer from Prague")).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(/thesis|Unicorn/i);
+});

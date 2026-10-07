@@ -895,6 +895,8 @@ input[type="checkbox"] { accent-color: var(--cyan); }
 .track-stat-value { font-size: 26px; font-weight: 650; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .track-hit { color: var(--emerald-fg); }
 .track-miss { color: var(--crimson-fg); }
+.share-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 18px; }
+.share-bar-label { font-size: 12.5px; margin-right: 2px; }
 .links-page { min-height: 100vh; max-width: 440px; margin: 0 auto; padding: 48px 20px; text-align: center; display: grid; justify-items: center; align-content: start; gap: 10px; }
 .links-page h1 { font-size: 22px; margin: 6px 0 0; }
 .links-logo { width: 56px; height: 56px; border-radius: 16px; }
