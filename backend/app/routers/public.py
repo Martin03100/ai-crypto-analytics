@@ -26,7 +26,7 @@ from app.routers.community import premium_info
 from app.services import cards
 from app.services.app_settings import public_settings, require_feature
 from app.services.digest import check_unsubscribe_token
-from app.services.premium import is_premium
+from app.services.premium import ambassador_badge, invited_signups, is_premium
 from app.services.status_check import collect_status
 
 router = APIRouter(prefix="/api/public", tags=["public"])
@@ -188,7 +188,8 @@ def tipsters(period: Literal["week", "all"] = Query(default="week"), db: Session
     return {
         "period": period, "week_start": since.isoformat() + "Z",
         "leaders": [{"nickname": u.nickname, "duels": n, "wins": int(w or 0), "win_pct": round((w or 0) / n * 100),
-                     "premium": is_premium(u)} for u, n, w in rows],
+                     "premium": is_premium(u), "badge": ambassador_badge(invited_signups(db, u.id))}
+                    for u, n, w in rows],
         "humans_vs_ai": {"wins": outcomes.get("win", 0), "losses": outcomes.get("loss", 0), "ties": outcomes.get("tie", 0)},
     }
 

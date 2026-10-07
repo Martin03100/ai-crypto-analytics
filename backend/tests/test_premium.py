@@ -6,7 +6,7 @@ import pytest
 
 from app.database import SessionLocal
 from app.models import ForecastEvaluation, PriceAlert, User
-from tests.conftest import csrf_headers
+from tests.conftest import csrf_headers, set_app_settings
 
 
 def _user(username):
@@ -18,6 +18,7 @@ def _user(username):
 
 
 def _make_premium(username, days=10):
+    set_app_settings(premium_mode=True)
     db = SessionLocal()
     try:
         db.query(User).filter(User.username == username).update(
@@ -72,14 +73,18 @@ def test_alert_fires_once_with_notification_and_email(registered, monkeypatch):
         assert row.active is False and row.triggered_price == 101500.0
     finally:
         db.close()
-    assert sent == ["Price alert: BTC is above $100,000"]
+    assert sent == ["Alert: BTC is above $100,000"]
     note = client.get("/api/account/notifications").json()["items"][0]
     assert note["kind"] == "price_alert" and note["data"]["price"] == 101500.0
 
 
 def test_premium_only_endpoints_are_gated(registered):
     client, username, _p = registered
-    assert client.get("/api/account/stats").status_code == 403
+    res = client.get("/api/account/stats")
+    assert res.status_code == 403 and res.json()["detail"] == "Táto funkcia je momentálne vypnutá."   # mode off
+    set_app_settings(premium_mode=True)
+    res = client.get("/api/account/stats")
+    assert res.status_code == 403 and res.json()["detail"] == "Táto funkcia je dostupná v Premium."
     res = client.put("/api/account/preferences", json={"briefing_opt_in": True}, headers=csrf_headers(client))
     assert res.status_code == 403
     _make_premium(username)
@@ -132,6 +137,7 @@ def test_morning_briefing_only_for_premium_subscribers(registered, monkeypatch):
     try:
         db.query(User).filter(User.username == username).update({"briefing_opt_in": True})
         db.commit()
+        set_app_settings(premium_mode=True)
         assert briefing.send_morning_briefings(db) == 0          # not Premium
         db.query(User).filter(User.username == username).update(
             {"premium_until": datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=3)})
@@ -155,18 +161,15 @@ def stripe_on(monkeypatch):
 
 
 def _set(**values):
-    from app.services import app_settings
-    db = SessionLocal()
-    try:
-        app_settings.update(db, values)
-    finally:
-        db.close()
+    set_app_settings(premium_mode=True, **values)
 
 
 def test_checkout_needs_operator_details_and_consent(registered, stripe_on):
     client, _u, _p = registered
     buy = lambda body: client.post("/api/billing/checkout", json=body, headers=csrf_headers(client))  # noqa: E731
     consent = {"accept_terms": True, "start_immediately": True}
+    assert buy(consent).status_code == 503                       # Premium mode off
+    _set()
     assert buy(consent).status_code == 503                       # seller identity missing on the Terms page
     assert client.get("/api/public/premium").json()["billing_enabled"] is False
     _set(operator_name="Martin Masaryk", operator_address="Prague, Czech Republic")
@@ -176,6 +179,7 @@ def test_checkout_needs_operator_details_and_consent(registered, stripe_on):
     assert res.status_code == 200 and res.json()["url"].startswith("https://checkout.stripe.test")
     path, data = stripe_on[-1]
     assert path == "/checkout/sessions" and data["subscription_data[trial_period_days]"] == "7"
+    assert data["line_items[0][price]"] == "price_test"
     actions = [e["action"] for e in client.get("/api/account/activity").json()["events"]]
     assert "premium_checkout_consent" in actions
 
@@ -192,3 +196,18 @@ def test_trial_is_given_only_once(registered, stripe_on):
     client.post("/api/billing/checkout", json={"accept_terms": True, "start_immediately": True}, headers=csrf_headers(client))
     _path, data = stripe_on[-1]
     assert "subscription_data[trial_period_days]" not in data and data["customer"] == "cus_old"
+
+
+def test_yearly_plan_uses_yearly_price(registered, stripe_on, monkeypatch):
+    from app.services import billing
+    client, _u, _p = registered
+    _set(operator_name="M", operator_address="Prague")
+    body = {"accept_terms": True, "start_immediately": True, "plan": "yearly"}
+    client.post("/api/billing/checkout", json=body, headers=csrf_headers(client))
+    assert stripe_on[-1][1]["line_items[0][price]"] == "price_test"      # no yearly price configured: monthly
+    monkeypatch.setattr(billing, "STRIPE_PRICE_ID_YEARLY", "price_year")
+    assert client.get("/api/public/premium").json()["yearly"] is True
+    client.post("/api/billing/checkout", json=body, headers=csrf_headers(client))
+    assert stripe_on[-1][1]["line_items[0][price]"] == "price_year"
+    body["plan"] = "lifetime"
+    assert client.post("/api/billing/checkout", json=body, headers=csrf_headers(client)).status_code == 422

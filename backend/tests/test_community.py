@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 from app.database import SessionLocal
 from app.models import ForecastHistory, JobRun, PriceTip, User
-from tests.conftest import anon_csrf_headers, csrf_headers, signed_forecast_payload
+from tests.conftest import anon_csrf_headers, csrf_headers, set_app_settings, signed_forecast_payload
 
 _COMPLETED = {"status": "completed", "accuracy_pct": 97.0, "predicted_prices": [100.0, 110.0],
               "actual_prices": [101.0, 107.0], "time_labels": ["a", "b"], "matures_at": "x",
@@ -72,33 +72,60 @@ def test_notifications_are_private(registered):
     assert client.get("/api/account/notifications").status_code == 401
 
 
-def test_referral_gives_both_users_premium(client):
+def _paid_invoice(customer, amount, period_end):
+    return {"type": "invoice.paid", "data": {"object": {"customer": customer, "amount_paid": amount,
+                                                        "lines": {"data": [{"period": {"end": period_end}}]}}}}
+
+
+def test_invite_link_records_friend_and_badge(client):
     _register(client, "inviter1")
     code = client.get("/api/account/membership").json()["referral_code"]
     assert len(code) == 8
     me = _register(client, "invited1", ref=code)
-    assert me["premium"] is True
-    membership = client.get("/api/account/membership").json()
-    assert membership["premium"] is True and membership["premium_until"]
+    assert me["premium"] is False                         # signing up alone gives no Premium
+    _register(client, "inviter1b")
     inviter = _db_user("inviter1")
-    assert inviter.premium_until and inviter.premium_until > datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=29)
-    assert _db_user("invited1").referred_by_id == inviter.id
+    assert _db_user("invited1").referred_by_id == inviter.id and inviter.premium_until is None
+    from app.services.premium import ambassador_badge
+    assert [ambassador_badge(n) for n in (0, 1, 4, 5, 10)] == [None, "bronze", "bronze", "silver", "gold"]
 
 
 def test_unknown_referral_code_is_ignored(client):
-    me = _register(client, "loner1", ref="NOPE1234")
-    assert me["premium"] is False
+    _register(client, "loner1", ref="NOPE1234")
+    assert _db_user("loner1").referred_by_id is None
 
 
-def test_referral_reward_waits_for_email_verification(client, monkeypatch):
-    from app.routers import auth
-    from app.services import verification
+def test_inviter_gets_premium_when_friend_pays(premium_on, monkeypatch):
+    from app.services import billing
+    client = premium_on
     _register(client, "inviter2")
     code = client.get("/api/account/membership").json()["referral_code"]
-    monkeypatch.setattr(auth, "is_email_configured", lambda: True)
-    monkeypatch.setattr(verification, "send_email", lambda *a, **k: True)
-    assert _register(client, "invited2", ref=code)["premium"] is False
-    assert _db_user("inviter2").premium_until is None
+    _register(client, "buyer2", ref=code)
+    _update_user("buyer2", stripe_customer_id="cus_buyer")
+    end = int((datetime.now(timezone.utc) + timedelta(days=30)).timestamp())
+    db = SessionLocal()
+    try:
+        billing.handle_event(db, _paid_invoice("cus_buyer", 0, end))      # free trial invoice: no reward yet
+        assert _db_user("inviter2").premium_until is None
+        billing.handle_event(db, _paid_invoice("cus_buyer", 499, end))
+        billing.handle_event(db, _paid_invoice("cus_buyer", 499, end))    # second month: rewarded only once
+    finally:
+        db.close()
+    inviter = _db_user("inviter2")
+    assert inviter.premium_until > datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=29)
+    assert inviter.premium_until < datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=31)
+    assert _db_user("buyer2").referral_rewarded is True
+
+
+def test_invited_friend_gets_longer_trial(premium_on):
+    from app.services.premium import trial_days_for
+    client = premium_on
+    _register(client, "host3")
+    code = client.get("/api/account/membership").json()["referral_code"]
+    _register(client, "guest3", ref=code)
+    assert trial_days_for(_db_user("guest3")) == 14 and trial_days_for(_db_user("host3")) == 7
+    _update_user("guest3", stripe_customer_id="cus_x")
+    assert trial_days_for(_db_user("guest3")) == 0
 
 
 def test_premium_raises_schedule_limit(registered):
@@ -106,6 +133,8 @@ def test_premium_raises_schedule_limit(registered):
     client, username, _p = registered
     assert client.get("/api/schedules").json()["max"] == FREE_SCHEDULES
     _update_user(username, premium_until=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=3))
+    assert client.get("/api/schedules").json()["max"] == FREE_SCHEDULES      # Premium mode is off
+    set_app_settings(premium_mode=True)
     assert client.get("/api/schedules").json()["max"] == PREMIUM_SCHEDULES
 
 
@@ -157,17 +186,25 @@ def test_tipster_board_shows_only_public_nicknames(client):
     _add_tip(a, "win", 4, demo=True)
     _add_tip(b, "win", 5)
     week = client.get("/api/public/tipsters").json()
-    assert week["leaders"] == [{"nickname": "Ace", "duels": 2, "wins": 1, "win_pct": 50, "premium": False}]
+    assert week["leaders"] == [{"nickname": "Ace", "duels": 2, "wins": 1, "win_pct": 50, "premium": False, "badge": None}]
     assert week["humans_vs_ai"]["wins"] == 2 and week["humans_vs_ai"]["losses"] == 1
     assert client.get("/api/public/tipsters?period=all").json()["leaders"][0]["wins"] == 2
     assert client.get("/api/public/tipsters?period=year").status_code == 422
 
 
-def test_premium_info_and_billing_off_by_default(registered):
+def test_premium_mode_hides_everything_paid(registered):
     client, _u, _p = registered
-    info = client.get("/api/public/premium").json()
-    assert info["billing_enabled"] is False and info["limits"]["premium"]["schedules"] > info["limits"]["free"]["schedules"]
+    set_app_settings(operator_name="Test firm", operator_business_id="TestIČO", operator_address="Test street")
+    assert client.get("/api/public/premium").json() == {"enabled": False}
+    config = client.get("/api/public/config").json()
+    assert config["premium_mode"] is False and config["premium"] == {"enabled": False}
+    assert config["operator_name"] == "" and config["operator_business_id"] == "" and config["waitlist_enabled"] is False
     assert client.post("/api/billing/checkout", json={}, headers=csrf_headers(client)).status_code == 503
+    set_app_settings(premium_mode=True)
+    info = client.get("/api/public/premium").json()
+    assert info["enabled"] is True and info["billing_enabled"] is False
+    assert info["limits"]["premium"]["schedules"] > info["limits"]["free"]["schedules"]
+    assert client.get("/api/public/config").json()["operator_business_id"] == "TestIČO"
 
 
 def _signed(payload: bytes, secret: str, ts=None):
@@ -237,23 +274,27 @@ def test_weekly_digest_sends_only_to_opted_in(registered, monkeypatch):
 
 def test_periodic_jobs_run_once_per_slot(client, monkeypatch):
     from app.routers import forecast as forecast_router
-    from app.services import alerts, background, briefing, digest
+    from app.services import alerts, background, briefing, digest, tracker
     calls = []
+    monkeypatch.setattr(tracker, "take_snapshots", lambda db: calls.append("snap"))
     monkeypatch.setattr(forecast_router, "_evaluate_pending", lambda db, **k: calls.append("eval"))
     monkeypatch.setattr(alerts, "check_alerts", lambda db: calls.append("alerts"))
     monkeypatch.setattr(briefing, "send_morning_briefings", lambda db: calls.append("briefing"))
     monkeypatch.setattr(digest, "send_weekly_digests", lambda db: calls.append("digest"))
     monday = datetime(2026, 10, 12, 8, 30)
-    assert background.run_periodic_jobs(monday) == ["evaluate_forecasts", "price_alerts", "morning_briefing", "weekly_digest"]
+    assert background.run_periodic_jobs(monday) == ["evaluate_forecasts", "price_alerts", "morning_briefing",
+                                                 "portfolio_snapshots", "weekly_digest"]
     assert background.run_periodic_jobs(monday + timedelta(minutes=4)) == []
     assert background.run_periodic_jobs(monday + timedelta(minutes=11)) == ["evaluate_forecasts", "price_alerts"]
     wednesday = datetime(2026, 10, 14, 9, 0)
-    assert background.run_periodic_jobs(wednesday) == ["evaluate_forecasts", "price_alerts", "morning_briefing"]
+    assert background.run_periodic_jobs(wednesday) == ["evaluate_forecasts", "price_alerts", "morning_briefing",
+                                                       "portfolio_snapshots"]
     assert background.run_periodic_jobs(datetime(2026, 10, 14, 15, 0)) == ["evaluate_forecasts", "price_alerts"]
-    assert calls.count("digest") == 1 and calls.count("briefing") == 2
+    assert calls.count("digest") == 1 and calls.count("briefing") == 2 and calls.count("snap") == 2
     db = SessionLocal()
     try:
-        assert {r.name for r in db.query(JobRun).all()} == {"evaluate_forecasts", "price_alerts", "morning_briefing", "weekly_digest"}
+        assert {r.name for r in db.query(JobRun).all()} == {"evaluate_forecasts", "price_alerts", "morning_briefing",
+                                                  "portfolio_snapshots", "weekly_digest"}
     finally:
         db.close()
 

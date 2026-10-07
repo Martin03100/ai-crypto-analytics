@@ -81,6 +81,7 @@ def test_admin_stats_and_user_search(admin):
 
 def test_admin_grants_and_removes_premium(admin, other):
     c, _username = admin
+    _switch(c, premium_mode=True)
     _register(other, "member1")
     member = _get("member1")
     res = c.patch(f"/api/admin/users/{member.id}", json={"add_premium_days": 14}, headers=csrf_headers(c))
@@ -121,7 +122,7 @@ def test_settings_validation_and_audit(admin):
     for values in bad:
         assert client.put("/api/admin/settings", json={"values": values}, headers=csrf_headers(client)).status_code == 400
     res = client.put("/api/admin/settings", json={"values": {"free_schedules": 3, "announcement": " Launch week! ",
-                                                             "premium_price_label": "€2.99 / month"}},
+                                                             "premium_price_label": "€2.99 / month", "premium_mode": True}},
                      headers=csrf_headers(client))
     assert res.status_code == 200 and res.json()["values"]["announcement"] == "Launch week!"
     assert client.get("/api/schedules").json()["max"] == 3
@@ -151,19 +152,16 @@ def test_feature_switches_are_enforced(admin, other):
     assert res.status_code == 403
 
 
-def test_referral_switch_and_reward_days(admin, other):
+def test_referral_switch_controls_the_longer_trial(admin, other):
+    from app.services.premium import trial_days_for
     client, _admin_name = admin
-    _switch(client, referral_reward_days=7)
+    _switch(client, premium_mode=True, referral_trial_days=21)
     code = client.get("/api/account/membership").json()["referral_code"]
-    res = other.post("/api/auth/register", json={"username": "friend2", "password": "TestPass123",
-                                                  "email": "friend2@example.com", "referral_code": code})
-    until = _get("friend2").premium_until
-    assert res.json()["premium"] is True and until < datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=8)
+    other.post("/api/auth/register", json={"username": "friend2", "password": "TestPass123",
+                                           "email": "friend2@example.com", "referral_code": code})
+    assert trial_days_for(_get("friend2")) == 21
     _switch(client, referrals_enabled=False)
-    other.cookies.clear()
-    res = other.post("/api/auth/register", json={"username": "friend3", "password": "TestPass123",
-                                                  "email": "friend3@example.com", "referral_code": code})
-    assert res.json()["premium"] is False
+    assert trial_days_for(_get("friend2")) == 7
 
 
 def test_waitlist_export(admin):

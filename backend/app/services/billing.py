@@ -12,10 +12,10 @@ from typing import Optional
 import requests
 from sqlalchemy.orm import Session
 
-from app.config import APP_PUBLIC_URL, STRIPE_PRICE_ID, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+from app.config import APP_PUBLIC_URL, STRIPE_PRICE_ID, STRIPE_PRICE_ID_YEARLY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
 from app.models import User
 from app.services.notifications import notify
-from app.services.premium import set_premium_until
+from app.services.premium import reward_referrer_for_purchase, set_premium_until, trial_days_for
 
 logger = logging.getLogger("aca.billing")
 
@@ -35,7 +35,12 @@ def checkout_ready() -> bool:
     """Selling also needs the seller's identity on the Terms page (EU consumer law)."""
     from app.services import app_settings
 
-    return billing_enabled() and bool(app_settings.get("operator_name") and app_settings.get("operator_address"))
+    return (billing_enabled() and app_settings.premium_mode()
+            and bool(app_settings.get("operator_name") and app_settings.get("operator_address")))
+
+
+def yearly_available() -> bool:
+    return bool(STRIPE_PRICE_ID_YEARLY)
 
 
 def _post(path: str, data: dict) -> dict:
@@ -49,10 +54,12 @@ def _post(path: str, data: dict) -> dict:
     return res.json()
 
 
-def create_checkout_url(user: User, trial_days: int = 0) -> str:
+def create_checkout_url(user: User, plan: str = "monthly") -> str:
+    price = STRIPE_PRICE_ID_YEARLY if plan == "yearly" and STRIPE_PRICE_ID_YEARLY else STRIPE_PRICE_ID
+    trial_days = trial_days_for(user)
     data = {
         "mode": "subscription",
-        "line_items[0][price]": STRIPE_PRICE_ID,
+        "line_items[0][price]": price,
         "line_items[0][quantity]": "1",
         "success_url": f"{APP_PUBLIC_URL}/premium?status=success",
         "cancel_url": f"{APP_PUBLIC_URL}/premium?status=cancel",
@@ -61,7 +68,7 @@ def create_checkout_url(user: User, trial_days: int = 0) -> str:
         "subscription_data[metadata][user_id]": str(user.id),
         "billing_address_collection": "auto",
     }
-    if trial_days > 0 and not user.stripe_customer_id:   # one free trial per customer
+    if trial_days > 0:
         data["subscription_data[trial_period_days]"] = str(trial_days)
     if user.stripe_customer_id:
         data["customer"] = user.stripe_customer_id
@@ -130,6 +137,8 @@ def handle_event(db: Session, event: dict) -> None:
         ends = [e for e in ends if e]
         if user is not None and ends:
             set_premium_until(user, max(ends))
+        if user is not None and (obj.get("amount_paid") or 0) > 0:   # a real payment, not a free trial invoice
+            reward_referrer_for_purchase(db, user)
     elif kind in ("customer.subscription.created", "customer.subscription.updated"):
         user = _user_for(db, obj)
         items = (obj.get("items") or {}).get("data") or [{}]

@@ -1,6 +1,6 @@
 /** Landing page. */
 
-import { ArrowRight, BarChart3, Brain, Check, Crown, Database, ShieldCheck, Trophy, Users } from "lucide-react";
+import { ArrowRight, BarChart3, BellRing, Brain, Check, Crown, Database, Radar, ShieldCheck, Trophy, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { api } from "../api";
@@ -10,6 +10,7 @@ import WaitlistForm from "../components/WaitlistForm";
 import { useAppConfig } from "../context/AppConfigContext";
 import { useLanguage } from "../context/LanguageContext";
 import { usePageTitle } from "../hooks/usePageTitle";
+import { usePremium } from "../hooks/usePremium";
 import { LANGUAGES } from "../i18n/translations";
 
 const FEATURES = [
@@ -17,11 +18,15 @@ const FEATURES = [
   { icon: Database, title: "landing.f2Title", text: "landing.f2Text" },
   { icon: Trophy, title: "landing.f3Title", text: "landing.f3Text" },
   { icon: Users, title: "landing.f4Title", text: "landing.f4Text" },
+  { icon: Radar, title: "landing.f5Title", text: "landing.f5Text" },
+  { icon: BellRing, title: "landing.f6Title", text: "landing.f6Text" },
 ];
+const PREMIUM_POINTS = ["consensus", "smartModel", "simulator", "scanner", "tracker", "telegram"];
 
 export default function Landing() {
   const { t, lang, setLang } = useLanguage();
   const { waitlist_enabled } = useAppConfig();
+  const { mode } = usePremium();
   const [stats, setStats] = useState(null);
   useEffect(() => {
     api.trackRecord()
@@ -89,14 +94,14 @@ export default function Landing() {
         </ol>
       </section>
 
-      <section className="card landing-premium">
+      {mode && <section className="card landing-premium">
         <span className="premium-pill"><Crown size={13} /> Premium</span>
         <h2>{t("landing.premiumTitle")}</h2>
         <ul>
-          {["alerts", "briefing", "stats", "schedules"].map((k) => <li key={k}><Check size={14} /> {t(`landing.premium.${k}`)}</li>)}
+          {PREMIUM_POINTS.map((k) => <li key={k}><Check size={14} /> {t(`landing.premium.${k}`)}</li>)}
         </ul>
         <Link to="/premium" className="btn btn-primary btn-sm">{t("landing.premiumCta")} <ArrowRight size={14} /></Link>
-      </section>
+      </section>}
 
       {waitlist_enabled && <WaitlistForm />}
 
@@ -109,7 +114,7 @@ export default function Landing() {
       </section>
 
       <footer className="landing-footer">
-        <Link to="/about">{t("about.title")}</Link> · <Link to="/track-record">{t("track.title")}</Link> · <Link to="/premium">Premium</Link> · <Link to="/status">{t("status.title")}</Link> ·{" "}
+        <Link to="/about">{t("about.title")}</Link> · <Link to="/track-record">{t("track.title")}</Link> · {mode && <><Link to="/premium">Premium</Link> · </>}<Link to="/status">{t("status.title")}</Link> ·{" "}
         <Link to="/privacy">{t("privacy.title")}</Link> · <Link to="/terms">{t("terms.title")}</Link>
       </footer>
     </main>

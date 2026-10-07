@@ -17,6 +17,8 @@ from app.models import AppSetting
 
 # key -> (default, kind, limits)
 SCHEMA: dict[str, tuple[Any, str, tuple]] = {
+    # Master switch: off = no Premium anywhere (pages, prices, seller details), the app looks completely free.
+    "premium_mode": (False, "bool", ()),
     "signups_enabled": (True, "bool", ()),
     "chat_enabled": (True, "bool", ()),
     "compare_enabled": (True, "bool", ()),
@@ -26,9 +28,11 @@ SCHEMA: dict[str, tuple[Any, str, tuple]] = {
     "digest_enabled": (True, "bool", ()),
     "referrals_enabled": (True, "bool", ()),
     "premium_price_label": (PREMIUM_PRICE_LABEL, "str", (40,)),
+    "premium_price_label_yearly": ("€39 / year", "str", (40,)),
     "free_schedules": (5, "int", (0, 50)),
     "premium_schedules": (20, "int", (1, 200)),
     "referral_reward_days": (REFERRAL_REWARD_DAYS, "int", (1, 365)),
+    "referral_trial_days": (14, "int", (0, 60)),
     "free_alerts": (1, "int", (0, 50)),
     "premium_alerts": (25, "int", (1, 200)),
     "premium_trial_days": (7, "int", (0, 30)),
@@ -39,7 +43,7 @@ SCHEMA: dict[str, tuple[Any, str, tuple]] = {
     "announcement_level": ("info", "choice", ("info", "warn", "success")),
 }
 
-PUBLIC_KEYS = ("signups_enabled", "chat_enabled", "compare_enabled", "backtest_enabled", "tipsters_enabled",
+PUBLIC_KEYS = ("premium_mode", "signups_enabled", "chat_enabled", "compare_enabled", "backtest_enabled", "tipsters_enabled",
                "waitlist_enabled", "digest_enabled", "referrals_enabled", "announcement", "announcement_level",
                "operator_name", "operator_business_id", "operator_address")
 
@@ -124,4 +128,12 @@ def require_feature(key: str) -> None:
 
 def public_settings() -> dict[str, Any]:
     values = all_settings()
-    return {k: values[k] for k in PUBLIC_KEYS}
+    public = {k: values[k] for k in PUBLIC_KEYS}
+    if not values["premium_mode"]:   # nothing about selling is shown while Premium is switched off
+        for key in ("operator_name", "operator_business_id", "operator_address", "waitlist_enabled"):
+            public[key] = "" if key.startswith("operator") else False
+    return public
+
+
+def premium_mode() -> bool:
+    return bool(get("premium_mode"))

@@ -26,14 +26,21 @@ statistical model and real market data. Bachelor's thesis project (Software Deve
   (Netlify Edge Function + Pillow cards), plus **robots.txt / sitemap / JSON-LD**.
 - **Community:** "Beat the AI" price duels with a weekly and all-time tipster board (opt-in nicknames), in-app
   **notifications** when forecasts are checked or duels end, and an opt-in **weekly "AI vs reality" email**.
-- **Premium:** Stripe Checkout subscription (off until configured), Premium waitlist, and **invite rewards**
-  (both people get 30 days of Premium once the invited user confirms their email).
+- **Free tools:** **market scanner** (expected 24h move, RSI and a signal for the top 5 coins) and **smart alerts**
+  (price level, big 24h move, RSI extremes).
 - **20 coins** (incl. TON, SUI, PEPE…) and a **4-hour horizon** next to 24h / 1 week / 1 month / 1 year.
-- **Premium** (Stripe, 7-day trial): up to 25 email **price alerts**, a **morning briefing** for the watchlist,
-  **personal accuracy stats** by model/coin/horizon and 20 scheduled forecasts. Checkout requires accepting the Terms,
-  and stays off until the seller details are filled in. **GDPR data export** for every user.
+- **Premium** (Stripe, monthly or yearly, 7-day trial): **AI consensus** weighted by each model's track record,
+  **smart model pick** (most accurate AI per coin and horizon, Bayesian-shrunk), **strategy simulator** on real past
+  forecasts (fees, shorts, drawdown vs. buy & hold), the **full scanner** (20 coins), **portfolio P&L tracker** with risk
+  score and daily history, **PDF report**, **Telegram** delivery, Fear & Greed alerts, up to 25 alerts, a **morning
+  briefing**, **personal accuracy stats** and 20 scheduled forecasts. Checkout requires accepting the Terms and stays off
+  until the seller details are filled in. **GDPR data export** for every user.
+- **Premium mode switch:** the admin can hide everything paid (prices, Premium pages, seller details, paid features)
+  with one switch; it is off by default, so the app looks fully free until payments are ready.
+- **Invites:** a friend who signs up with your link gets a 14-day trial; when they pay, the inviter gets 30 days of
+  Premium. With Premium off, invites earn bronze / silver / gold **ambassador badges** on the public board.
 - **Admin panel** (`/admin`, users listed in `ADMIN_USERNAMES`, 2FA required): stats, user search, granting or removing
-  Premium, blocking accounts, waitlist CSV export, feature switches, limits, Premium price label and a site-wide
+  Premium, blocking accounts, waitlist CSV export, the Premium mode switch, feature switches, limits, prices and a site-wide
   announcement banner. Stripe keys stay in environment variables, never editable from the browser.
 - Transactional emails in **English, Slovak and Czech**, following the user's app language.
 - **Demo mode** for presentations: one click fills the whole app with clearly labelled test data ("Gemini test", "Claude test", ...)

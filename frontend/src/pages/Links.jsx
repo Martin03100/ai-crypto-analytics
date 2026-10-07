@@ -5,11 +5,13 @@ import { Link } from "react-router-dom";
 import { SOCIAL_LINKS } from "../config/social";
 import { useLanguage } from "../context/LanguageContext";
 import { usePageTitle } from "../hooks/usePageTitle";
+import { usePremium } from "../hooks/usePremium";
 import { safeUrl } from "../utils/safeUrl";
 
 export default function Links() {
   const { t } = useLanguage();
   usePageTitle("links.pageTitle");
+  const { mode } = usePremium();
   const socials = SOCIAL_LINKS.map((s) => ({ ...s, href: safeUrl(s.url) }));
 
   return (
@@ -21,7 +23,7 @@ export default function Links() {
       <nav className="links-list" aria-label={t("links.pageTitle")}>
         <Link to="/auth?tab=register" className="btn btn-primary links-item">{t("links.tryApp")}</Link>
         <Link to="/track-record" className="btn btn-ghost links-item">{t("links.trackRecord")}</Link>
-        <Link to="/premium" className="btn btn-ghost links-item">{t("links.waitlist")}</Link>
+        {mode && <Link to="/premium" className="btn btn-ghost links-item">Premium</Link>}
       </nav>
 
       <h2 className="links-follow">{t("links.followTitle")}</h2>

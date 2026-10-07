@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { useAppConfig } from "../context/AppConfigContext";
 import { useLanguage } from "../context/LanguageContext";
 import { usePageTitle } from "../hooks/usePageTitle";
+import { usePremium } from "../hooks/usePremium";
 
 function LegalPage({ titleKey, sections }) {
   const { t } = useLanguage();
@@ -36,13 +37,16 @@ function Operator({ t }) {
   );
 }
 
-const PRIVACY_SECTIONS = ["dataCollected", "purposes", "cookies", "analytics", "waitlist", "payments", "thirdParty",
-  "retention", "rights", "contact"];
-const TERMS_SECTIONS = ["notAdvice", "eligibility", "account", "premium", "withdrawal", "acceptableUse", "liability",
-  "law", "changes"];
+const PRIVACY_SECTIONS = ["dataCollected", "purposes", "cookies", "analytics", "alertsData", "waitlist", "payments",
+  "thirdParty", "retention", "rights", "contact"];
+const TERMS_SECTIONS = ["notAdvice", "eligibility", "account", "premium", "referrals", "withdrawal", "acceptableUse",
+  "liability", "law", "changes"];
+// Sections that only apply while the paid plan exists.
+const PAID_ONLY = new Set(["waitlist", "payments", "premium", "referrals", "withdrawal"]);
 
 function LegalSections({ prefix, t }) {
-  const sections = prefix === "privacy" ? PRIVACY_SECTIONS : TERMS_SECTIONS;
+  const { mode } = usePremium();
+  const sections = (prefix === "privacy" ? PRIVACY_SECTIONS : TERMS_SECTIONS).filter((k) => mode || !PAID_ONLY.has(k));
   return (
     <>
       {sections.map((key) => (

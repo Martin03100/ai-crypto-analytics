@@ -1,14 +1,15 @@
 /** Premium: the user's own accuracy by model, coin and horizon. */
 
-import { BarChart3 } from "lucide-react";
+import { BarChart3, FileDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
+import { QUANT_LABEL } from "../utils/models";
 import { Card } from "./Card";
 import PremiumGate from "./PremiumGate";
 
-const QUANT_LABEL = "Quant (free model)";
+const pct = (v) => (v == null ? "—" : `${v}%`);
 
 function Table({ title, rows, label }) {
   const { t } = useLanguage();
@@ -23,7 +24,7 @@ function Table({ title, rows, label }) {
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.key}><td>{r.key}</td><td>{r.evaluated}</td><td>{r.direction_hit_pct}%</td><td>{r.avg_accuracy_pct}%</td><td>{r.beats_baseline_pct}%</td></tr>
+              <tr key={r.key}><td>{r.key}</td><td>{r.evaluated}</td><td>{pct(r.direction_hit_pct)}</td><td>{pct(r.avg_accuracy_pct)}</td><td>{pct(r.beats_baseline_pct)}</td></tr>
             ))}
           </tbody>
         </table>
@@ -46,6 +47,9 @@ export default function MyStats() {
 
   return (
     <>
+      <div className="mystats-actions">
+        <a className="btn btn-ghost btn-sm" href={api.reportPdfUrl()} download><FileDown size={14} /> {t("report.download")}</a>
+      </div>
       <div className="track-stats">
         <div className="card track-stat"><span className="track-stat-value">{stats.total_evaluated}</span><span className="text-sub">{t("track.statEvaluated")}</span></div>
         <div className="card track-stat"><span className="track-stat-value">{stats.direction_hit_pct == null ? "—" : `${stats.direction_hit_pct}%`}</span><span className="text-sub">{t("track.statDirection")}</span></div>

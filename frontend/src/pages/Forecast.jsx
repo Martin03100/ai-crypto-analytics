@@ -8,6 +8,8 @@ import { AccuracyBadge, ConfidenceBadge, FallbackBadge, MockBadge, RiskBadge } f
 import { Card } from "../components/Card";
 import BacktestPanel from "../components/BacktestPanel";
 import MyStats from "../components/MyStats";
+import SmartModelHint from "../components/SmartModelHint";
+import StrategySimulator from "../components/StrategySimulator";
 import ComparePanel from "../components/ComparePanel";
 import CostConfirmModal from "../components/CostConfirmModal";
 import DataSources from "../components/DataSources";
@@ -28,12 +30,14 @@ import { humanizeError } from "../i18n/errorMessages";
 import { localeForLang } from "../i18n/locale";
 import { copyToClipboard } from "../utils/copyToClipboard";
 import { usePageTitle } from "../hooks/usePageTitle";
+import { usePremium } from "../hooks/usePremium";
 import { stripMockTag } from "../utils/mockText";
 import { formatTechDetail } from "../utils/techDetail";
 import { COINS } from "../utils/coins";
 import { predictedChangePct } from "../utils/forecastMath";
 
 
+const TABS = ["history", "schedule", "leaderboard", "compare", "backtest", "simulator", "mystats"];
 const HORIZONS = ["4h", "24h", "1T", "1M", "1R"];
 
 function HistoryItem({ entry, onDelete }) {
@@ -194,11 +198,12 @@ export default function Forecast() {
   usePageTitle("forecast.title");
   const { currency } = useCurrency();
   const { compare_enabled, backtest_enabled } = useAppConfig();
+  const { mode: premiumMode } = usePremium();
   const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState(() => (["history", "schedule", "leaderboard", "compare", "backtest", "mystats"].includes(searchParams.get("tab")) ? searchParams.get("tab") : "new"));
+  const [tab, setTab] = useState(() => (TABS.includes(searchParams.get("tab")) ? searchParams.get("tab") : "new"));
   const urlTab = searchParams.get("tab");
   useEffect(() => {
-    if (["history", "schedule", "leaderboard", "compare", "backtest", "mystats"].includes(urlTab)) setTab(urlTab);
+    if (TABS.includes(urlTab)) setTab(urlTab);
   }, [urlTab]);
   const providersCtx = useProviders();
   const providers = useMemo(
@@ -349,7 +354,8 @@ export default function Forecast() {
         <button className={`tab ${tab === "leaderboard" ? "active" : ""}`} onClick={() => setTab("leaderboard")}>{t("forecast.tabLeaderboard")}</button>
         {compare_enabled && <button className={`tab ${tab === "compare" ? "active" : ""}`} onClick={() => setTab("compare")}>{t("forecast.tabCompare")}</button>}
         {backtest_enabled && <button className={`tab ${tab === "backtest" ? "active" : ""}`} onClick={() => setTab("backtest")}>{t("forecast.tabBacktest")}</button>}
-        <button className={`tab ${tab === "mystats" ? "active" : ""}`} onClick={() => setTab("mystats")}><Crown size={13} style={{ marginRight: 5 }} />{t("mystats.tab")}</button>
+        {premiumMode && <button className={`tab ${tab === "simulator" ? "active" : ""}`} onClick={() => setTab("simulator")}><Crown size={13} style={{ marginRight: 5 }} />{t("sim.tab")}</button>}
+        {premiumMode && <button className={`tab ${tab === "mystats" ? "active" : ""}`} onClick={() => setTab("mystats")}><Crown size={13} style={{ marginRight: 5 }} />{t("mystats.tab")}</button>}
       </div>
 
       {tab === "new" && (
@@ -375,6 +381,7 @@ export default function Forecast() {
                 </>
               )}
             </div>
+            {canGenerate && <SmartModelHint coin={coin} horizon={horizon} providers={providers} current={provider} onPick={setProvider} />}
             {!hasAiProvider && (() => {
               const [before, after] = t("forecast.quantHint", { link: "\u0000" }).split("\u0000");
               return <p className="text-sub" style={{ margin: "4px 0 10px" }}>{before}<Link to="/account" style={{ color: "var(--cyan-fg)" }}>{t("provider.connectLinkLabel")}</Link>{after}</p>;
@@ -436,7 +443,8 @@ export default function Forecast() {
       {tab === "leaderboard" && <Leaderboard />}
       {tab === "compare" && compare_enabled && <ComparePanel />}
       {tab === "backtest" && backtest_enabled && <BacktestPanel />}
-      {tab === "mystats" && <MyStats />}
+      {tab === "mystats" && premiumMode && <MyStats />}
+      {tab === "simulator" && premiumMode && <StrategySimulator />}
 
       {tab === "history" && (
         <div>

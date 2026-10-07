@@ -17,7 +17,9 @@ import { usePageTitle } from "../hooks/usePageTitle";
 const TABS = [["overview", LayoutGrid], ["users", Users], ["waitlist", Download], ["settings", Settings2]];
 const SWITCHES = ["signups_enabled", "chat_enabled", "compare_enabled", "backtest_enabled", "tipsters_enabled",
   "waitlist_enabled", "digest_enabled", "referrals_enabled"];
-const NUMBERS = ["free_schedules", "premium_schedules", "free_alerts", "premium_alerts", "premium_trial_days", "referral_reward_days"];
+const NUMBERS = ["free_schedules", "premium_schedules", "free_alerts", "premium_alerts", "premium_trial_days", "referral_reward_days",
+  "referral_trial_days"];
+const LABELS = ["premium_price_label", "premium_price_label_yearly"];
 const OPERATOR = [["operator_name", 120], ["operator_business_id", 60], ["operator_address", 200]];
 
 function Overview() {
@@ -56,6 +58,7 @@ function UsersTab() {
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [data, setData] = useState(null);
+  const { premium } = useAppConfig();
   const load = useCallback(() => api.adminUsers(q, page).then(setData).catch((e) => push(e?.message || "error", "error")), [q, page, push]);
   useEffect(() => { const id = setTimeout(load, 250); return () => clearTimeout(id); }, [load]);
 
@@ -70,6 +73,7 @@ function UsersTab() {
     }
   };
   const date = (iso) => (iso ? new Date(iso).toLocaleDateString(localeForLang(lang)) : "—");
+  const premiumMode = Boolean(premium?.enabled);
   const pages = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1;
 
   return (
@@ -98,7 +102,7 @@ function UsersTab() {
                     <td>{u.premium ? `Premium ${t("admin.until", { date: date(u.premium_until) })}` : t("membership.free")}{u.paying && <span className="text-sub" style={{ display: "block" }}>Stripe</span>}</td>
                     <td>
                       <div className="admin-actions">
-                        <button className="btn btn-ghost btn-sm" onClick={() => change(u, { add_premium_days: 30 })}>{t("admin.add30")}</button>
+                        {premiumMode && <button className="btn btn-ghost btn-sm" onClick={() => change(u, { add_premium_days: 30 })}>{t("admin.add30")}</button>}
                         {u.premium && <button className="btn btn-ghost btn-sm" onClick={() => change(u, { remove_premium: true }, t("admin.removePremiumQ", { user: u.username }))}>{t("admin.removePremium")}</button>}
                         {u.nickname && <button className="btn btn-ghost btn-sm" onClick={() => change(u, { clear_nickname: true })}>{t("admin.clearNickname")}</button>}
                         {!u.admin && (
@@ -179,7 +183,16 @@ function SettingsTab() {
 
   return (
     <form onSubmit={save} className="admin-settings">
-      <Card title={t("admin.features")}>
+      <Card title={t("admin.premiumMode")} icon={Crown} glow={values.premium_mode ? "emerald" : undefined}>
+        <label className="toggle-row premium-mode-switch">
+          <input type="checkbox" checked={Boolean(values.premium_mode)} onChange={(e) => set("premium_mode", e.target.checked)} data-testid="premium-mode" />
+          <span>
+            <strong>{t(values.premium_mode ? "admin.premiumModeOn" : "admin.premiumModeOff")}</strong>
+            <span className="text-sub" style={{ display: "block" }}>{t("admin.premiumModeText")}</span>
+          </span>
+        </label>
+      </Card>
+      <Card title={t("admin.features")} style={{ marginTop: 16 }}>
         <div className="admin-switches">
           {SWITCHES.map((k) => (
             <label key={k} className="toggle-row">
@@ -191,10 +204,12 @@ function SettingsTab() {
       </Card>
       <Card title={t("admin.premiumSettings")} style={{ marginTop: 16 }}>
         <div className="grid grid-2">
-          <div className="field">
-            <label>{t("admin.set.premium_price_label")}</label>
-            <input className="input" maxLength={40} value={values.premium_price_label} onChange={(e) => set("premium_price_label", e.target.value)} />
-          </div>
+          {LABELS.map((k) => (
+            <div key={k} className="field">
+              <label>{t(`admin.set.${k}`)}</label>
+              <input className="input" maxLength={40} value={values[k]} onChange={(e) => set(k, e.target.value)} />
+            </div>
+          ))}
           {NUMBERS.map((k) => (
             <div key={k} className="field">
               <label>{t(`admin.set.${k}`)}</label>

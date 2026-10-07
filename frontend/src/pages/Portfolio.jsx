@@ -1,6 +1,6 @@
 /** Portfolio advisor page. */
 
-import { CheckCircle2, Compass, Download, FileText, GraduationCap, Loader2, Plus, RefreshCw, Save, Search, Trash2, Upload, Wallet } from "lucide-react";
+import { CheckCircle2, Compass, Crown, Download, FileText, GraduationCap, Loader2, Plus, RefreshCw, Save, Search, Trash2, Upload, Wallet } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { api } from "../api";
@@ -12,6 +12,8 @@ import InfoTip from "../components/InfoTip";
 import { useConfirm } from "../context/ConfirmContext";
 import DataSources from "../components/DataSources";
 import PortfolioHistoryItem from "../components/PortfolioHistoryItem";
+import PortfolioTracker from "../components/PortfolioTracker";
+import { usePremium } from "../hooks/usePremium";
 import { SkeletonLines } from "../components/Skeleton";
 import ProviderSelect from "../components/ProviderSelect";
 import { useCurrency } from "../context/CurrencyContext";
@@ -57,6 +59,7 @@ export default function Portfolio() {
   const locale = localeForLang(lang);
   usePageTitle("portfolio.title");
   const [tab, setTab] = useState("new");
+  const { mode: premiumMode } = usePremium();
   const providersCtx = useProviders();
   const providers = providersCtx.providers;
   const [provider, setProvider] = useState(null);
@@ -343,7 +346,10 @@ export default function Portfolio() {
       <div className="tabs">
         <button className={`tab ${tab === "new" ? "active" : ""}`} onClick={() => setTab("new")}>{t("portfolio.tabNew")}</button>
         <button className={`tab ${tab === "history" ? "active" : ""}`} onClick={() => setTab("history")}>{t("portfolio.tabHistory")}</button>
+        {premiumMode && <button className={`tab ${tab === "tracker" ? "active" : ""}`} onClick={() => setTab("tracker")}><Crown size={13} style={{ marginRight: 5 }} />{t("tracker.tab")}</button>}
       </div>
+
+      {tab === "tracker" && premiumMode && <PortfolioTracker />}
 
       {tab === "new" && (
       <>

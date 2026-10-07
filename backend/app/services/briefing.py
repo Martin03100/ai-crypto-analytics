@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.config import APP_PUBLIC_URL
 from app.models import User
-from app.services import quant_engine
+from app.services import quant_engine, telegram
 from app.services.alerts import fmt_price
 from app.services.email_service import email_lang, email_shell, is_email_configured, send_email
 from app.services.premium import is_premium
@@ -83,7 +83,12 @@ def send_morning_briefings(db: Session) -> int:
         if not is_premium(user):
             continue
         rows = [r for r in (coin_outlook(c, cache) for c in _watchlist(user)) if r]
-        if rows and send_email(user.email, *render_briefing(user, rows)):
-            sent += 1
+        if not rows:
+            continue
+        subject, text, body = render_briefing(user, rows)
+        delivered = send_email(user.email, subject, text, body)
+        if user.telegram_chat_id:
+            delivered = telegram.send(user.telegram_chat_id, f"☀️ {text}") or delivered
+        sent += bool(delivered)
     logger.info("Ranny prehlad odoslany %s pouzivatelom.", sent)
     return sent

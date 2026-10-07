@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useLanguage } from "../context/LanguageContext";
+import AmbassadorBadge from "./AmbassadorBadge";
 import { Card } from "./Card";
 
 export default function TipsterBoard() {
@@ -45,7 +46,7 @@ export default function TipsterBoard() {
               {data.leaders.map((l, i) => (
                 <tr key={l.nickname}>
                   <td>{i + 1}</td>
-                  <td>{l.nickname}{l.premium && <Crown size={12} className="premium-crown" aria-label="Premium" />}</td>
+                  <td>{l.nickname}{l.premium && <Crown size={12} className="premium-crown" aria-label="Premium" />}<AmbassadorBadge level={l.badge} compact /></td>
                   <td>{l.wins}</td>
                   <td>{l.duels}</td>
                   <td>{l.win_pct}%</td>

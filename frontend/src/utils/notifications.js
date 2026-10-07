@@ -1,6 +1,20 @@
 /** Human-readable notification texts. */
 
+import { alertValue } from "./alerts";
 import { formatPrice } from "./formatPrice";
+
+function alertNotification(d, t) {
+  switch (d.alert_kind) {
+    case "move":
+      return t("notif.alertMove", { coin: d.coin, value: alertValue("move", d.price) });
+    case "rsi":
+      return t("notif.alertRsi", { coin: d.coin, value: alertValue("rsi", d.price) });
+    case "fear_greed":
+      return t("notif.alertFearGreed", { value: alertValue("fear_greed", d.price) });
+    default:
+      return t(d.direction === "above" ? "notif.alertAbove" : "notif.alertBelow", { coin: d.coin, price: formatPrice(d.price) });
+  }
+}
 
 export function notificationText(n, t) {
   const d = n.data || {};
@@ -13,7 +27,7 @@ export function notificationText(n, t) {
     case "referral_reward":
       return t("notif.referral", { days: d.days });
     case "price_alert":
-      return t(d.direction === "above" ? "notif.alertAbove" : "notif.alertBelow", { coin: d.coin, price: formatPrice(d.price) });
+      return alertNotification(d, t);
     case "premium_started":
       return t("notif.premium");
     default:

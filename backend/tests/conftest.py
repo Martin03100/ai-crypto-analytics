@@ -84,3 +84,20 @@ def signed_forecast_payload(client, prices=(100.0, 110.0), provider="gemini", co
             "vytvorene": created, "podpis": sign_forecast(user_id, provider, coin, horizon, prices, created),
         },
     }
+
+
+def set_app_settings(**values) -> None:
+    from app.database import SessionLocal
+    from app.services import app_settings
+    db = SessionLocal()
+    try:
+        app_settings.update(db, values)
+    finally:
+        db.close()
+
+
+@pytest.fixture()
+def premium_on(client):
+    """Premium mode is off by default (the app looks free); tests of paid features switch it on."""
+    set_app_settings(premium_mode=True)
+    return client

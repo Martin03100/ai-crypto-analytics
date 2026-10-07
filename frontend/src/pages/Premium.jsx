@@ -1,8 +1,11 @@
-/** Premium plan: what it adds, price, trial, consent and checkout (or the waitlist before payments start). */
+/** Premium plan: what it adds, monthly or yearly price, trial, consent and checkout (or the waitlist before payments start). */
 
-import { ArrowLeft, BarChart3, BellRing, CalendarClock, Check, Crown, Mail, Minus, Rocket, ShieldCheck } from "lucide-react";
+import {
+  ArrowLeft, BellRing, Check, Crown, FileDown, GraduationCap, Lightbulb, LineChart, Minus, Radar, Rocket, Scale, Send,
+  ShieldCheck, Sun, Target, Wallet,
+} from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import WaitlistForm from "../components/WaitlistForm";
 import { useAppConfig } from "../context/AppConfigContext";
@@ -10,13 +13,19 @@ import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../context/ToastContext";
 import { usePageTitle } from "../hooks/usePageTitle";
+import { usePremium } from "../hooks/usePremium";
 import { trackEvent } from "../utils/analytics";
 
 const HIGHLIGHTS = [
+  { icon: Scale, key: "consensus" },
+  { icon: Lightbulb, key: "smartModel" },
+  { icon: LineChart, key: "simulator" },
+  { icon: Radar, key: "scanner" },
+  { icon: Wallet, key: "tracker" },
   { icon: BellRing, key: "alerts" },
-  { icon: Mail, key: "briefing" },
-  { icon: BarChart3, key: "stats" },
-  { icon: CalendarClock, key: "schedules" },
+  { icon: Send, key: "telegram" },
+  { icon: Sun, key: "briefing" },
+  { icon: FileDown, key: "report" },
 ];
 
 function Cell({ value }) {
@@ -30,25 +39,40 @@ export default function Premium() {
   const { user } = useAuth();
   const { push } = useToast();
   const { waitlist_enabled, referrals_enabled } = useAppConfig();
+  const { mode, loaded } = usePremium();
   const [params] = useSearchParams();
   const [info, setInfo] = useState(null);
+  const [plan, setPlan] = useState("yearly");
   const [terms, setTerms] = useState(false);
   const [startNow, setStartNow] = useState(false);
   const [busy, setBusy] = useState(false);
   usePageTitle("premium.pageTitle");
 
-  useEffect(() => { api.premiumInfo().then(setInfo).catch(() => setInfo({ billing_enabled: false })); }, []);
+  useEffect(() => { api.premiumInfo().then(setInfo).catch(() => setInfo({ enabled: false })); }, []);
+
+  if (loaded && !mode) return <Navigate to="/" replace />;
 
   const status = params.get("status");
   const free = info?.limits?.free || { schedules: 5, alerts: 1 };
   const paid = info?.limits?.premium || { schedules: 20, alerts: 25 };
   const trial = info?.trial_days || 0;
+  const yearly = Boolean(info?.yearly);
+  const chosen = yearly ? plan : "monthly";
+  const price = chosen === "yearly" ? info?.price_label_yearly : info?.price_label;
 
   const rows = [
     ["rowForecasts", true, true],
     ["rowTrack", true, true],
+    ["rowScanner", t("premium.top5"), t("premium.allCoins")],
     ["rowAlerts", free.alerts, paid.alerts],
+    ["rowSmartAlerts", false, true],
     ["rowSchedules", free.schedules, paid.schedules],
+    ["rowConsensus", false, true],
+    ["rowSmartModel", false, true],
+    ["rowSimulator", false, true],
+    ["rowTracker", false, true],
+    ["rowReport", false, true],
+    ["rowTelegram", false, true],
     ["rowBriefing", false, true],
     ["rowStats", false, true],
     ["rowBadge", false, true],
@@ -57,9 +81,9 @@ export default function Premium() {
 
   const buy = async () => {
     setBusy(true);
-    trackEvent("checkout-start");
+    trackEvent("checkout-start", { plan: chosen });
     try {
-      const { url } = await api.checkout({ accept_terms: terms, start_immediately: startNow });
+      const { url } = await api.checkout({ plan: chosen, accept_terms: terms, start_immediately: startNow });
       window.location.assign(url);
     } catch (err) {
       push(err?.message || "error", "error");
@@ -86,7 +110,7 @@ export default function Premium() {
         <button className="btn btn-primary premium-cta" onClick={buy} disabled={busy || !terms || !startNow}>
           <Rocket size={15} /> {trial > 0 ? t("premium.startTrial", { days: trial }) : t("premium.buy")}
         </button>
-        <p className="text-sub premium-fine">{t(trial > 0 ? "premium.fineTrial" : "premium.fine", { days: trial, price: info.price_label })}</p>
+        <p className="text-sub premium-fine">{t(trial > 0 ? "premium.fineTrial" : "premium.fine", { days: trial, price })}</p>
       </div>
     );
   }
@@ -99,9 +123,18 @@ export default function Premium() {
         <span className="premium-pill"><Crown size={13} /> Premium</span>
         <h1>{t("premium.headline")}</h1>
         <p className="text-sub">{t("premium.intro")}</p>
+        {info?.billing_enabled && yearly && (
+          <div className="plan-switch" role="radiogroup" aria-label={t("premium.planLabel")}>
+            {["monthly", "yearly"].map((p) => (
+              <button key={p} type="button" role="radio" aria-checked={chosen === p} className={`plan-option ${chosen === p ? "on" : ""}`} onClick={() => setPlan(p)}>
+                {t(`premium.plan_${p}`)}{p === "yearly" && <span className="plan-save">{t("premium.yearlyBadge")}</span>}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="premium-price">
           {info?.billing_enabled
-            ? <><strong>{info.price_label}</strong>{trial > 0 && <span className="premium-trial">{t("premium.trialBadge", { days: trial })}</span>}</>
+            ? <><strong>{price}</strong>{trial > 0 && <span className="premium-trial">{t("premium.trialBadge", { days: trial })}</span>}</>
             : <strong>{t("premium.soon")}</strong>}
         </div>
       </section>
@@ -119,6 +152,17 @@ export default function Premium() {
         ))}
       </div>
 
+      <div className="premium-audience">
+        <div className="card">
+          <h2><GraduationCap size={16} /> {t("premium.forBeginners")}</h2>
+          <p className="text-sub">{t("premium.forBeginnersText")}</p>
+        </div>
+        <div className="card">
+          <h2><Target size={16} /> {t("premium.forPros")}</h2>
+          <p className="text-sub">{t("premium.forProsText")}</p>
+        </div>
+      </div>
+
       <div className="card premium-compare">
         <table className="lb-table">
           <thead><tr><th /><th>{t("premium.freeTitle")}</th><th className="premium-col">Premium</th></tr></thead>
@@ -131,22 +175,22 @@ export default function Premium() {
         {action && <div className="premium-action">{action}</div>}
       </div>
 
-      {info && !info.billing_enabled && waitlist_enabled && <div style={{ marginTop: 20 }}><WaitlistForm id="premium-waitlist" /></div>}
+      {info && !info.billing_enabled && waitlist_enabled && !user?.premium && <div style={{ marginTop: 20 }}><WaitlistForm id="premium-waitlist" /></div>}
 
       {referrals_enabled && (
         <div className="card premium-invite">
           <strong>{t("premium.inviteTitle")}</strong>
-          <p className="text-sub">{t("premium.inviteText", { days: info?.referral_days ?? 30 })}</p>
+          <p className="text-sub">{t("premium.inviteText", { days: info?.referral_days ?? 30, trial: info?.referral_trial_days ?? 14 })}</p>
           <Link to={user ? "/settings" : "/auth?tab=register"} className="key-link">{t("premium.inviteCta")}</Link>
         </div>
       )}
 
       <section className="premium-faq">
         <h2>{t("premium.faqTitle")}</h2>
-        {[1, 2, 3, 4].map((n) => (
+        {[1, 2, 3, 4, 5].map((n) => (
           <details key={n} className="card">
             <summary>{t(`premium.q${n}`)}</summary>
-            <p className="text-sub">{t(`premium.a${n}`)}</p>
+            <p className="text-sub">{t(`premium.a${n}`, { days: info?.referral_days ?? 30, trial: info?.referral_trial_days ?? 14 })}</p>
           </details>
         ))}
       </section>

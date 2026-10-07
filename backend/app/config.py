@@ -171,8 +171,11 @@ SMTP_FROM: Final[str] = os.environ.get("SMTP_FROM", EMAIL_FROM)
 FRONTEND_URL: Final[str] = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
 # Premium (Stripe). Billing stays off until all three are set; the app then shows the waitlist instead.
+TELEGRAM_BOT_TOKEN: Final[str] = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_BOT_USERNAME: Final[str] = os.environ.get("TELEGRAM_BOT_USERNAME", "").lstrip("@")
 STRIPE_SECRET_KEY: Final[str] = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PRICE_ID: Final[str] = os.environ.get("STRIPE_PRICE_ID", "")
+STRIPE_PRICE_ID_YEARLY: Final[str] = os.environ.get("STRIPE_PRICE_ID_YEARLY", "")
 STRIPE_WEBHOOK_SECRET: Final[str] = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 PREMIUM_PRICE_LABEL: Final[str] = os.environ.get("PREMIUM_PRICE_LABEL", "€4.99 / month")
 APP_PUBLIC_URL: Final[str] = os.environ.get("APP_PUBLIC_URL", "https://aicryptopredictor.netlify.app").rstrip("/")

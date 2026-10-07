@@ -28,6 +28,12 @@ test("admin turns on 2FA, manages users and switches a feature off", async ({ pa
 
   await page.getByRole("link", { name: "Admin" }).click();
   await expect(page.getByText("users", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Settings" }).click();
+  await expect(page.getByText("Premium is OFF — the app looks completely free")).toBeVisible();
+  await page.getByTestId("premium-mode").check();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("Saved.").last()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Premium" })).toBeVisible();
   await page.getByRole("button", { name: "Users" }).click();
   await page.getByPlaceholder("Search by username, email or nickname").fill(member);
   const row = page.getByRole("row").filter({ hasText: member });
@@ -45,6 +51,7 @@ test("admin turns on 2FA, manages users and switches a feature off", async ({ pa
   await expect(other.locator(".fab-chat")).toHaveCount(0);
 
   await page.getByRole("checkbox", { name: "AI chat" }).check();
+  await page.getByTestId("premium-mode").uncheck();
   await page.getByLabel("Text shown at the top of the app and the landing page (empty = hidden)").fill("");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("Saved.").last()).toBeVisible();

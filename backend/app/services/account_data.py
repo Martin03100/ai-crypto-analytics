@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     AuditEvent, CommunityVote, ForecastEvaluation, ForecastHistory, ForecastSchedule, Notification, PortfolioHistory,
-    PriceAlert, PriceTip, User,
+    PortfolioPosition, PortfolioSnapshot, PriceAlert, PriceTip, User,
 )
 
 
@@ -74,7 +74,10 @@ def export_user_data(db: Session, user: User) -> dict:
         "portfolio_analyses": _rows(db, PortfolioHistory, user.id, ("id", "created_at", "model_used", "holdings_json", "analysis_json")),
         "price_tips": _rows(db, PriceTip, user.id, ("forecast_id", "tip_price", "ai_price", "outcome", "created_at")),
         "schedules": _rows(db, ForecastSchedule, user.id, ("coin", "horizon", "provider", "frequency", "hour", "minute", "timezone", "active")),
-        "price_alerts": _rows(db, PriceAlert, user.id, ("coin", "direction", "target_price", "active", "created_at", "triggered_at")),
+        "price_alerts": _rows(db, PriceAlert, user.id, ("kind", "coin", "direction", "target_price", "active", "created_at",
+                                                        "triggered_at")),
+        "portfolio_positions": _rows(db, PortfolioPosition, user.id, ("coin", "amount", "avg_buy_price", "created_at")),
+        "portfolio_history": _rows(db, PortfolioSnapshot, user.id, ("day", "value_usd", "cost_usd")),
         "community_votes": _rows(db, CommunityVote, user.id, ("sentiment_vote", "voted_at")),
         "notifications": _rows(db, Notification, user.id, ("kind", "data_json", "created_at", "read_at")),
         "account_activity": _rows(db, AuditEvent, user.id, ("action", "ip", "user_agent", "created_at")),

@@ -6,6 +6,7 @@ import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, X
 import { api } from "../api";
 import { ConfidenceBadge, FallbackBadge, MockBadge, RiskBadge } from "./Badge";
 import { Card } from "./Card";
+import ConsensusBox from "./ConsensusBox";
 import { useLanguage } from "../context/LanguageContext";
 import { useProviders } from "../context/ProvidersContext";
 import { humanizeError } from "../i18n/errorMessages";
@@ -118,6 +119,8 @@ export default function ComparePanel() {
               </ResponsiveContainer>
             </div>
           ) : <p className="text-sub">{t("compare.nothingToChart")}</p>}
+
+          <ConsensusBox coin={ranFor.coin} horizon={ranFor.horizon} series={charted} />
 
           <div className="compare-table" role="table">
             {results.map((r) => {

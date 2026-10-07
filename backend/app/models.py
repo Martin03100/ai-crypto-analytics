@@ -53,6 +53,8 @@ class User(Base):
     # Blocked by an admin: cannot sign in and existing sessions stop working.
     disabled: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=None)
     briefing_opt_in: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=None)
+    telegram_chat_id: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, default=None)
+    telegram_link_code: Mapped[Optional[str]] = mapped_column(String(16), unique=True, index=True, nullable=True, default=None)
 
     reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
@@ -257,6 +259,8 @@ class PriceAlert(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    # price: USD level · move: 24h change in % · rsi: daily RSI(14) · fear_greed: market-wide index (coin "ALL")
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="price", server_default="price")
     coin: Mapped[str] = mapped_column(String(16), nullable=False)
     direction: Mapped[str] = mapped_column(String(8), nullable=False)
     target_price: Mapped[float] = mapped_column(Float, nullable=False)
@@ -264,3 +268,29 @@ class PriceAlert(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     triggered_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, default=None)
     triggered_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=None)
+
+
+class PortfolioPosition(Base):
+    __tablename__ = "portfolio_positions"
+    __table_args__ = (UniqueConstraint("user_id", "coin", name="uq_position_user_coin"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    coin: Mapped[str] = mapped_column(String(16), nullable=False)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    avg_buy_price: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class PortfolioSnapshot(Base):
+    """Daily value of the tracked positions, for the P&L chart."""
+
+    __tablename__ = "portfolio_snapshots"
+    __table_args__ = (UniqueConstraint("user_id", "day", name="uq_snapshot_user_day"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    day: Mapped[str] = mapped_column(String(10), nullable=False)
+    value_usd: Mapped[float] = mapped_column(Float, nullable=False)
+    cost_usd: Mapped[float] = mapped_column(Float, nullable=False)
+

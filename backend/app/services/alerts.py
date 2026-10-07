@@ -1,30 +1,38 @@
-"""Price alerts: checked by the background job, delivered in the app and by email."""
+"""Alerts: price levels, 24h moves, RSI and the Fear & Greed index. Delivered in the app, by email and on Telegram."""
 
 from __future__ import annotations
 
 import html
 import logging
 from datetime import datetime, timezone
+from typing import Dict, Optional
 
 from sqlalchemy.orm import Session
 
 from app.config import APP_PUBLIC_URL, DEFAULT_COIN_IDS
 from app.models import PriceAlert, User
-from app.services import app_settings, market_data
+from app.services import app_settings, market_data, telegram
 from app.services.email_service import email_lang, email_shell, is_email_configured, send_email
 from app.services.notifications import notify
 from app.services.premium import is_premium
 
 logger = logging.getLogger("aca.alerts")
 
-_T = {
-    "en": ("Price alert: {coin} is {dir} {target}", "{coin} just went {dir} your target of {target}. Current price: {price}.",
-           "above", "below", "Open AI Crypto Analytics"),
-    "sk": ("Cenový alarm: {coin} je {dir} {target}", "{coin} sa práve dostal {dir} tvoj cieľ {target}. Aktuálna cena: {price}.",
-           "nad", "pod", "Otvoriť AI Crypto Analytics"),
-    "cs": ("Cenový alarm: {coin} je {dir} {target}", "{coin} se právě dostal {dir} tvůj cíl {target}. Aktuální cena: {price}.",
-           "nad", "pod", "Otevřít AI Crypto Analytics"),
+KINDS = ("price", "move", "rsi", "fear_greed")
+PREMIUM_KINDS = ("fear_greed",)
+LIMITS = {"price": (0, 1e9), "move": (0.5, 100), "rsi": (1, 99), "fear_greed": (1, 99)}
+
+_SUBJECT = {
+    "en": {"price": "{coin} is {dir} {target}", "move": "{coin} moved {value} in 24 hours",
+           "rsi": "{coin} RSI is {value}", "fear_greed": "Fear & Greed index is {value}"},
+    "sk": {"price": "{coin} je {dir} {target}", "move": "{coin} sa za 24 hodín pohol o {value}",
+           "rsi": "RSI {coin} je {value}", "fear_greed": "Index Fear & Greed je {value}"},
+    "cs": {"price": "{coin} je {dir} {target}", "move": "{coin} se za 24 hodin pohnul o {value}",
+           "rsi": "RSI {coin} je {value}", "fear_greed": "Index Fear & Greed je {value}"},
 }
+_WORDS = {"en": ("above", "below", "Alert", "Open AI Crypto Analytics"),
+          "sk": ("nad", "pod", "Alarm", "Otvoriť AI Crypto Analytics"),
+          "cs": ("nad", "pod", "Alarm", "Otevřít AI Crypto Analytics")}
 
 
 def fmt_price(value: float) -> str:
@@ -39,48 +47,81 @@ def alert_limit(user: User) -> int:
     return app_settings.get("premium_alerts" if is_premium(user) else "free_alerts")
 
 
-def crossed(alert: PriceAlert, price: float) -> bool:
-    return price >= alert.target_price if alert.direction == "above" else price <= alert.target_price
+def crossed(alert: PriceAlert, value: float) -> bool:
+    if alert.kind == "move" and alert.direction == "above":
+        return value >= alert.target_price
+    if alert.kind == "move":
+        return value <= -alert.target_price
+    return value >= alert.target_price if alert.direction == "above" else value <= alert.target_price
 
 
-def _email(user: User, alert: PriceAlert, price: float) -> tuple[str, str, str]:
-    subject_t, body_t, above, below, cta = _T[email_lang(user.lang)]
+def describe(alert: PriceAlert, value: float, lang: Optional[str]) -> str:
+    lang = email_lang(lang)
+    above, below, label, _cta = _WORDS[lang]
     params = {"coin": alert.coin, "dir": above if alert.direction == "above" else below,
-              "target": fmt_price(alert.target_price), "price": fmt_price(price)}
-    subject, body = subject_t.format(**params), body_t.format(**params)
+              "target": fmt_price(alert.target_price),
+              "value": f"{value:+.1f}%" if alert.kind == "move" else f"{value:.0f}" if alert.kind != "price" else fmt_price(value)}
+    return f"{label}: " + _SUBJECT[lang][alert.kind].format(**params)
+
+
+def _email(user: User, text: str) -> tuple[str, str, str]:
+    cta = _WORDS[email_lang(user.lang)][3]
     link = f"{APP_PUBLIC_URL}/dashboard?utm_source=alert&utm_medium=email"
-    html_body = email_shell(lang=user.lang, preheader=subject, inner_html=f"""
-        <h1 style="margin:0 0 14px; font-size:19px; color:#0f172a;">{html.escape(subject)}</h1>
-        <p style="margin:0 0 18px; font-size:14px; line-height:1.6; color:#334155;">{html.escape(body)}</p>
+    body = email_shell(lang=user.lang, preheader=text, inner_html=f"""
+        <h1 style="margin:0 0 18px; font-size:19px; color:#0f172a;">{html.escape(text)}</h1>
         <p style="margin:0;"><a href="{link}" style="display:inline-block; background:#0f172a; color:#ffffff;
            padding:11px 18px; border-radius:10px; font-size:14px; font-weight:600; text-decoration:none;">{cta}</a></p>""")
-    return subject, f"{body}\n\n{link}", html_body
+    return text, f"{text}\n\n{link}", body
+
+
+def _current_values(alerts: list[PriceAlert]) -> Dict[tuple, float]:
+    from app.services.insights import daily_rsi
+    values: Dict[tuple, float] = {}
+    coins = sorted({a.coin for a in alerts if a.kind in ("price", "move") and a.coin in DEFAULT_COIN_IDS})
+    if coins:
+        ok, prices, _err = market_data.get_live_prices([DEFAULT_COIN_IDS[c] for c in coins])
+        for coin in coins if ok and prices else []:
+            quote = prices.get(DEFAULT_COIN_IDS[coin]) or {}
+            if isinstance(quote.get("usd"), (int, float)):
+                values[("price", coin)] = float(quote["usd"])
+            if isinstance(quote.get("usd_24h_change"), (int, float)):
+                values[("move", coin)] = float(quote["usd_24h_change"])
+    for coin in sorted({a.coin for a in alerts if a.kind == "rsi" and a.coin in DEFAULT_COIN_IDS}):
+        ok, history, _err = market_data.get_market_history(DEFAULT_COIN_IDS[coin], 30)
+        rsi = daily_rsi(history.get("prices", [])) if ok else None
+        if rsi is not None:
+            values[("rsi", coin)] = rsi
+    if any(a.kind == "fear_greed" for a in alerts):
+        ok, data, _err = market_data.get_fear_greed_index()
+        if ok and data:
+            values[("fear_greed", "ALL")] = float(data["value"])
+    return values
 
 
 def check_alerts(db: Session) -> int:
     alerts = db.query(PriceAlert).filter(PriceAlert.active.is_(True)).all()
-    coins = sorted({a.coin for a in alerts if a.coin in DEFAULT_COIN_IDS})
-    if not coins:
+    if not alerts:
         return 0
-    ok, prices, _err = market_data.get_live_prices([DEFAULT_COIN_IDS[c] for c in coins])
-    if not ok or not prices:
-        return 0
-    fired = 0
-    emails = []
+    values = _current_values(alerts)
+    deliveries = []
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     for alert in alerts:
-        price = (prices.get(DEFAULT_COIN_IDS.get(alert.coin, "")) or {}).get("usd")
-        if not isinstance(price, (int, float)) or not crossed(alert, price):
+        value = values.get((alert.kind, alert.coin))
+        if value is None or not crossed(alert, value):
             continue
-        alert.active, alert.triggered_at, alert.triggered_price = False, now, float(price)
-        notify(db, alert.user_id, "price_alert", coin=alert.coin, direction=alert.direction,
-               target=alert.target_price, price=float(price))
         user = db.get(User, alert.user_id)
-        if user is not None and user.email and user.email_verified is not False:
-            emails.append((user.email, *_email(user, alert, float(price))))
-        fired += 1
+        if user is None:
+            continue
+        if alert.kind in PREMIUM_KINDS and not is_premium(user):
+            continue                      # Premium ended: the alert waits until it is renewed
+        alert.active, alert.triggered_at, alert.triggered_price = False, now, value
+        notify(db, alert.user_id, "price_alert", alert_kind=alert.kind, coin=alert.coin, direction=alert.direction,
+               target=alert.target_price, price=value)
+        deliveries.append((user, describe(alert, value, user.lang)))
     db.commit()
-    if is_email_configured():
-        for to, subject, text, body in emails:
-            send_email(to, subject, text, body)
-    return fired
+    for user, text in deliveries:
+        if user.email and user.email_verified is not False and is_email_configured():
+            send_email(user.email, *_email(user, text))
+        if user.telegram_chat_id and is_premium(user):
+            telegram.send(user.telegram_chat_id, f"🔔 {text}")
+    return len(deliveries)

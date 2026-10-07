@@ -37,7 +37,7 @@ from app.services.email_service import (
     subject as email_subject,
 )
 from app.services.app_settings import require_feature
-from app.services.premium import find_referrer, grant_referral_reward, is_premium
+from app.services.premium import find_referrer, is_premium
 from app.services.roles import is_admin
 from app.services.verification import send_verification_code
 
@@ -85,8 +85,6 @@ def register(payload: RegisterRequest, response: Response, request: Request, bac
     try:
         db.flush()
         audit.record(db, user.id, "register", request)
-        if user.email_verified is None:   # no email confirmation in this deployment
-            grant_referral_reward(db, user)
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -297,7 +295,6 @@ def verify_email(payload: VerifyEmailRequest, user: User = Depends(get_current_u
         raise HTTPException(status_code=400, detail="Kód je nesprávny alebo expirovaný.")
     user.email_verified = True
     db.query(EmailVerificationCode).filter(EmailVerificationCode.user_id == user.id).delete(synchronize_session=False)
-    grant_referral_reward(db, user)
     db.commit()
     return {"success": True, "email_verified": True}
 

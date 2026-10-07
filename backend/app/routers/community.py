@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
@@ -16,9 +17,11 @@ from app.config import APP_PUBLIC_URL, MAX_REWARDED_REFERRALS, RATE_LIMIT_ACCOUN
 from app.deps import get_current_user, get_db
 from app.models import User
 from app.rate_limit import rate_limit_by_user
-from app.services import app_settings, audit, billing, notifications
+from app.services import app_settings, audit, billing, notifications, telegram
 from app.services.account_data import export_user_data, personal_stats
-from app.services.premium import ensure_referral_code, is_premium, rewarded_referrals
+from app.services.premium import (
+    ambassador_badge, ensure_referral_code, invited_signups, is_premium, require_premium, rewarded_referrals,
+)
 
 logger = logging.getLogger("aca.community")
 router = APIRouter(tags=["community"])
@@ -28,22 +31,34 @@ NICKNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{3,20}$")
 
 def premium_info() -> dict:
     s = app_settings.all_settings()
-    return {"billing_enabled": billing.checkout_ready(), "price_label": s["premium_price_label"],
-            "trial_days": s["premium_trial_days"],
+    if not s["premium_mode"]:
+        return {"enabled": False}
+    return {"enabled": True, "billing_enabled": billing.checkout_ready(), "yearly": billing.yearly_available(),
+            "price_label": s["premium_price_label"], "price_label_yearly": s["premium_price_label_yearly"],
+            "trial_days": s["premium_trial_days"], "referral_trial_days": s["referral_trial_days"],
             "limits": {"free": {"schedules": s["free_schedules"], "alerts": s["free_alerts"]},
                        "premium": {"schedules": s["premium_schedules"], "alerts": s["premium_alerts"]}},
             "referral_days": s["referral_reward_days"], "referrals_enabled": s["referrals_enabled"]}
 
 
+def _require_premium_mode() -> None:
+    if not app_settings.premium_mode():
+        raise HTTPException(status_code=404, detail="Not found")
+
+
 @router.get("/api/account/membership")
 def membership(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     code = ensure_referral_code(db, user)
-    until = user.premium_until.isoformat() + "Z" if user.premium_until else None
+    premium = is_premium(user)
+    signups = invited_signups(db, user.id)
     return {
-        "premium": is_premium(user), "premium_until": until, "has_billing": bool(user.stripe_customer_id),
+        "premium": premium, "premium_until": user.premium_until.isoformat() + "Z" if premium else None,
+        "has_billing": bool(user.stripe_customer_id),
         "nickname": user.nickname, "digest_opt_in": bool(user.digest_opt_in), "lang": user.lang or "en",
-        "briefing_opt_in": bool(user.briefing_opt_in) and is_premium(user),
+        "briefing_opt_in": bool(user.briefing_opt_in) and premium,
+        "telegram": {"available": telegram.enabled(), "linked": bool(user.telegram_chat_id)},
         "referral_code": code, "referral_link": f"{APP_PUBLIC_URL}/?ref={code}",
+        "referral_signups": signups, "badge": ambassador_badge(signups),
         "referrals_rewarded": rewarded_referrals(db, user.id), "referrals_max": MAX_REWARDED_REFERRALS,
         **premium_info(),
     }
@@ -82,8 +97,8 @@ def set_preferences(payload: PreferencesIn, user: User = Depends(get_current_use
     if payload.lang is not None:
         user.lang = payload.lang
     if payload.briefing_opt_in is not None:
-        if payload.briefing_opt_in and not is_premium(user):
-            raise HTTPException(status_code=403, detail="Táto funkcia je dostupná v Premium.")
+        if payload.briefing_opt_in:
+            require_premium(user)
         user.briefing_opt_in = payload.briefing_opt_in
     db.commit()
     return {"digest_opt_in": bool(user.digest_opt_in), "lang": user.lang or "en",
@@ -108,6 +123,7 @@ def _billing_ready() -> None:
 
 
 class CheckoutIn(BaseModel):
+    plan: Literal["monthly", "yearly"] = "monthly"
     # The buyer accepts the Terms and asks for Premium to start right away (EU consumer law, services).
     accept_terms: bool = False
     start_immediately: bool = False
@@ -122,7 +138,7 @@ def checkout(payload: CheckoutIn, request: Request, user: User = Depends(get_cur
     audit.record(db, user.id, "premium_checkout_consent", request)
     db.commit()
     try:
-        return {"url": billing.create_checkout_url(user, app_settings.get("premium_trial_days"))}
+        return {"url": billing.create_checkout_url(user, payload.plan)}
     except billing.BillingError:
         raise HTTPException(status_code=502, detail="Platobnú bránu sa nepodarilo otvoriť. Skús to o chvíľu.") from None
 
@@ -130,9 +146,23 @@ def checkout(payload: CheckoutIn, request: Request, user: User = Depends(get_cur
 @router.get("/api/account/stats")
 def my_stats(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     """Premium: the user's own accuracy by model, coin and horizon."""
-    if not is_premium(user):
-        raise HTTPException(status_code=403, detail="Táto funkcia je dostupná v Premium.")
+    require_premium(user)
     return personal_stats(db, user.id)
+
+
+@router.post("/api/account/telegram/link", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
+def telegram_link(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    require_premium(user)
+    if not telegram.enabled():
+        raise HTTPException(status_code=403, detail="Táto funkcia je momentálne vypnutá.")
+    return {"url": telegram.link_url(db, user)}
+
+
+@router.delete("/api/account/telegram")
+def telegram_unlink(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    user.telegram_chat_id, user.telegram_link_code = None, None
+    db.commit()
+    return {"success": True}
 
 
 @router.get("/api/account/export")
