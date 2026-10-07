@@ -21,12 +21,22 @@ const FEATURES = [
   { icon: Radar, title: "landing.f5Title", text: "landing.f5Text" },
   { icon: BellRing, title: "landing.f6Title", text: "landing.f6Text" },
 ];
+// The stats strip appears only once enough forecasts were checked to mean something (the full record stays public).
+const MIN_PUBLIC_SAMPLE = 50;
 const PREMIUM_POINTS = ["consensus", "smartModel", "simulator", "scanner", "tracker", "telegram"];
 
 export default function Landing() {
   const { t, lang, setLang } = useLanguage();
   const { waitlist_enabled } = useAppConfig();
   const { mode } = usePremium();
+  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && window.matchMedia?.("(max-width: 480px)").matches);
+  useEffect(() => {
+    const query = window.matchMedia?.("(max-width: 480px)");
+    if (!query) return undefined;
+    const onChange = (e) => setNarrow(e.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
   const [stats, setStats] = useState(null);
   useEffect(() => {
     api.trackRecord()
@@ -45,7 +55,7 @@ export default function Landing() {
         <div className="landing-brand"><div className="brand-mark"><BarChart3 size={18} /></div><strong>AI Crypto Analytics</strong></div>
         <div className="landing-nav-actions">
           <select className="select landing-lang" value={lang} onChange={(e) => setLang(e.target.value)} aria-label={t("landing.language")}>
-            {LANGUAGES.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
+            {LANGUAGES.map((l) => <option key={l.code} value={l.code}>{narrow ? l.code.toUpperCase() : l.label}</option>)}
           </select>
           <Link to="/auth" className="btn btn-ghost btn-sm">{t("landing.login")}</Link>
         </div>
@@ -76,7 +86,7 @@ export default function Landing() {
         ))}
       </section>
 
-      {stats?.evaluated > 0 && (
+      {stats?.evaluated >= MIN_PUBLIC_SAMPLE && (
         <Link to="/track-record" className="landing-stats" aria-label={t("track.landingLink")}>
           <span><strong>{stats.evaluated}</strong> {t("landing.statChecked")}</span>
           <span><strong>{stats.direction_hit_pct}%</strong> {t("landing.statHit")}</span>
