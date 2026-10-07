@@ -80,6 +80,9 @@ CRYPTO_NEWS_RSS_URLS: Final[List[str]] = [
     "https://www.coindesk.com/arc/outboundfeeds/rss/",
     "https://cointelegraph.com/rss",
     "https://decrypt.co/feed",
+    "https://www.theblock.co/rss.xml",
+    "https://bitcoinmagazine.com/.rss/full/",
+    "https://cryptoslate.com/feed/",
 ]
 REDDIT_CRYPTO_URL: Final[str] = "https://www.reddit.com/r/CryptoCurrency/hot.json"
 

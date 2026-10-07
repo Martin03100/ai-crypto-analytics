@@ -253,6 +253,10 @@ _HORIZON_STEP = {"4h": "hodinu", "24h": "hodinu", "1T": "den", "1M": "den", "1R"
 def build_forecast_prompt(coin: str, horizon: str, points: int, market_context: str | None = None) -> str:
     context_block = (
         f"SKUTOCNE aktualne trhove data pre {coin} (pouzi ako hlavny zaklad predikcie): {market_context}. "
+        "Ak su k dispozicii trhove signaly (derivaty, opcie, toky kapitalu, makro, kalendar, regulacia), zvaz ich "
+        "vahu podla horizontu: pri kratkom horizonte (4h, 24h) maju vacsiu vahu funding, likvidacie a open interest, "
+        "pri dlhom (1 mesiac, 1 rok) makro, toky kapitalu a regulacia. V odovodneni spomen 2-3 najdolezitejsie signaly "
+        "s konkretnymi cislami. "
         if market_context else
         f"Aktualne trhove data pre {coin} nie su k dispozicii - vychadzaj zo vseobecnych znalosti o tomto aktive, "
         f"ale jasne to zohladni v nizsej istote (confidence_score) a v odovodneni to spomen. "

@@ -181,7 +181,7 @@ function HistoryItem({ entry, onDelete }) {
                 </p>
               )}
               <p className="text-sub" style={{ marginTop: 8 }}>{stripMockTag(entry.forecast_data.odovodnenie)}</p>
-              <DataSources sources={entry.forecast_data.zdroje_dat} />
+              <DataSources sources={entry.forecast_data.zdroje_dat} signals={entry.forecast_data.signaly} />
             </>
           ) : (
             <p className="text-sub">{t("forecast.noChartData")}</p>
@@ -427,7 +427,7 @@ export default function Forecast() {
                 <p style={{ margin: 0, lineHeight: 1.6, fontSize: 13.5, color: "var(--text-secondary)" }}>
                   {stripMockTag(result.data.odovodnenie)}
                 </p>
-                <DataSources sources={result.data.zdroje_dat} />
+                <DataSources sources={result.data.zdroje_dat} signals={result.data.signaly} />
               </Card>
               <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end" }}>
                 <button className={`btn btn-sm ${saved ? "btn-success" : "btn-primary"}`} onClick={saveCurrentForecast} disabled={saving || saved}>

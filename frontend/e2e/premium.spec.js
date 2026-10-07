@@ -25,9 +25,11 @@ test("with Premium mode off the app looks completely free", async ({ page }) => 
   await expect(page.getByRole("button", { name: "Simulator" })).toHaveCount(0);
   await page.goto("/dashboard");
   await expect(page.getByRole("tab", { name: "Big move" })).toBeVisible();
+  await expect(page.getByText("Market signals")).toBeVisible();
   await expect(page.getByRole("tab", { name: "Fear & Greed" })).toHaveCount(0);
   await page.goto("/market");
   await expect(page.getByText("Market scanner")).toBeVisible();
+  await expect(page.getByText("Market signals")).toBeVisible();
   await expect(page.getByText(/more coins in the full scan/)).toHaveCount(0);
 });
 

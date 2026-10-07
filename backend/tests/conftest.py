@@ -101,3 +101,13 @@ def premium_on(client):
     """Premium mode is off by default (the app looks free); tests of paid features switch it on."""
     set_app_settings(premium_mode=True)
     return client
+
+
+@pytest.fixture(autouse=True)
+def _no_live_signals(monkeypatch, request):
+    """Market signals call many public APIs; unit tests opt in explicitly (marker: live_signals)."""
+    if request.node.get_closest_marker("live_signals"):
+        return
+    from app.services import signals
+    monkeypatch.setattr(signals, "collect", lambda *a, **k: {"coin": "BTC", "items": [], "sources": [], "lines": [],
+                                                            "updated_at": "", "score": {"bullish": 0, "bearish": 0, "neutral": 0}})

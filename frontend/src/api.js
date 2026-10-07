@@ -241,6 +241,7 @@ export const api = {
   checkout: (body) => request("/billing/checkout", { method: "POST", body }),
   telegramLink: () => request("/account/telegram/link", { method: "POST" }).then(obj),
   telegramUnlink: () => request("/account/telegram", { method: "DELETE" }),
+  marketSignals: (coin = "BTC") => request(`/market/signals?coin=${encodeURIComponent(coin)}`).then((r) => withArrays(r, ["items", "sources"])),
   scanner: () => request("/tools/scanner").then((r) => withArrays(r, ["rows"])),
   modelRanking: (coin, horizon) =>
     request(`/tools/model-ranking?coin=${encodeURIComponent(coin)}&horizon=${encodeURIComponent(horizon)}`).then((r) => withArrays(r, ["ranking"])),

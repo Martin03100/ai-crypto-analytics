@@ -58,7 +58,7 @@ export default function SharedForecast() {
           </div>
           {!evaluation && <p className="text-sub">{t("share.notEvaluatedYet")}</p>}
           {data?.odovodnenie && <p className="text-sub" style={{ marginTop: 8, lineHeight: 1.6 }}>{stripMockTag(data.odovodnenie)}</p>}
-          <DataSources sources={data?.zdroje_dat} />
+          <DataSources sources={data?.zdroje_dat} signals={data?.signaly} />
         </Card>
       )}
       {shared && <ShareBar text={t("share.shareText", { coin: shared.coin, horizon: shared.horizon })} />}

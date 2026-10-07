@@ -499,7 +499,7 @@ export default function Portfolio() {
 
           <Card title={t("portfolio.expertAnalysisTitle")} icon={GraduationCap}>
             <p style={{ margin: 0, lineHeight: 1.6, fontSize: 13.5, color: "var(--text-secondary)" }}>{stripMockTag(result.data.odborna_analyza)}</p>
-            <DataSources sources={result.data.zdroje_dat} />
+            <DataSources sources={result.data.zdroje_dat} signals={result.data.signaly} />
           </Card>
         </div>
       )}

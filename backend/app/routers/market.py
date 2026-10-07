@@ -4,18 +4,19 @@ from __future__ import annotations
 
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import (
+    DEFAULT_COIN_IDS,
     RATE_LIMIT_AI_ENDPOINT, RATE_LIMIT_MARKET_GLOBAL, RATE_LIMIT_MARKET_PUBLIC, RATE_LIMIT_VOTE,
 )
 from app.deps import get_current_user, get_db, get_decrypted_api_key
 from app.models import CommunityVote, User
 from app.rate_limit import rate_limit_by_ip, rate_limit_by_user, rate_limit_global
 from app.schemas import AIResultOut, DailyDigestRequest, NewsSentimentRequest, VoteRequest
-from app.services import jobs
+from app.services import jobs, signals
 from app.services.ai_engine import get_daily_digest, get_news_sentiment_summary
 from app.services.market_data import (
     VALID_CHART_DAYS, VALID_VS_CURRENCIES, is_valid_coin_id,
@@ -110,6 +111,16 @@ def _daily_digest(payload: DailyDigestRequest, api_key) -> dict:
 
     result = get_daily_digest(payload.provider, fg_value, fg_classification, headlines, api_key, payload.lang)
     return AIResultOut(**result.as_dict()).model_dump()
+
+
+@router.get("/signals", dependencies=_PUBLIC_LIMITS)
+def market_signals(coin: str = Query(default="BTC", max_length=10)) -> dict:
+    """Derivatives, options, flows, macro and more for one coin (market-wide parts are shared)."""
+    coin = coin.upper()
+    if coin not in DEFAULT_COIN_IDS:
+        raise HTTPException(status_code=400, detail="Táto minca nie je podporovaná.")
+    bundle = signals.collect(coin)
+    return {k: bundle[k] for k in ("coin", "items", "sources", "updated_at", "score")} | {"coin": coin}
 
 
 @router.get("/events", dependencies=_PUBLIC_LIMITS)

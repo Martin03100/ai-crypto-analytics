@@ -26,6 +26,12 @@ statistical model and real market data. Bachelor's thesis project (Software Deve
   (Netlify Edge Function + Pillow cards), plus **robots.txt / sitemap / JSON-LD**.
 - **Community:** "Beat the AI" price duels with a weekly and all-time tipster board (opt-in nicknames), in-app
   **notifications** when forecasts are checked or duels end, and an opt-in **weekly "AI vs reality" email**.
+- **Market signals** from public, keyless sources, shown to users and fed into every AI analysis (forecast, portfolio,
+  news summary, digest, chat and the morning briefing): funding, open interest, long/short ratio (Binance → Bybit → OKX
+  fallback), liquidations (OKX), options put/call and implied volatility (Deribit), stablecoin supply (DefiLlama),
+  Coinbase premium, BTC dominance and total market cap, Bitcoin fees and hashrate (mempool.space), VIX, Nasdaq,
+  S&P 500, dollar, yields, oil, Fed rate and CPI (FRED), gold, the Fed/CPI calendar, SEC and CFTC news and Polymarket odds.
+  Each analysis keeps the exact values it used, so users can check the reasoning.
 - **Free tools:** **market scanner** (expected 24h move, RSI and a signal for the top 5 coins) and **smart alerts**
   (price level, big 24h move, RSI extremes).
 - **20 coins** (incl. TON, SUI, PEPE…) and a **4-hour horizon** next to 24h / 1 week / 1 month / 1 year.

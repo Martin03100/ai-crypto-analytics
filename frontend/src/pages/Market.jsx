@@ -9,6 +9,7 @@ import InfoTip from "../components/InfoTip";
 import LoadError from "../components/LoadError";
 import OnchainCard from "../components/OnchainCard";
 import MarketScanner from "../components/MarketScanner";
+import MarketSignals from "../components/MarketSignals";
 import PriceChart from "../components/PriceChart";
 import { SkeletonLines } from "../components/Skeleton";
 import ProviderSelect from "../components/ProviderSelect";
@@ -151,6 +152,8 @@ export default function Market() {
       </div>
 
       <MarketScanner />
+
+      <MarketSignals style={{ marginBottom: 16 }} />
 
       <div className="grid grid-2" style={{ marginBottom: 16 }}>
         <Card title={<>{t("market.fearGreedTitle")} <InfoTip text={t("help.fearGreed")} /></>} icon={Gauge} glow={fg && fg.value >= 55 ? "emerald" : fg && fg.value <= 45 ? "crimson" : undefined}>

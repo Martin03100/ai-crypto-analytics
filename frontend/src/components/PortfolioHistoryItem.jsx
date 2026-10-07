@@ -85,7 +85,7 @@ export default function PortfolioHistoryItem({ entry, onDelete }) {
             ))}
           </div>
           <p className="text-sub">{stripMockTag(entry.analysis_data?.odborna_analyza)}</p>
-          <DataSources sources={entry.analysis_data?.zdroje_dat} />
+          <DataSources sources={entry.analysis_data?.zdroje_dat} signals={entry.analysis_data?.signaly} />
         </div>
       )}
     </div>

@@ -24,6 +24,10 @@ class TTLCache:
             return value
         return None
 
+    def clear(self) -> None:
+        with self._lock:
+            self._store.clear()
+
     def is_fresh(self, key: str) -> bool:
         return self.get(key) is not None
 

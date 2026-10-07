@@ -29,7 +29,7 @@ from app.config import (
     PROVIDER_TOKEN_PRICE_USD_PER_1K,
     AI_REQUEST_TIMEOUT_SECONDS, SECTOR_CATEGORIES, TIME_HORIZONS,
 )
-from app.services import data_sources, market_data, quant_engine
+from app.services import data_sources, market_data, quant_engine, signals
 from app.services.validators import (
     language_instruction,
     build_daily_digest_prompt, build_forecast_prompt, build_news_prompt, build_portfolio_prompt,
@@ -457,6 +457,32 @@ def _await(future, deadline: float):
         return None
 
 
+_SIGNALS_WAIT = 14
+
+
+def _append_signals(lines: List[str], sources: List[str], future, started: float) -> None:
+    bundle = _await(future, started + _SIGNALS_WAIT)
+    block = signals.context_block(bundle) if bundle else None
+    if block:
+        lines.append(block)
+        sources.extend(bundle["sources"])
+
+
+def market_signals_block(*symbols: str) -> Optional[str]:
+    """Signals for prompts outside forecasts (news summary, digest, chat). Never raises."""
+    blocks, seen = [], set()
+    for symbol in symbols or ("BTC",):
+        try:
+            bundle = signals.collect(symbol)
+        except Exception:  # noqa: BLE001
+            continue
+        fresh = [line for line in bundle.get("lines", []) if line not in seen]
+        seen.update(fresh)
+        if fresh:
+            blocks.append("- " + "\n- ".join(fresh))
+    return "Market signals (live, public sources):\n" + "\n".join(blocks) if blocks else None
+
+
 def _append_common_context(lines: List[str], sources: List[str], futures: Dict[str, Any], deadline: float) -> None:
     btc = _await(futures.get("btc"), deadline)
     if btc and btc[0]:
@@ -483,10 +509,12 @@ def _build_market_context(coin: str) -> Tuple[Optional[str], List[str]]:
     if not coin_id:
         return None, []
     symbol = coin.upper()
-    pool = ThreadPoolExecutor(max_workers=12)
+    pool = ThreadPoolExecutor(max_workers=13)
     try:
-        deadline = time.monotonic() + _MARKET_CONTEXT_TIMEOUT + 1
+        started = time.monotonic()
+        deadline = started + _MARKET_CONTEXT_TIMEOUT + 1
         futures = {
+            "signals": pool.submit(signals.collect, symbol),
             "coin": pool.submit(market_data.get_market_history, coin_id, 30, _MARKET_CONTEXT_TIMEOUT),
             "btc": pool.submit(market_data.get_market_history, "bitcoin", 30, _MARKET_CONTEXT_TIMEOUT) if coin_id != "bitcoin" else None,
             "fg": pool.submit(market_data.get_fear_greed_index),
@@ -531,6 +559,7 @@ def _build_market_context(coin: str) -> Tuple[Optional[str], List[str]]:
                 lines.append(value)
                 sources.append(label)
         _append_common_context(lines, sources, futures, deadline)
+        _append_signals(lines, sources, futures["signals"], started)
         return "\n".join(lines), sources
     except Exception:  # noqa: BLE001
         return None, []
@@ -544,10 +573,12 @@ def _fetch_market_context(coin: str) -> Optional[str]:
 
 def _build_portfolio_context(holdings: List[Dict[str, Any]]) -> Tuple[Optional[str], List[str]]:
     ids = [h.get("coin_id") or DEFAULT_COIN_IDS.get(str(h.get("minca", "")).upper()) for h in holdings]
-    pool = ThreadPoolExecutor(max_workers=6)
+    pool = ThreadPoolExecutor(max_workers=7)
     try:
-        deadline = time.monotonic() + _MARKET_CONTEXT_TIMEOUT + 1
+        started = time.monotonic()
+        deadline = started + _MARKET_CONTEXT_TIMEOUT + 1
         futures = {
+            "signals": pool.submit(signals.collect, "BTC"),
             "markets": pool.submit(market_data.get_coin_markets, [i for i in ids if i], _MARKET_CONTEXT_TIMEOUT),
             "btc": pool.submit(market_data.get_market_history, "bitcoin", 30, _MARKET_CONTEXT_TIMEOUT),
             "fg": pool.submit(market_data.get_fear_greed_index),
@@ -588,6 +619,7 @@ def _build_portfolio_context(holdings: List[Dict[str, Any]]) -> Tuple[Optional[s
             lines.append(f"Celkova hodnota ${total:,.0f} | najvacsia pozicia {weights[0]:.0f}% | pocet pozicii {len(holdings)}")
         sources = ["coingecko_prices"]
         _append_common_context(lines, sources, futures, deadline)
+        _append_signals(lines, sources, futures["signals"], started)
         return "\n".join(lines), sources
     except Exception:  # noqa: BLE001
         return None, []
@@ -689,6 +721,7 @@ def get_coin_forecast(provider: str, coin: str, horizon: str, api_key: Optional[
         return _forecast_fallback(coin, horizon, lang, validation_error)
 
     parsed["zdroje_dat"] = sources_used
+    parsed["signaly"] = _used_signals(coin)
     parsed["vytvorene"] = datetime.now(timezone.utc).isoformat()
     if market_context:
         ok, history, _ = market_data.get_market_history(DEFAULT_COIN_IDS[coin.upper()], 30, _MARKET_CONTEXT_TIMEOUT)
@@ -718,7 +751,16 @@ def get_portfolio_analysis(provider: str, holdings: List[Dict[str, Any]], api_ke
         return AIEngineResult(True, _generate_mock_portfolio_analysis(holdings, lang), True, validation_error)
 
     parsed["zdroje_dat"] = sources_used
+    parsed["signaly"] = _used_signals("BTC")
     return AIEngineResult(True, parsed, False)
+
+
+def _used_signals(symbol: str) -> List[Dict[str, Any]]:
+    """The exact signal values the model saw, kept with the result so users can check them."""
+    try:
+        return [{k: s[k] for k in ("group", "key", "display", "tone", "source")} for s in signals.collect(symbol)["items"]]
+    except Exception:  # noqa: BLE001
+        return []
 
 
 def get_news_sentiment_summary(provider: str, headlines: List[str], api_key: Optional[str],
@@ -730,7 +772,8 @@ def get_news_sentiment_summary(provider: str, headlines: List[str], api_key: Opt
         return AIEngineResult(True, _generate_mock_news_summary(headlines, lang), True,
                                missing_api_key_message(lang))
 
-    prompt = build_news_prompt(headlines) + language_instruction(lang)
+    block = market_signals_block("BTC")
+    prompt = build_news_prompt(headlines) + (f"\n\n{block}" if block else "") + language_instruction(lang)
     success, raw_text, call_error = call_ai_provider(provider, prompt, api_key)
     if not success:
         return AIEngineResult(True, _generate_mock_news_summary(headlines, lang), True, call_error)
@@ -755,7 +798,9 @@ def get_daily_digest(provider: str, fg_value: int, fg_classification: str,
         return AIEngineResult(True, _generate_mock_digest(fg_value, fg_classification, lang), True,
                                missing_api_key_message(lang))
 
-    prompt = build_daily_digest_prompt(fg_value, fg_classification, headlines) + language_instruction(lang)
+    block = market_signals_block("BTC")
+    prompt = (build_daily_digest_prompt(fg_value, fg_classification, headlines) + (f"\n\n{block}" if block else "")
+              + language_instruction(lang))
     success, raw_text, call_error = call_ai_provider(provider, prompt, api_key)
     if not success:
         return AIEngineResult(True, _generate_mock_digest(fg_value, fg_classification, lang), True, call_error)
@@ -827,10 +872,14 @@ def chat_with_ai(provider: str, messages: List[Dict[str, str]], api_key: Optiona
         }, True, missing_api_key_message(lang))
 
     conversation = "\n".join(f"{m.get('role', 'user')}: {m.get('content', '')}" for m in messages)
+    last_user = next((m.get("content", "") for m in reversed(messages) if m.get("role") == "user"), "")
+    mentioned = [c for c in DEFAULT_COIN_IDS if re.search(rf"\b{c}\b", last_user, re.I) and c != "BTC"][:1]
+    block = market_signals_block("BTC", *mentioned)
     prompt = (
         "Si strucny, priatelsky AI asistent pre krypto analyticku aplikaciu. "
         "Odpovedz strucne (max 4-5 viet) na poslednu spravu pouzivatela, "
-        "v kontexte celej konverzacie nizsie:\n\n" + conversation
+        "v kontexte celej konverzacie nizsie. Ak sa pyta na trh, opri sa o aktualne data nizsie "
+        "a nevymyslaj cisla.\n\n" + (f"{block}\n\n" if block else "") + conversation
     )
     prompt += language_instruction(lang, json_mode=False)
     success, text, error = call_ai_provider(provider, prompt, api_key)
