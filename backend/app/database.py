@@ -115,8 +115,8 @@ def init_db() -> None:
         logger.info("init_db: databaza bez Alembic verzie - doplnam schemu a oznacujem ju ako aktualnu")
         Base.metadata.create_all(bind=engine)
         auto_migrate()
-        _create_missing_indexes()
         _require_complete_schema()
+        _create_missing_indexes()
         command.stamp(cfg, "head")
         return
     command.upgrade(cfg, "head")

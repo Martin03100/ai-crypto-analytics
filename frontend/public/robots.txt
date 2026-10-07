@@ -1,6 +1,6 @@
 User-agent: *
+Allow: /api/public/
 Disallow: /api/
-Disallow: /share/
 Allow: /
 
 Sitemap: https://aicryptopredictor.netlify.app/sitemap.xml

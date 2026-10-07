@@ -38,7 +38,7 @@ export default function About() {
 
       <Card title={t("about.featuresTitle")} icon={Sparkles}>
         <ul className="about-list">
-          {["forecast", "quant", "backtest", "portfolio", "market", "security"].map((k) => <li key={k}>{t(`about.feature.${k}`)}</li>)}
+          {["forecast", "quant", "backtest", "portfolio", "market", "community", "security"].map((k) => <li key={k}>{t(`about.feature.${k}`)}</li>)}
         </ul>
       </Card>
 

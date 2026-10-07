@@ -21,6 +21,8 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     email: str = Field(min_length=3, max_length=255)
     captcha_token: Optional[str] = Field(default=None, max_length=4096)
+    lang: Optional[str] = Field(default=None, pattern=r"^(en|sk|cs)$")
+    referral_code: Optional[str] = Field(default=None, max_length=16, pattern=r"^[A-Za-z0-9]*$")
 
 
 class LoginRequest(BaseModel):
@@ -37,6 +39,7 @@ class TokenResponse(BaseModel):
     email: Optional[str] = None
     email_verified: Optional[bool] = None
     totp_enabled: bool = False
+    premium: bool = False
 
 
 class ApiKeyIn(BaseModel):
@@ -123,7 +126,7 @@ class PortfolioRequest(BaseModel):
 class ForecastRequest(BaseModel):
     provider: str = Field(max_length=32)
     coin: str = Field(min_length=1, max_length=16)
-    horizon: Literal["24h", "1T", "1M", "1R"]
+    horizon: Literal["4h", "24h", "1T", "1M", "1R"]
     lang: str = "en"
 
 
@@ -202,7 +205,7 @@ def _check_json_size(value: Dict[str, Any]) -> Dict[str, Any]:
 class SaveForecastRequest(BaseModel):
     provider: str = Field(max_length=32)
     coin: str = Field(min_length=1, max_length=16)
-    horizon: Literal["24h", "1T", "1M", "1R"]
+    horizon: Literal["4h", "24h", "1T", "1M", "1R"]
     forecast_data: Dict[str, Any]
     is_mock: bool = False
 
@@ -270,7 +273,7 @@ class DailyDigestRequest(BaseModel):
 class ScheduleCreate(BaseModel):
     provider: str = Field(max_length=32)
     coin: str = Field(min_length=2, max_length=10)
-    horizon: Literal["24h", "1T", "1M"]
+    horizon: Literal["4h", "24h", "1T", "1M"]
     frequency: Literal["daily", "weekly"]
     weekday: Optional[int] = Field(default=None, ge=0, le=6)
     hour: int = Field(ge=0, le=23)

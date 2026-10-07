@@ -247,7 +247,7 @@ def build_daily_digest_prompt(fear_greed_value: int, fear_greed_classification: 
     )
 
 
-_HORIZON_STEP = {"24h": "hodinu", "1T": "den", "1M": "den", "1R": "mesiac"}
+_HORIZON_STEP = {"4h": "hodinu", "24h": "hodinu", "1T": "den", "1M": "den", "1R": "mesiac"}
 
 
 def build_forecast_prompt(coin: str, horizon: str, points: int, market_context: str | None = None) -> str:

@@ -34,7 +34,9 @@ from app.services import totp
 from app.services.totp import consume_totp_code
 from app.services.email_service import (
     is_email_configured, render_lockout_email, render_new_login_email, render_reset_password_email, send_email,
+    subject as email_subject,
 )
+from app.services.premium import find_referrer, grant_referral_reward, is_premium
 from app.services.verification import send_verification_code
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -72,12 +74,16 @@ def register(payload: RegisterRequest, response: Response, request: Request, bac
         if not (is_email_configured() and release_email_if_unverified(db, email)):
             raise HTTPException(status_code=400, detail="Tento email už používa iný účet.")
 
+    referrer = find_referrer(db, payload.referral_code)
     user = User(username=username, password_hash=hash_password(payload.password), email=email,
-                email_verified=False if is_email_configured() else None)
+                email_verified=False if is_email_configured() else None, lang=payload.lang or "en",
+                referred_by_id=referrer.id if referrer else None)
     db.add(user)
     try:
         db.flush()
         audit.record(db, user.id, "register", request)
+        if user.email_verified is None:   # no email confirmation in this deployment
+            grant_referral_reward(db, user)
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -89,7 +95,8 @@ def register(payload: RegisterRequest, response: Response, request: Request, bac
     _set_auth_cookie(response, user)
     return TokenResponse(access_token=create_access_token(user.id, user.username, user.token_version),
                           username=user.username, user_id=user.id, email=user.email,
-                          email_verified=user.email_verified, totp_enabled=bool(user.totp_enabled))
+                          email_verified=user.email_verified, totp_enabled=bool(user.totp_enabled),
+                          premium=is_premium(user))
 
 
 @router.post("/login", response_model=TokenResponse, dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_LOGIN))])
@@ -144,7 +151,8 @@ def login(payload: LoginRequest, response: Response, request: Request, backgroun
     _set_auth_cookie(response, user)
     return TokenResponse(access_token=create_access_token(user.id, user.username, user.token_version),
                           username=user.username, user_id=user.id, email=user.email,
-                          email_verified=user.email_verified, totp_enabled=bool(user.totp_enabled))
+                          email_verified=user.email_verified, totp_enabled=bool(user.totp_enabled),
+                          premium=is_premium(user))
 
 
 @router.post("/logout")
@@ -156,7 +164,8 @@ def logout(response: Response) -> dict:
 @router.get("/me", response_model=TokenResponse)
 def me(user: User = Depends(get_current_user)) -> TokenResponse:
     return TokenResponse(access_token="", username=user.username, user_id=user.id, email=user.email,
-                         email_verified=user.email_verified, totp_enabled=bool(user.totp_enabled))
+                         email_verified=user.email_verified, totp_enabled=bool(user.totp_enabled),
+                         premium=is_premium(user))
 
 
 @router.post("/forgot-password", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_LOGIN))])
@@ -183,12 +192,12 @@ def forgot_password(payload: ForgotPasswordRequest, request: Request, background
     db.add(PasswordResetToken(user_id=user.id, token_hash=code_hash, expires_at=expires_at))
     db.commit()
 
-    text_body, html_body = render_reset_password_email(user.username, code, PASSWORD_RESET_TOKEN_MINUTES)
-    subject = "Kód na obnovenie hesla — AI Crypto Analytics"
+    text_body, html_body = render_reset_password_email(user.username, code, PASSWORD_RESET_TOKEN_MINUTES, user.lang)
+    title = email_subject("reset", user.lang)
     if is_email_configured():
-        background_tasks.add_task(send_email, user.email, subject, text_body, html_body)
+        background_tasks.add_task(send_email, user.email, title, text_body, html_body)
     else:
-        send_email(user.email, subject, text_body, html_body)
+        send_email(user.email, title, text_body, html_body)
 
     result = dict(generic_response)
     if not is_email_configured() and APP_ENV != "production":
@@ -248,9 +257,9 @@ def reset_password(payload: ResetPasswordRequest, request: Request, db: Session 
 def _send_new_login_alert(background_tasks: BackgroundTasks, user: User, now: datetime,
                           user_agent: str | None, ip: str | None) -> None:
     when = now.strftime("%d.%m.%Y %H:%M UTC")
-    text_body, html_body = render_new_login_email(user.username, when, audit.describe_user_agent(user_agent), ip or "?")
-    background_tasks.add_task(send_email, user.email, "Nové prihlásenie do účtu — AI Crypto Analytics",
-                              text_body, html_body)
+    text_body, html_body = render_new_login_email(user.username, when, audit.describe_user_agent(user_agent), ip or "?",
+                                                  user.lang)
+    background_tasks.add_task(send_email, user.email, email_subject("login", user.lang), text_body, html_body)
 
 
 def _register_failed_attempt(db: Session, user: User, now, background_tasks: BackgroundTasks,
@@ -266,9 +275,9 @@ def _register_failed_attempt(db: Session, user: User, now, background_tasks: Bac
         audit.record(db, user.id, "account_locked", request)
     db.commit()
     if locked and user.email and is_email_configured():
-        text_body, html_body = render_lockout_email(user.username, ACCOUNT_LOCKOUT_MINUTES)
+        text_body, html_body = render_lockout_email(user.username, ACCOUNT_LOCKOUT_MINUTES, user.lang)
         threading.Thread(target=send_email, daemon=True, args=(
-            user.email, "Upozornenie: pokusy o prihlásenie — AI Crypto Analytics", text_body, html_body)).start()
+            user.email, email_subject("lock", user.lang), text_body, html_body)).start()
 
 
 @router.post("/verify-email", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_RESET_CODE))])
@@ -283,6 +292,7 @@ def verify_email(payload: VerifyEmailRequest, user: User = Depends(get_current_u
         raise HTTPException(status_code=400, detail="Kód je nesprávny alebo expirovaný.")
     user.email_verified = True
     db.query(EmailVerificationCode).filter(EmailVerificationCode.user_id == user.id).delete(synchronize_session=False)
+    grant_referral_reward(db, user)
     db.commit()
     return {"success": True, "email_verified": True}
 

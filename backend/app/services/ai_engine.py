@@ -24,7 +24,7 @@ from urllib3.connectionpool import HTTPSConnectionPool
 
 from app.config import (
     ANTHROPIC_API_URL, ANTHROPIC_API_VERSION, ANTHROPIC_MODEL,
-    DEEPSEEK_API_URL, DEEPSEEK_MODEL, DEFAULT_COIN_IDS, GEMINI_FALLBACK_MODELS, GEMINI_MODEL, GROK_API_URL, GROK_MODEL, QUANT_PROVIDER,
+    DEEPSEEK_API_URL, DEEPSEEK_MODEL, DEFAULT_COIN_IDS, HORIZON_HOURS, GEMINI_FALLBACK_MODELS, GEMINI_MODEL, GROK_API_URL, GROK_MODEL, QUANT_PROVIDER,
     MOCK_BASE_PRICES, OPENAI_API_URL, OPENAI_MODEL,
     PROVIDER_TOKEN_PRICE_USD_PER_1K,
     AI_REQUEST_TIMEOUT_SECONDS, SECTOR_CATEGORIES, TIME_HORIZONS,
@@ -341,7 +341,7 @@ def _generate_mock_forecast(coin: str, horizon: str, lang: str = "en") -> Dict[s
     current = base_price
     for _ in range(points):
         current = max(0.0001, current * (1 + rng.uniform(-0.04, 0.045)))
-        prices.append(round(current, 4))
+        prices.append(float(f"{current:.8g}"))
 
     time_labels = [f"{unit} {i + 1}" for i in range(points)]
     trend_direction = "up" if prices[-1] >= prices[0] else "down"
@@ -597,13 +597,12 @@ def _build_portfolio_context(holdings: List[Dict[str, Any]]) -> Tuple[Optional[s
 
 def compute_forecast_accuracy(coin: str, timeframe: str, predicted_prices: List[float],
                                time_labels: List[str], created_at: datetime) -> Dict[str, Any]:
-    horizon_days_map = {"24h": 1, "1T": 7, "1M": 30, "1R": 365}
-    horizon_days = horizon_days_map.get(timeframe, 7)
+    horizon_hours = HORIZON_HOURS.get(timeframe, 7 * 24)
     if (not isinstance(predicted_prices, list)
             or not all(isinstance(p, (int, float)) and not isinstance(p, bool) and math.isfinite(p) for p in predicted_prices)):
         predicted_prices = []
     created_at_utc = created_at if created_at.tzinfo else created_at.replace(tzinfo=timezone.utc)
-    target_end = created_at_utc + timedelta(days=horizon_days)
+    target_end = created_at_utc + timedelta(hours=horizon_hours)
     now = datetime.now(timezone.utc)
 
     base = {"predicted_prices": predicted_prices, "time_labels": time_labels, "matures_at": target_end.isoformat()}

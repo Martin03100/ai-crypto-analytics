@@ -3,19 +3,26 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { api, isTransient, SESSION_EXPIRED_EVENT } from "../api";
 import { clearOfflineData, offlineSessionUser, rememberOfflineSession } from "../pwa";
+import { getReferralCode } from "../utils/referral";
+import { useLanguage } from "./LanguageContext";
 
 const AuthContext = createContext(null);
 
 function toUser(res) {
   return {
     username: res.username, id: res.user_id, email: res.email,
-    emailVerified: res.email_verified, totpEnabled: Boolean(res.totp_enabled),
+    emailVerified: res.email_verified, totpEnabled: Boolean(res.totp_enabled), premium: Boolean(res.premium),
   };
 }
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
+  const { lang } = useLanguage();
+
+  useEffect(() => {   // emails are sent in the language the user last used in the app
+    if (user?.id) api.setPreferences({ lang }).catch(() => {});
+  }, [lang, user?.id]);
 
   useEffect(() => {
     api.me()
@@ -57,7 +64,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const register = useCallback(async (username, password, email, captchaToken) => {
-    const res = await api.register(username, password, email, captchaToken);
+    const res = await api.register(username, password, email, captchaToken, getReferralCode());
     await clearOfflineData();
     rememberOfflineSession(toUser(res));
     setUser(toUser(res));

@@ -80,7 +80,7 @@ export default function Landing() {
       </section>
 
       <footer className="landing-footer">
-        <Link to="/about">{t("about.title")}</Link> · <Link to="/track-record">{t("track.title")}</Link> · <Link to="/status">{t("status.title")}</Link> ·{" "}
+        <Link to="/about">{t("about.title")}</Link> · <Link to="/track-record">{t("track.title")}</Link> · <Link to="/premium">Premium</Link> · <Link to="/status">{t("status.title")}</Link> ·{" "}
         <Link to="/privacy">{t("privacy.title")}</Link> · <Link to="/terms">{t("terms.title")}</Link>
       </footer>
     </main>

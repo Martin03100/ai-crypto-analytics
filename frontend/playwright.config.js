@@ -36,6 +36,7 @@ export default defineConfig({
         JWT_SECRET_KEY: "e2e-only-jwt-secret-not-for-production-use",
         API_KEY_ENCRYPTION_SECRET: "e2e-only-fernet-secret-not-for-production",
         PASSWORD_HASH_ROUNDS: "1000",
+        RATE_LIMIT_LOGIN_PER_MINUTE: "100",   // the suite signs up more than 10 test users per minute
         TURNSTILE_SECRET_KEY: "",
         BREVO_API_KEY: "",
         SMTP_HOST: "",

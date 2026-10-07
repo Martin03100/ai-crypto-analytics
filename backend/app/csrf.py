@@ -11,7 +11,7 @@ from starlette.responses import JSONResponse
 from app.config import AUTH_COOKIE_SAMESITE, AUTH_COOKIE_SECURE, CSRF_COOKIE_NAME, CSRF_HEADER_NAME
 
 _SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
-_EXEMPT_PATHS = {"/api/auth/login", "/api/auth/register", "/api/health"}
+_EXEMPT_PATHS = {"/api/auth/login", "/api/auth/register", "/api/health", "/api/billing/webhook"}
 
 
 class CSRFMiddleware(BaseHTTPMiddleware):

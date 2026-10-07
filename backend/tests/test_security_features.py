@@ -86,4 +86,4 @@ def test_lockout_sends_warning_email(registered, monkeypatch):
         if sent:
             break
         time.sleep(0.02)
-    assert len(sent) == 1 and "prihlásenie" in sent[0][1]
+    assert len(sent) == 1 and "sign-in" in sent[0][1]

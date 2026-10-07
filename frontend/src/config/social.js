@@ -1,6 +1,6 @@
 /**
- * Social media profiles shown on the /links page. Leave a url empty ("") to hide that network.
- * Use the full profile address, e.g. "https://www.tiktok.com/@yourname".
+ * Social media profiles on the /links page. Paste the full profile address into `url`
+ * (e.g. "https://www.tiktok.com/@yourname"); until then the network shows as "link coming soon".
  */
 export const SOCIAL_LINKS = [
   { id: "tiktok", label: "TikTok", url: "" },

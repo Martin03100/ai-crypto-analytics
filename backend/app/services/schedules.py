@@ -13,10 +13,10 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from app.config import QUANT_PROVIDER, provider_label
 from app.database import SessionLocal
 from app.models import ForecastHistory, ForecastSchedule
+from app.services.background import run_periodic_jobs
 
 logger = logging.getLogger("aca.schedules")
 
-MAX_SCHEDULES_PER_USER = 5
 POLL_SECONDS = 60
 _BATCH = 10
 _PARALLEL_RUNS = 3          # one slow AI provider must not hold up everyone else's schedule
@@ -152,6 +152,10 @@ def _loop() -> None:
             run_due_schedules()
         except Exception as exc:  # noqa: BLE001
             logger.warning("Planovac predikcii: %s", exc)
+        try:
+            run_periodic_jobs()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Periodicke ulohy: %s", exc)
 
 
 def start_scheduler() -> None:

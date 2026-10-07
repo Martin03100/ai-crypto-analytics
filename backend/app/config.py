@@ -54,16 +54,19 @@ def provider_label(provider: str) -> Optional[str]:
     return PROVIDER_LABELS.get(provider)
 
 SUPPORTED_COINS: Final[List[str]] = [
-    "BTC", "ETH", "SOL", "BNB", "XRP",
-    "ADA", "DOGE", "AVAX", "DOT", "LINK",
+    "BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "DOT", "LINK",
+    "TON", "TRX", "LTC", "BCH", "SHIB", "SUI", "PEPE", "NEAR", "APT", "UNI",
 ]
 
 MOCK_BASE_PRICES: Final[Dict[str, float]] = {
     "BTC": 83_000.0, "ETH": 2_850.0, "SOL": 115.0, "BNB": 800.0, "XRP": 1.60,
     "ADA": 0.36, "DOGE": 0.12, "AVAX": 12.0, "DOT": 1.15, "LINK": 12.0,
+    "TON": 2.5, "TRX": 0.30, "LTC": 90.0, "BCH": 450.0, "SHIB": 0.000012, "SUI": 2.8, "PEPE": 0.00001,
+    "NEAR": 2.4, "APT": 4.5, "UNI": 7.5,
 }
 
 TIME_HORIZONS: Final[Dict[str, Dict[str, object]]] = {
+    "4h": {"points": 4, "unit": "hodina"},
     "24h": {"points": 24, "unit": "hodina"},
     "1T": {"points": 7, "unit": "den"},
     "1M": {"points": 30, "unit": "den"},
@@ -113,8 +116,12 @@ EMAIL_VERIFICATION_CODE_MINUTES: Final[int] = 30
 DEFAULT_COIN_IDS: Final[Dict[str, str]] = {
     "BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana", "BNB": "binancecoin",
     "XRP": "ripple", "ADA": "cardano", "DOGE": "dogecoin", "AVAX": "avalanche-2",
-    "DOT": "polkadot", "LINK": "chainlink",
+    "DOT": "polkadot", "LINK": "chainlink", "TON": "the-open-network", "TRX": "tron", "LTC": "litecoin",
+    "BCH": "bitcoin-cash", "SHIB": "shiba-inu", "SUI": "sui", "PEPE": "pepe", "NEAR": "near", "APT": "aptos",
+    "UNI": "uniswap",
 }
+
+HORIZON_HOURS: Final[Dict[str, int]] = {"4h": 4, "24h": 24, "1T": 7 * 24, "1M": 30 * 24, "1R": 365 * 24}
 
 PROVIDER_KEY_LINKS: Final[Dict[str, str]] = {
     "gemini": "https://aistudio.google.com/app/apikey",
@@ -141,7 +148,7 @@ SCHEDULER_ENABLED: Final[bool] = os.environ.get("SCHEDULER_ENABLED", "1") != "0"
 MAX_SAVED_ITEMS_PER_USER: Final[int] = int(os.environ.get("MAX_SAVED_ITEMS_PER_USER", "1000"))
 ACCOUNT_LOCKOUT_MINUTES: Final[int] = 15
 
-RATE_LIMIT_LOGIN: Final[tuple] = (10, 60)
+RATE_LIMIT_LOGIN: Final[tuple] = (int(os.environ.get("RATE_LIMIT_LOGIN_PER_MINUTE", "10")), 60)
 RATE_LIMIT_AI_ENDPOINT: Final[tuple] = (20, 60)
 RATE_LIMIT_CHAT: Final[tuple] = (30, 60)
 RATE_LIMIT_ACCOUNT_SENSITIVE: Final[tuple] = (5, 60)
@@ -162,6 +169,15 @@ SMTP_USER: Final[str] = os.environ.get("SMTP_USER", "")
 SMTP_PASSWORD: Final[str] = os.environ.get("SMTP_PASSWORD", "")
 SMTP_FROM: Final[str] = os.environ.get("SMTP_FROM", EMAIL_FROM)
 FRONTEND_URL: Final[str] = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+
+# Premium (Stripe). Billing stays off until all three are set; the app then shows the waitlist instead.
+STRIPE_SECRET_KEY: Final[str] = os.environ.get("STRIPE_SECRET_KEY", "")
+STRIPE_PRICE_ID: Final[str] = os.environ.get("STRIPE_PRICE_ID", "")
+STRIPE_WEBHOOK_SECRET: Final[str] = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+PREMIUM_PRICE_LABEL: Final[str] = os.environ.get("PREMIUM_PRICE_LABEL", "€4.99 / month")
+APP_PUBLIC_URL: Final[str] = os.environ.get("APP_PUBLIC_URL", "https://aicryptopredictor.netlify.app").rstrip("/")
+REFERRAL_REWARD_DAYS: Final[int] = 30
+MAX_REWARDED_REFERRALS: Final[int] = 12
 
 CSRF_COOKIE_NAME: Final[str] = "aca_csrf"
 CSRF_HEADER_NAME: Final[str] = "X-CSRF-Token"

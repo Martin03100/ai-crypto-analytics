@@ -15,6 +15,7 @@ import { CurrencyProvider } from "./context/CurrencyContext";
 import { startLabelAssociation } from "./utils/a11yLabels";
 import { initMonitoring } from "./utils/monitoring";
 import { initAnalytics, rememberUtmSource } from "./utils/analytics";
+import { captureReferralCode } from "./utils/referral";
 import "@fontsource-variable/inter";
 import "@fontsource/jetbrains-mono/400.css";
 import "./styles/app.css";
@@ -24,6 +25,7 @@ startLabelAssociation();
 initMonitoring();
 initPwa();
 rememberUtmSource();
+captureReferralCode();
 initAnalytics();
 
 ReactDOM.createRoot(document.getElementById("root")).render(

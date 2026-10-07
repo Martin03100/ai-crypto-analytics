@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from app.services import schedules
+from app.services.premium import FREE_SCHEDULES
 from tests.conftest import csrf_headers
 
 
@@ -41,7 +42,7 @@ def test_crud_and_ownership(registered, client):
     sid = res.json()["id"]
     assert res.json()["next_run_at"].endswith("+00:00")
     listed = c.get("/api/schedules").json()
-    assert [s["id"] for s in listed["items"]] == [sid] and listed["max"] == schedules.MAX_SCHEDULES_PER_USER
+    assert [s["id"] for s in listed["items"]] == [sid] and listed["max"] == FREE_SCHEDULES
     assert c.patch(f"/api/schedules/{sid}", json={"active": False}, headers=csrf_headers(c)).json()["active"] is False
     # another user can neither see nor change it
     c.cookies.clear()
@@ -53,12 +54,12 @@ def test_crud_and_ownership(registered, client):
 def test_validation_and_limit(registered):
     c, _u, _p = registered
     assert _create(c, provider="nope").status_code == 400
-    assert _create(c, coin="SHIB").status_code == 400
+    assert _create(c, coin="FAKECOIN").status_code == 400
     assert _create(c, frequency="weekly").status_code == 422          # weekday missing
     assert _create(c, horizon="1R").status_code == 422
     assert _create(c, hour=24).status_code == 422
     assert _create(c, timezone="Mars/Olympus").status_code == 422
-    for _ in range(schedules.MAX_SCHEDULES_PER_USER):
+    for _ in range(FREE_SCHEDULES):
         assert _create(c).status_code == 201
     assert _create(c).status_code == 400
 
@@ -127,7 +128,7 @@ def test_watchlist_defaults_and_update(registered):
     res = c.put("/api/account/watchlist", json={"coins": ["eth", "ETH", "LINK"]}, headers=csrf_headers(c))
     assert res.status_code == 200 and res.json()["coins"] == ["ETH", "LINK"]
     assert c.get("/api/account/watchlist").json()["coins"] == ["ETH", "LINK"]
-    assert c.put("/api/account/watchlist", json={"coins": ["SHIB"]}, headers=csrf_headers(c)).status_code == 400
+    assert c.put("/api/account/watchlist", json={"coins": ["FAKECOIN"]}, headers=csrf_headers(c)).status_code == 400
     assert c.put("/api/account/watchlist", json={"coins": ["BTC"] * 13}, headers=csrf_headers(c)).status_code == 422
 
 

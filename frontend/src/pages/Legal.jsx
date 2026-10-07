@@ -21,8 +21,8 @@ function LegalPage({ titleKey, sections }) {
   );
 }
 
-const PRIVACY_SECTIONS = ["dataCollected", "cookies", "analytics", "waitlist", "thirdParty", "rights", "contact"];
-const TERMS_SECTIONS = ["notAdvice", "account", "acceptableUse", "liability", "changes"];
+const PRIVACY_SECTIONS = ["dataCollected", "cookies", "analytics", "waitlist", "payments", "thirdParty", "rights", "contact"];
+const TERMS_SECTIONS = ["notAdvice", "account", "premium", "acceptableUse", "liability", "changes"];
 
 function LegalSections({ prefix, t }) {
   const sections = prefix === "privacy" ? PRIVACY_SECTIONS : TERMS_SECTIONS;

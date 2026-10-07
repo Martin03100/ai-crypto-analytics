@@ -32,7 +32,7 @@ export function parseServerDate(value) {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-const HORIZON_UNIT = { "24h": "hour", "1T": "day", "1M": "day", "1R": "month" };
+const HORIZON_UNIT = { "4h": "hour", "24h": "hour", "1T": "day", "1M": "day", "1R": "month" };
 
 export function buildTimePoints(createdAt, horizon, count) {
   const start = parseServerDate(createdAt);

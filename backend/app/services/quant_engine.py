@@ -19,7 +19,7 @@ _MIN_OBSERVATIONS = 48
 
 _JUMP_VARIANCE_FLOOR = 0.0003
 
-STEP_HOURS: Dict[str, float] = {"24h": 1.0, "1T": 24.0, "1M": 24.0, "1R": 365.0 * 24.0 / 12.0}
+STEP_HOURS: Dict[str, float] = {"4h": 1.0, "24h": 1.0, "1T": 24.0, "1M": 24.0, "1R": 365.0 * 24.0 / 12.0}
 
 
 def _clean_series(prices: List[List[float]]) -> List[Tuple[float, float]]:

@@ -5,6 +5,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import ChatWidget from "../components/ChatWidget";
 import ErrorBoundary from "../components/ErrorBoundary";
+import NotificationBell from "../components/NotificationBell";
 import OnboardingTour from "../components/OnboardingTour";
 import Sidebar, { BrandMark } from "../components/Sidebar";
 import ShortcutsHelp from "../components/ShortcutsHelp";
@@ -112,6 +113,7 @@ export default function Layout() {
         </Suspense>
       </main>
 
+      <NotificationBell />
       <BottomNav onMore={() => setMenuOpen(true)} />
       <UpdatePrompt />
       <ChatWidget />

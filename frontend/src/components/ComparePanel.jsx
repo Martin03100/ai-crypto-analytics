@@ -13,7 +13,7 @@ import { COMPARE_COLORS, buildComparisonRows, changePct } from "../utils/compare
 import { axisDecimals, formatPrice, formatUsd } from "../utils/formatPrice";
 import { COINS } from "../utils/coins";
 
-const HORIZONS = ["24h", "1T", "1M", "1R"];
+const HORIZONS = ["4h", "24h", "1T", "1M", "1R"];
 const MAX_PROVIDERS = COMPARE_COLORS.length;
 
 export default function ComparePanel() {

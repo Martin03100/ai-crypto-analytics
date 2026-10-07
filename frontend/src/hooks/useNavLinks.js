@@ -1,6 +1,6 @@
 /** Navigation entries shared by the sidebar and the mobile tab bar. */
 
-import { LayoutDashboard, Settings as SettingsIcon, Sparkles, TrendingUp, User, Wallet } from "lucide-react";
+import { Crown, LayoutDashboard, Settings as SettingsIcon, Sparkles, TrendingUp, User, Wallet } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
 
 export function useNavLinks() {
@@ -15,6 +15,7 @@ export function useNavLinks() {
     account: [
       { to: "/account", label: t("nav.account"), icon: User },
       { to: "/settings", label: t("nav.settings"), icon: SettingsIcon },
+      { to: "/premium", label: "Premium", icon: Crown },
     ],
   };
 }

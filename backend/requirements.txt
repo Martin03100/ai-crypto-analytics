@@ -12,3 +12,4 @@ python-multipart==0.0.32
 google-genai==2.25.0
 psycopg2-binary==2.9.13
 sentry-sdk[fastapi]==2.71.0
+pillow==12.3.0

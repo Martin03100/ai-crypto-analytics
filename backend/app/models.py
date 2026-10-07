@@ -41,6 +41,15 @@ class User(Base):
     totp_last_step: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=None)
     # JSON list of coin symbols the user follows on the dashboard; None = the default set.
     watchlist_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
+    # Public name on the tipster leaderboard; None = the user does not appear there.
+    nickname: Mapped[Optional[str]] = mapped_column(String(24), unique=True, index=True, nullable=True, default=None)
+    digest_opt_in: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=None)
+    lang: Mapped[Optional[str]] = mapped_column(String(4), nullable=True, default=None)
+    premium_until: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, default=None)
+    stripe_customer_id: Mapped[Optional[str]] = mapped_column(String(64), unique=True, index=True, nullable=True, default=None)
+    referral_code: Mapped[Optional[str]] = mapped_column(String(16), unique=True, index=True, nullable=True, default=None)
+    referred_by_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=None)
+    referral_rewarded: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=None)
 
     reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
@@ -206,3 +215,24 @@ class WaitlistEntry(Base):
     # utm_source of the visit (e.g. "tiktok"), so it is clear which channel brings interested users.
     source: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    data_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, index=True)
+    read_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, default=None)
+
+
+class JobRun(Base):
+    """Last run of a periodic background job, shared by all backend instances."""
+
+    __tablename__ = "job_runs"
+
+    name: Mapped[str] = mapped_column(String(48), primary_key=True)
+    last_run_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+

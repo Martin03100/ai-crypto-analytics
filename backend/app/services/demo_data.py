@@ -26,7 +26,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from sqlalchemy.orm import Session
 
-from app.config import DEFAULT_COIN_IDS, SECTOR_CATEGORIES, TIME_HORIZONS
+from app.config import DEFAULT_COIN_IDS, HORIZON_HOURS, SECTOR_CATEGORIES, TIME_HORIZONS
 from app.i18n_content import _fmt_price, normalize_lang, unit_label
 from app.models import ForecastEvaluation, ForecastHistory, PortfolioHistory, PriceTip
 from app.services import quant_engine
@@ -80,7 +80,6 @@ SERIES_LEN = PAST_HOURS + FUTURE_HOURS + 1
 LOOKBACK_HOURS = 30 * 24         # volatility is estimated from the 30 days before a forecast
 MAX_HOURS_AGO = PAST_HOURS - LOOKBACK_HOURS
 
-HORIZON_HOURS = {"24h": 24, "1T": 7 * 24, "1M": 30 * 24, "1R": 365 * 24}
 
 
 def _floor_hour(moment: datetime) -> datetime:

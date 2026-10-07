@@ -22,6 +22,14 @@ statistical model and real market data. Bachelor's thesis project (Software Deve
 - **Portfolio advisor** with CSV import (generic or exchange balance export).
 - **Market sentiment:** Fear & Greed index, news, on-chain whale activity, official FOMC/CPI calendar.
 - **Public share links** for forecasts, **account activity log**, **new-device sign-in alerts**, optional 2FA.
+- **Public track record** (`/track-record`) with share buttons and auto-generated preview images for social networks
+  (Netlify Edge Function + Pillow cards), plus **robots.txt / sitemap / JSON-LD**.
+- **Community:** "Beat the AI" price duels with a weekly and all-time tipster board (opt-in nicknames), in-app
+  **notifications** when forecasts are checked or duels end, and an opt-in **weekly "AI vs reality" email**.
+- **Premium:** Stripe Checkout subscription (off until configured), Premium waitlist, and **invite rewards**
+  (both people get 30 days of Premium once the invited user confirms their email).
+- **20 coins** (incl. TON, SUI, PEPE…) and a **4-hour horizon** next to 24h / 1 week / 1 month / 1 year.
+- Transactional emails in **English, Slovak and Czech**, following the user's app language.
 - **Demo mode** for presentations: one click fills the whole app with clearly labelled test data ("Gemini test", "Claude test", ...)
   on synthetic prices - forecasts, evaluated accuracy, leaderboard, tips and portfolio analyses, visible only to the user who loaded it.
 
@@ -77,7 +85,8 @@ npx playwright install chromium && npm run test:e2e   # end-to-end tests (start 
 
 Secrets are read from environment variables only (see `backend/.env.example` and `frontend/.env.example`).
 Optional integrations stay off when their variable is empty: email (Brevo/SMTP), Cloudflare Turnstile,
-Sentry (`SENTRY_DSN`, `VITE_SENTRY_DSN`), CoinGecko/Blockchair API keys.
+Sentry (`SENTRY_DSN`, `VITE_SENTRY_DSN`), CoinGecko/Blockchair API keys, Stripe (`STRIPE_*`) and Umami analytics
+(`VITE_UMAMI_WEBSITE_ID`).
 
 ## Database migrations
 

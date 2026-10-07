@@ -13,7 +13,7 @@ import { formatHour, userTimeZone, weekdayNames } from "../utils/schedule";
 import { Card } from "./Card";
 import { SkeletonLines } from "./Skeleton";
 
-const HORIZONS = ["24h", "1T", "1M"];
+const HORIZONS = ["4h", "24h", "1T", "1M"];
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 
 function StatusBadge({ schedule, t }) {

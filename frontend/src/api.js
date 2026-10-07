@@ -203,7 +203,9 @@ function watchlist(res) {
 }
 
 export const api = {
-  register: (username, password, email, captcha_token) => request("/auth/register", { method: "POST", body: { username, password, email, captcha_token } }),
+  register: (username, password, email, captcha_token, referral_code) => request("/auth/register", {
+    method: "POST", body: { username, password, email, captcha_token, lang: currentLang(), referral_code: referral_code || undefined },
+  }),
   login: (username, password, totp_code) => request("/auth/login", { method: "POST", body: { username, password, totp_code } }),
   logout: () => request("/auth/logout", { method: "POST" }),
   me: () => request("/auth/me").then(obj),
@@ -231,6 +233,19 @@ export const api = {
   shareForecast: (id) => request(`/forecast/history/${id}/share`, { method: "POST" }).then(obj),
   unshareForecast: (id) => request(`/forecast/history/${id}/share`, { method: "DELETE" }),
   serviceStatus: () => request("/public/status").then((r) => withArrays(r, ["services"])),
+  membership: () => request("/account/membership").then(obj),
+  setNickname: (nickname) => request("/account/nickname", { method: "PUT", body: { nickname } }),
+  setPreferences: (prefs) => request("/account/preferences", { method: "PUT", body: prefs }),
+  notifications: () => request("/account/notifications").then((r) => withArrays(r, ["items"])),
+  readNotifications: () => request("/account/notifications/read", { method: "POST" }),
+  checkout: () => request("/billing/checkout", { method: "POST" }),
+  billingPortal: () => request("/billing/portal", { method: "POST" }),
+  premiumInfo: () => request("/public/premium").then(obj),
+  tipsters: (period) => request(`/public/tipsters?period=${period === "all" ? "all" : "week"}`).then((r) => withArrays(r, ["leaders"])),
+  unsubscribeDigest: async (userId, token) => {
+    if (!readCookie(CSRF_COOKIE_NAME)) await request("/health").catch(() => {});
+    return request("/public/digest/unsubscribe", { method: "POST", body: { user_id: userId, token } });
+  },
   trackRecord: () => request("/public/track-record").then((r) => withArrays(r, ["providers", "recent"])),
   joinWaitlist: async (email, lang, source) => {
     // A first-time visitor may not have the CSRF cookie yet; any API response sets it.

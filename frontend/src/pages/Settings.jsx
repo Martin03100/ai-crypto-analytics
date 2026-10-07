@@ -6,6 +6,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Card } from "../components/Card";
 import DemoDataCard from "../components/DemoDataCard";
 import InstallAppCard from "../components/InstallAppCard";
+import MembershipCard from "../components/MembershipCard";
 import { resetOnboarding } from "../components/OnboardingTour";
 import PasswordInput from "../components/PasswordInput";
 import TwoFactorSettings from "../components/TwoFactorSettings";
@@ -187,13 +188,15 @@ export default function Settings() {
           </button>
         </Card>
 
+        <MembershipCard />
+
         <InstallAppCard />
 
         <DemoDataCard />
 
         <Card title={t("settings.about")} icon={Info}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13 }}>
-            <div><strong>{t("settings.version")}:</strong> 2.2.0 — 2026 Edition</div>
+            <div><strong>{t("settings.version")}:</strong> 2.3.0</div>
             <div><strong>{t("settings.techStack")}:</strong> React (Vite), FastAPI, SQLAlchemy, Recharts, CoinGecko API</div>
             <div><strong>{t("settings.support")}:</strong> <a href="mailto:aicryptoanalytics7@gmail.com" className="key-link">aicryptoanalytics7@gmail.com</a></div>
             <div style={{ display: "flex", gap: 14, marginTop: 6, flexWrap: "wrap" }}>

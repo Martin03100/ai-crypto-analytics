@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { prepare } from "./helpers";
+import { prepare, register } from "./helpers";
 
 test.beforeEach(async ({ page }) => prepare(page));
 
@@ -20,11 +20,13 @@ test("a visitor can join the Premium waitlist without an account", async ({ page
   await expect(form.getByRole("status")).toHaveText("You're on the list! We'll email you when Premium launches.");
 });
 
-test("links page offers the app, the track record and the waitlist", async ({ page }) => {
+test("links page offers the app, track record, Premium and social placeholders", async ({ page }) => {
   await page.goto("/links");
   await expect(page.getByRole("heading", { name: "AI Crypto Analytics" })).toBeVisible();
-  await page.getByRole("link", { name: "Join the Premium waitlist" }).click();
-  await expect(page.locator("#waitlist")).toBeInViewport();
+  await expect(page.getByText("Instagram · link coming soon")).toBeVisible();
+  await page.getByRole("link", { name: "Premium" }).click();
+  await expect(page).toHaveURL(/\/premium$/);
+  await expect(page.locator("#premium-waitlist")).toBeVisible();
 });
 
 test("privacy policy describes analytics and the waitlist", async ({ page }) => {
@@ -45,4 +47,29 @@ test("about page does not mention the thesis", async ({ page }) => {
   await page.goto("/about");
   await expect(page.getByText("student developer from Prague")).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/thesis|Unicorn/i);
+});
+
+test("signed-in user gets a bell, membership card, invite link, 4h horizon and new coins", async ({ page }) => {
+  await register(page);
+  await expect(page.getByRole("button", { name: "Notifications" })).toBeVisible();
+  await page.getByRole("button", { name: "Notifications" }).click();
+  await expect(page.getByText("Nothing yet.")).toBeVisible();
+  await page.goto("/settings");
+  await expect(page.getByText("Premium & community")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Invite friends" })).toHaveValue(/\?ref=[A-Z0-9]{8}$/);
+  const nick = `Fox${Date.now().toString(36).slice(-6)}`;
+  await page.getByRole("textbox", { name: "Public nickname" }).fill(nick);
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("Nickname saved.")).toBeVisible();
+  await page.getByRole("checkbox").check();
+  await page.goto("/track-record");
+  await expect(page.getByText("Beat the AI: top tippers")).toBeVisible();
+  await page.goto("/forecast");
+  await expect(page.locator("select").filter({ has: page.locator('option[value="4h"]') })).toHaveCount(1);
+  await expect(page.locator('option[value="PEPE"]').first()).toBeAttached();
+});
+
+test("invalid unsubscribe link explains what to do", async ({ page }) => {
+  await page.goto("/unsubscribe?u=1&t=short");
+  await expect(page.getByText("This unsubscribe link is not valid.")).toBeVisible();
 });

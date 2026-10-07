@@ -17,7 +17,7 @@ from sqlalchemy import case, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.config import DEFAULT_COIN_IDS, QUANT_PROVIDER, RATE_LIMIT_AI_ENDPOINT, provider_label
+from app.config import DEFAULT_COIN_IDS, HORIZON_HOURS, QUANT_PROVIDER, RATE_LIMIT_AI_ENDPOINT, provider_label
 from app.deps import ensure_below_save_limit, get_current_user, get_db, get_decrypted_api_key
 from app.models import ForecastEvaluation, ForecastHistory, PriceTip, User
 from app.rate_limit import rate_limit_by_user
@@ -27,6 +27,7 @@ from app.schemas import (
     AIResultOut, CostEstimateOut, ForecastAccuracyOut, ForecastHistoryOut, ForecastRequest, PaginatedForecastHistory, SaveForecastRequest, TipRequest, BulkDeleteRequest,
 )
 from app.services import audit, jobs
+from app.services.notifications import notify
 from app.services.backtest import BACKTEST_SETUP, run_backtest
 from app.services.demo_data import DEMO_LABEL_LIKE, demo_accuracy, is_demo_label
 from app.services.ai_engine import compute_forecast_accuracy, estimate_forecast_cost, get_coin_forecast
@@ -188,7 +189,7 @@ def get_forecast_accuracy(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], us
         result = compute_forecast_accuracy(row.crypto_symbol, row.timeframe, predicted_prices, time_labels, created_at)
     _record_evaluation(db, row, result)
     tip = db.query(PriceTip).filter(PriceTip.forecast_id == row.id, PriceTip.user_id == user.id).first()
-    _settle_tip(tip, result)
+    _settle_tip(db, tip, result)
     _commit_ignoring_duplicates(db)
     can_tip = (tip is None and bool(predicted_prices)
                and datetime.now(timezone.utc) - _created_at(row, forecast_data) <= _TIP_WINDOW)
@@ -284,7 +285,6 @@ def get_history(symbol: Optional[str] = Query(default=None, max_length=16),
 
 
 _TIP_WINDOW = timedelta(hours=2)
-_HORIZON_DAYS = {"24h": 1, "1T": 7, "1M": 30, "1R": 365}
 
 
 def _created_at(row: ForecastHistory, forecast_data: dict) -> datetime:
@@ -312,6 +312,10 @@ def _record_evaluation(db: Session, row: ForecastHistory, result: dict) -> None:
         direction_correct=bool(result.get("direction_correct")), actual_final_price=result["actual_prices"][-1],
         is_demo=True if is_demo_label(row.model_used) else None,
     ))
+    if not is_demo_label(row.model_used):
+        notify(db, row.user_id, "forecast_evaluated", forecast_id=row.id, coin=row.crypto_symbol, horizon=row.timeframe,
+               provider=row.model_used, direction_correct=bool(result.get("direction_correct")),
+               accuracy_pct=result["accuracy_pct"])
 
 
 def _commit_ignoring_duplicates(db: Session) -> None:
@@ -322,12 +326,15 @@ def _commit_ignoring_duplicates(db: Session) -> None:
         db.rollback()
 
 
-def _settle_tip(tip, result: dict) -> None:
+def _settle_tip(db: Session, tip, result: dict) -> None:
     if tip is None or tip.outcome or result.get("status") != "completed" or not result.get("actual_prices"):
         return
     actual = result["actual_prices"][-1]
     user_error, ai_error = abs(tip.tip_price - actual), abs(tip.ai_price - actual)
     tip.outcome = "tie" if abs(user_error - ai_error) < 1e-9 else ("win" if user_error < ai_error else "loss")
+    if not tip.is_demo:
+        notify(db, tip.user_id, "duel_settled", forecast_id=tip.forecast_id, outcome=tip.outcome,
+               tip_price=tip.tip_price, ai_price=tip.ai_price, actual_price=actual)
 
 
 _EVAL_MAX_ATTEMPTS = 8
@@ -337,9 +344,9 @@ _EVAL_RETRY_AFTER = timedelta(hours=6)
 def _matured(now: datetime):
     """SQL condition: the forecast horizon has passed, so unripe long-horizon forecasts never fill the batch."""
     return or_(
-        *[(ForecastHistory.timeframe == tf) & (ForecastHistory.created_at <= now - timedelta(days=days))
-          for tf, days in _HORIZON_DAYS.items()],
-        ForecastHistory.timeframe.not_in(list(_HORIZON_DAYS)) & (ForecastHistory.created_at <= now - timedelta(days=7)),
+        *[(ForecastHistory.timeframe == tf) & (ForecastHistory.created_at <= now - timedelta(hours=hours))
+          for tf, hours in HORIZON_HOURS.items()],
+        ForecastHistory.timeframe.not_in(list(HORIZON_HOURS)) & (ForecastHistory.created_at <= now - timedelta(days=7)),
     )
 
 
@@ -390,7 +397,7 @@ def _evaluate_pending(db: Session, limit: int = 5, deadline_seconds: float = 8.0
                 _mark_attempt(row, now)  # e.g. price history unavailable: retry later, give up after a few tries
                 continue
             _record_evaluation(db, row, result)
-            _settle_tip(db.query(PriceTip).filter(PriceTip.forecast_id == row.id).first(), result)
+            _settle_tip(db, db.query(PriceTip).filter(PriceTip.forecast_id == row.id).first(), result)
         _commit_ignoring_duplicates(db)
     finally:
         pool.shutdown(wait=False)

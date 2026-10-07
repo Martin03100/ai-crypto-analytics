@@ -32,7 +32,7 @@ import { COINS } from "../utils/coins";
 import { predictedChangePct } from "../utils/forecastMath";
 
 
-const HORIZONS = ["24h", "1T", "1M", "1R"];
+const HORIZONS = ["4h", "24h", "1T", "1M", "1R"];
 
 function HistoryItem({ entry, onDelete }) {
   const { push } = useToast();
@@ -193,6 +193,10 @@ export default function Forecast() {
   const { currency } = useCurrency();
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState(() => (["history", "schedule", "leaderboard", "compare", "backtest"].includes(searchParams.get("tab")) ? searchParams.get("tab") : "new"));
+  const urlTab = searchParams.get("tab");
+  useEffect(() => {
+    if (["history", "schedule", "leaderboard", "compare", "backtest"].includes(urlTab)) setTab(urlTab);
+  }, [urlTab]);
   const providersCtx = useProviders();
   const providers = useMemo(
     () => [...providersCtx.providers, { provider: "quant", label: t("provider.quantLabel"), connected: true }],
