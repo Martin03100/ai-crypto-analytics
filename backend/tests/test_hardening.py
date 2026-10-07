@@ -552,3 +552,23 @@ def test_reused_totp_code_is_not_counted_as_a_failed_attempt(registered):
         assert db.query(User).filter(User.username == username).one().failed_login_attempts == 0
     finally:
         db.close()
+
+
+def test_email_change_cannot_be_used_to_delete_the_owner(client, monkeypatch):
+    from app.database import SessionLocal
+    from app.models import User
+    _email_verification_on(monkeypatch)
+    assert _register(client, "vlastnik", "stary@example.com").status_code == 201
+    db = SessionLocal()
+    try:
+        db.query(User).filter(User.username == "vlastnik").update({"email_verified": True}); db.commit()
+    finally:
+        db.close()
+    assert client.put("/api/account/email", json={"email": "novy@example.com"}, headers=csrf_headers(client)).status_code == 200
+    client.cookies.clear()
+    assert _register(client, "utocnik2", "novy@example.com").status_code == 400      # owner's pending address stays theirs
+    db = SessionLocal()
+    try:
+        assert db.query(User).filter(User.username == "vlastnik").count() == 1
+    finally:
+        db.close()

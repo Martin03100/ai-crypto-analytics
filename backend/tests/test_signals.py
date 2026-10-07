@@ -153,7 +153,11 @@ def test_signals_endpoint_and_briefing_lines(client, monkeypatch):
                                        signals.signal("market", "btc_dominance", 58.0, "58.0%", "neutral", "coingecko", "dom")],
               "sources": ["fred"], "lines": [], "updated_at": "now", "score": {"bullish": 0, "bearish": 1, "neutral": 1}}
     monkeypatch.setattr(signals, "collect", lambda coin: {**bundle, "coin": coin})
-    res = client.get("/api/market/signals?coin=eth")
-    assert res.status_code == 200 and res.json()["coin"] == "ETH" and len(res.json()["items"]) == 2
+    monkeypatch.setattr(signals, "events", lambda lang="en": [signals.signal("events", "event", 2, "x", "neutral", "calendar",
+                                                                             "n", {"name": f"CPI-{lang}", "days": 2})])
+    res = client.get("/api/market/signals?coin=eth&lang=sk")
+    body = res.json()
+    assert res.status_code == 200 and body["coin"] == "ETH" and [s["key"] for s in body["items"]] == ["btc_dominance", "vix", "event"]
+    assert body["items"][-1]["meta"] == {"name": "CPI-sk", "days": 2} and all("note" not in s for s in body["items"])
     assert client.get("/api/market/signals?coin=FAKE").status_code == 400
     assert signals.headline(bundle["items"], "sk") == ["VIX: 28.0 ▼"]

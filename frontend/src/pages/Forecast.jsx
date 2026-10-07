@@ -198,13 +198,18 @@ export default function Forecast() {
   usePageTitle("forecast.title");
   const { currency } = useCurrency();
   const { compare_enabled, backtest_enabled } = useAppConfig();
-  const { mode: premiumMode } = usePremium();
+  const { mode: premiumMode, loaded: configLoaded } = usePremium();
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState(() => (TABS.includes(searchParams.get("tab")) ? searchParams.get("tab") : "new"));
   const urlTab = searchParams.get("tab");
   useEffect(() => {
     if (TABS.includes(urlTab)) setTab(urlTab);
   }, [urlTab]);
+  useEffect(() => {
+    // A shared link to a tab that is switched off (or not in this plan) opens the default tab instead of a blank page.
+    const off = { compare: !compare_enabled, backtest: !backtest_enabled, simulator: !premiumMode, mystats: !premiumMode };
+    if (configLoaded && off[tab]) setTab("new");
+  }, [configLoaded, tab, compare_enabled, backtest_enabled, premiumMode]);
   const providersCtx = useProviders();
   const providers = useMemo(
     () => [...providersCtx.providers, { provider: "quant", label: t("provider.quantLabel"), connected: true }],

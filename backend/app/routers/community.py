@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.config import APP_PUBLIC_URL, MAX_REWARDED_REFERRALS, RATE_LIMIT_ACCOUNT_SENSITIVE
 from app.deps import get_current_user, get_db
-from app.models import User
+from app.models import StripeEvent, User
 from app.rate_limit import rate_limit_by_user
 from app.services import app_settings, audit, billing, notifications, telegram
 from app.services.account_data import export_user_data, personal_stats
@@ -59,7 +59,8 @@ def membership(user: User = Depends(get_current_user), db: Session = Depends(get
         "telegram": {"available": telegram.enabled(), "linked": bool(user.telegram_chat_id)},
         "referral_code": code, "referral_link": f"{APP_PUBLIC_URL}/?ref={code}",
         "referral_signups": signups, "badge": ambassador_badge(signups),
-        "referrals_rewarded": rewarded_referrals(db, user.id), "referrals_max": MAX_REWARDED_REFERRALS,
+        **({"referrals_rewarded": rewarded_referrals(db, user.id), "referrals_max": MAX_REWARDED_REFERRALS}
+           if app_settings.premium_mode() else {}),
         **premium_info(),
     }
 
@@ -191,5 +192,10 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)) -> dic
         event = json.loads(payload)
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid payload.") from None
+    event_id = str(event.get("id") or "")[:255] if isinstance(event, dict) else ""
+    if event_id:
+        if db.get(StripeEvent, event_id) is not None:
+            return {"received": True, "duplicate": True}
+        db.add(StripeEvent(id=event_id))
     billing.handle_event(db, event)
     return {"received": True}

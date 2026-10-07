@@ -23,7 +23,8 @@ test("links page offers the app, track record and social placeholders", async ({
 test("privacy policy describes analytics and the new data", async ({ page }) => {
   await page.goto("/privacy");
   await expect(page.getByRole("heading", { name: "Analytics" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Alerts, portfolio and Telegram" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Alerts", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Portfolio tracker and Telegram" })).toHaveCount(0);
 });
 
 test("track record offers sharing and SEO files are served", async ({ page, request }) => {

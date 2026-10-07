@@ -62,7 +62,8 @@ def generate_forecast(payload: ForecastRequest, request: Request, user: User = D
             # can only be saved (and scored on the leaderboard) as the quant model.
             signed_provider = result.provider_used or payload.provider
             result.data["podpis"] = sign_forecast(user_id, signed_provider, payload.coin, payload.horizon,
-                                                  result.data["ceny"], str(result.data.get("vytvorene", "")))
+                                                  result.data["ceny"], str(result.data.get("vytvorene", "")),
+                                                  content=result.data)
         return AIResultOut(**result.as_dict()).model_dump()
 
     return jobs.respond(request, user_id, compute)
@@ -104,7 +105,7 @@ def save_forecast(payload: SaveForecastRequest, user: User = Depends(get_current
         prices, created = data.get("ceny"), data.get("vytvorene")
         if (not isinstance(prices, list) or not isinstance(created, str)
                 or not verify_forecast_signature(data.get("podpis"), user.id, payload.provider, payload.coin,
-                                                 payload.horizon, prices, created)):
+                                                 payload.horizon, prices, created, content=data)):
             raise HTTPException(status_code=400, detail="Predikciu sa nepodarilo overiť. Vygeneruj ju znova a ulož ju bez úprav.")
         model_label = label
     ensure_below_save_limit(db, ForecastHistory, user.id)

@@ -20,6 +20,17 @@ export function signalLabel(s, t) {
 /** Free-text items (calendar, regulators, prediction markets) show the text itself, numbers show "label: value". */
 export const TEXT_SIGNALS = new Set(["event", "regulator_news", "polymarket"]);
 
+/** Calendar and prediction-market rows phrased in the reader's language (older saved analyses fall back to display). */
+export function signalText(s, t) {
+  const m = s.meta || {};
+  if (s.key === "event" && m.name && Number.isFinite(m.days)) {
+    const when = m.days === 0 ? t("signals.today") : m.days === 1 ? t("signals.tomorrow") : t("signals.inDays", { n: m.days });
+    return `${m.name} · ${when}`;
+  }
+  if (s.key === "polymarket" && m.question && Number.isFinite(m.yes)) return `${m.question} · ${t("signals.odds", { n: m.yes })}`;
+  return s.display;
+}
+
 export function signalBalance(items) {
   const count = (tone) => (items || []).filter((s) => s.tone === tone).length;
   return { bullish: count("bullish"), bearish: count("bearish"), neutral: count("neutral") };

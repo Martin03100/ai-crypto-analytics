@@ -77,13 +77,10 @@ def signed_forecast_payload(client, prices=(100.0, 110.0), provider="gemini", co
     user_id = client.get("/api/auth/me").json()["user_id"]
     created = created or datetime.now(timezone.utc).isoformat()
     prices = [float(p) for p in prices]
-    return {
-        "provider": provider, "coin": coin, "horizon": horizon, "is_mock": False,
-        "forecast_data": {
-            "ceny": prices, "casove_body": [f"b{i}" for i in range(len(prices))], "odovodnenie": "test",
-            "vytvorene": created, "podpis": sign_forecast(user_id, provider, coin, horizon, prices, created),
-        },
-    }
+    data = {"ceny": prices, "casove_body": [f"b{i}" for i in range(len(prices))], "odovodnenie": "test",
+            "vytvorene": created}
+    data["podpis"] = sign_forecast(user_id, provider, coin, horizon, prices, created, content=data)
+    return {"provider": provider, "coin": coin, "horizon": horizon, "is_mock": False, "forecast_data": data}
 
 
 def set_app_settings(**values) -> None:

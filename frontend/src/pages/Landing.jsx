@@ -103,7 +103,7 @@ export default function Landing() {
         <Link to="/premium" className="btn btn-primary btn-sm">{t("landing.premiumCta")} <ArrowRight size={14} /></Link>
       </section>}
 
-      {waitlist_enabled && <WaitlistForm />}
+      {mode && waitlist_enabled && <WaitlistForm />}
 
       <section className="card landing-honest">
         <ShieldCheck size={18} />

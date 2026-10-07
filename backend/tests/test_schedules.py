@@ -143,3 +143,27 @@ def test_a_schedule_is_claimed_by_only_one_poller(registered):
     first = schedules.claim_due_schedules(now)
     second = schedules.claim_due_schedules(now)
     assert sorted(first) == sorted(ids) and second == []
+
+
+def test_only_schedules_within_the_plan_run(registered):
+    from app.database import SessionLocal
+    from app.models import ForecastSchedule, User
+    from app.services import schedules
+    from tests.conftest import set_app_settings
+    client, username, _p = registered
+    set_app_settings(free_schedules=2)
+    ids = [_create(client, hour=h).json()["id"] for h in (6, 7)]
+    db = SessionLocal()
+    try:
+        extra = ForecastSchedule(user_id=db.query(User).filter(User.username == username).one().id, coin="ETH",
+                                 horizon="1T", provider="quant", frequency="daily", hour=9, minute=0,
+                                 timezone="UTC", lang="en", active=True, next_run_at=datetime(2030, 1, 1))
+        db.add(extra)                       # e.g. created while the user still had Premium
+        db.commit()
+        assert schedules._within_plan(db, db.get(ForecastSchedule, ids[0]))
+        assert not schedules._within_plan(db, extra)
+        db.query(User).filter(User.username == username).update({"disabled": True})
+        db.commit()
+        assert not schedules._within_plan(db, db.get(ForecastSchedule, ids[0]))
+    finally:
+        db.close()

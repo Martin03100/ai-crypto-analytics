@@ -24,9 +24,9 @@ test("with Premium mode off the app looks completely free", async ({ page }) => 
   await expect(page.getByRole("button", { name: "My stats" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Simulator" })).toHaveCount(0);
   await page.goto("/dashboard");
-  await expect(page.getByRole("tab", { name: "Big move" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: "Big move" })).toBeVisible();
   await expect(page.getByText("Market signals")).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Fear & Greed" })).toHaveCount(0);
+  await expect(page.getByRole("radio", { name: "Fear & Greed" })).toHaveCount(0);
   await page.goto("/market");
   await expect(page.getByText("Market scanner")).toBeVisible();
   await expect(page.getByText("Market signals")).toBeVisible();
@@ -57,7 +57,7 @@ test.describe.serial("with Premium mode on", () => {
     await expect(page.getByText("Alert set. We'll let you know.")).toBeVisible();
     await expect(page.getByText("Active alerts: 1 of 1")).toBeVisible();
     await expect(page.getByRole("button", { name: "Add alert" })).toBeDisabled();
-    await page.getByRole("tab", { name: "Fear & Greed" }).click();
+    await page.getByRole("radio", { name: "Fear & Greed" }).click();
     await expect(page.getByText("Fear & Greed alerts are part of Premium.")).toBeVisible();
 
     await page.goto("/forecast?tab=simulator");
@@ -100,7 +100,7 @@ test.describe.serial("with Premium mode on", () => {
     expect(pdf.headers()["content-type"]).toBe("application/pdf");
 
     await page.goto("/dashboard");
-    await page.getByRole("tab", { name: "Fear & Greed" }).click();
+    await page.getByRole("radio", { name: "Fear & Greed" }).click();
     await page.getByRole("button", { name: "Add alert" }).click();
     await expect(page.getByText("Fear & Greed falls below 25")).toBeVisible();
 

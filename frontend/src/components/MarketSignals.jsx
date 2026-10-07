@@ -13,16 +13,18 @@ import SignalList from "./SignalList";
 import { SkeletonLines } from "./Skeleton";
 
 export default function MarketSignals({ initialCoin = "BTC", compact = false, style }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [coin, setCoin] = useState(initialCoin);
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState(false);
 
   const load = useCallback(() => {
+    let alive = true;
     setFailed(false);
     setData(null);
-    api.marketSignals(coin).then(setData).catch(() => setFailed(true));
-  }, [coin]);
+    api.marketSignals(coin, lang).then((d) => alive && setData(d)).catch(() => alive && setFailed(true));
+    return () => { alive = false; };          // a late answer for the previous coin must not overwrite this one
+  }, [coin, lang]);
   useEffect(load, [load]);
 
   const balance = signalBalance(data?.items);
@@ -36,7 +38,7 @@ export default function MarketSignals({ initialCoin = "BTC", compact = false, st
           {COINS.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
         {total > 0 && (
-          <div className="signals-balance" aria-label={t("signals.balanceLabel")}>
+          <div className="signals-balance" role="img" aria-label={`${t("signals.balanceLabel")}: ${balance.bullish} / ${balance.bearish}`}>
             <span className="up">▲ {balance.bullish}</span>
             <div className="signals-bar"><span style={{ width: `${(balance.bullish / total) * 100}%` }} /></div>
             <span className="down">{balance.bearish} ▼</span>

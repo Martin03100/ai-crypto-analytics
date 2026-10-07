@@ -1387,3 +1387,4 @@ input[type="checkbox"] { accent-color: var(--cyan); }
 .data-used summary { cursor: pointer; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 6px; }
 .data-used[open] summary { margin-bottom: 8px; }
 .data-used .text-sub { margin: 0 0 10px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }

@@ -179,6 +179,12 @@ def delete_account(payload: DeleteAccountRequest, response: Response, user: User
                    db: Session = Depends(get_db)) -> dict:
     if not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=400, detail="Aktuálne heslo nie je správne.")
+    from app.services import billing
+    try:
+        billing.cancel_subscriptions(user)
+    except billing.BillingError:
+        raise HTTPException(status_code=409, detail="Predplatné sa nepodarilo zrušiť. Zruš ho v Nastavenia → Spravovať "
+                                                    "predplatné a potom zmaž účet.") from None
     delete_user_data(db, user)
     db.commit()
     from app.config import AUTH_COOKIE_NAME

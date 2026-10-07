@@ -65,6 +65,31 @@ def _post(path: str, data: dict) -> dict:
     return res.json()
 
 
+def _call(method: str, path: str, data: Optional[dict] = None) -> dict:
+    try:
+        res = requests.request(method, f"{STRIPE_API}{path}", data=data, auth=(credentials().get("secret_key", ""), ""),
+                               timeout=15)
+    except requests.RequestException as exc:
+        raise BillingError(str(exc)) from exc
+    if res.status_code >= 400:
+        logger.warning("Stripe %s %s zlyhal: %s", method, path, res.status_code)
+        raise BillingError(f"Stripe {res.status_code}")
+    return res.json()
+
+
+def cancel_subscriptions(user: User) -> int:
+    """Stops billing before an account is deleted; returns how many subscriptions were cancelled."""
+    if not user.stripe_customer_id or not credentials().get("secret_key"):
+        return 0
+    subs = _call("GET", f"/subscriptions?customer={user.stripe_customer_id}&status=all&limit=100").get("data", [])
+    cancelled = 0
+    for sub in subs:
+        if sub.get("status") in ("active", "trialing", "past_due", "unpaid", "incomplete"):
+            _call("DELETE", f"/subscriptions/{sub['id']}")
+            cancelled += 1
+    return cancelled
+
+
 def create_checkout_url(user: User, plan: str = "monthly") -> str:
     c = credentials()
     price = c["price_yearly"] if plan == "yearly" and c.get("price_yearly") else c["price_monthly"]

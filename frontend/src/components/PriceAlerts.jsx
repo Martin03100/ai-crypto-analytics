@@ -79,9 +79,9 @@ export default function PriceAlerts() {
   return (
     <Card title={t("alerts.title")} icon={BellRing} style={{ marginTop: 16 }}>
       <p className="text-sub" style={{ marginTop: 0 }}>{t(premium ? "alerts.introPremium" : "alerts.intro")}</p>
-      <div className="tabs alert-kinds" role="tablist" aria-label={t("alerts.kind")}>
+      <div className="tabs alert-kinds" role="radiogroup" aria-label={t("alerts.kind")}>
         {kinds.map((k) => (
-          <button key={k} type="button" role="tab" aria-selected={kind === k} className={`tab ${kind === k ? "active" : ""}`} onClick={() => pickKind(k)}>
+          <button key={k} type="button" role="radio" aria-checked={kind === k} className={`tab ${kind === k ? "active" : ""}`} onClick={() => pickKind(k)}>
             {premiumKinds.includes(k) && <Crown size={12} style={{ marginRight: 4 }} />}{t(`alerts.kind_${k}`)}
           </button>
         ))}

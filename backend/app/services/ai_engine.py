@@ -758,7 +758,8 @@ def get_portfolio_analysis(provider: str, holdings: List[Dict[str, Any]], api_ke
 def _used_signals(symbol: str) -> List[Dict[str, Any]]:
     """The exact signal values the model saw, kept with the result so users can check them."""
     try:
-        return [{k: s[k] for k in ("group", "key", "display", "tone", "source")} for s in signals.collect(symbol)["items"]]
+        bundle = signals.latest(symbol) or signals.collect(symbol)
+        return [{k: s[k] for k in ("group", "key", "display", "tone", "source", "meta") if k in s} for s in bundle["items"]]
     except Exception:  # noqa: BLE001
         return []
 

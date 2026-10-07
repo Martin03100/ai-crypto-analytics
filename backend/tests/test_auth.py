@@ -8,7 +8,8 @@ def test_register_success(client):
     assert res.status_code == 201
     body = res.json()
     assert body["username"] == "alice"
-    assert "access_token" in body and body["access_token"]
+    assert not body.get("access_token")            # the session lives only in the HttpOnly cookie
+    assert "aca_session" in res.cookies
 
 
 def test_register_duplicate_username_rejected(registered):

@@ -32,7 +32,8 @@ class LoginRequest(BaseModel):
 
 
 class TokenResponse(BaseModel):
-    access_token: str
+    """The session lives only in the HttpOnly cookie; the token is not exposed to JavaScript."""
+    access_token: Optional[str] = None
     token_type: str = "bearer"
     username: str
     user_id: int

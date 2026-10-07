@@ -114,13 +114,17 @@ def _daily_digest(payload: DailyDigestRequest, api_key) -> dict:
 
 
 @router.get("/signals", dependencies=_PUBLIC_LIMITS)
-def market_signals(coin: str = Query(default="BTC", max_length=10)) -> dict:
+def market_signals(coin: str = Query(default="BTC", max_length=10), lang: str = Query(default="en", max_length=5)) -> dict:
     """Derivatives, options, flows, macro and more for one coin (market-wide parts are shared)."""
     coin = coin.upper()
     if coin not in DEFAULT_COIN_IDS:
         raise HTTPException(status_code=400, detail="Táto minca nie je podporovaná.")
     bundle = signals.collect(coin)
-    return {k: bundle[k] for k in ("coin", "items", "sources", "updated_at", "score")} | {"coin": coin}
+    items = [{k: v for k, v in s.items() if k != "note"} for s in bundle["items"] if s["key"] != "event"]
+    items += [{k: v for k, v in s.items() if k != "note"} for s in signals.events(lang=lang)]   # names in the UI language
+    items.sort(key=lambda s: signals.GROUPS.index(s["group"]))
+    return {"coin": coin, "items": items, "sources": bundle["sources"], "updated_at": bundle["updated_at"],
+            "score": signals.score(items)}
 
 
 @router.get("/events", dependencies=_PUBLIC_LIMITS)

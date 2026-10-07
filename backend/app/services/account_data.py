@@ -66,7 +66,10 @@ def export_user_data(db: Session, user: User) -> dict:
                     "created_at": user.created_at, "language": user.lang, "nickname": user.nickname,
                     "two_factor": bool(user.totp_enabled), "premium_until": user.premium_until,
                     "weekly_email": bool(user.digest_opt_in), "morning_briefing": bool(user.briefing_opt_in),
-                    "referral_code": user.referral_code, "watchlist": user.watchlist_json},
+                    "referral_code": user.referral_code, "watchlist": user.watchlist_json,
+                    "invited_by_another_user": user.referred_by_id is not None,
+                    "telegram_connected": bool(user.telegram_chat_id),
+                    "payment_customer_at_stripe": bool(user.stripe_customer_id)},
         "connected_ai_providers": [k.provider for k in user.api_keys],
         "forecasts": _rows(db, ForecastHistory, user.id, ("id", "crypto_symbol", "timeframe", "model_used", "created_at", "forecast_json")),
         "forecast_evaluations": _rows(db, ForecastEvaluation, user.id, ("forecast_id", "provider", "coin", "timeframe", "accuracy_pct",
@@ -80,5 +83,5 @@ def export_user_data(db: Session, user: User) -> dict:
         "portfolio_history": _rows(db, PortfolioSnapshot, user.id, ("day", "value_usd", "cost_usd")),
         "community_votes": _rows(db, CommunityVote, user.id, ("sentiment_vote", "voted_at")),
         "notifications": _rows(db, Notification, user.id, ("kind", "data_json", "created_at", "read_at")),
-        "account_activity": _rows(db, AuditEvent, user.id, ("action", "ip", "user_agent", "created_at")),
+        "account_activity": _rows(db, AuditEvent, user.id, ("action", "ip", "user_agent", "details", "created_at")),
     }

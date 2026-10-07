@@ -66,6 +66,10 @@ def _run_one(schedule_id: int) -> None:
         if schedule is None:
             return
         schedule.last_run_at = utcnow()
+        if not _within_plan(db, schedule):
+            schedule.last_status, schedule.last_error = "error", "plan_limit"
+            db.commit()
+            return
         try:
             _create_forecast(db, schedule)
             db.commit()
@@ -77,6 +81,19 @@ def _run_one(schedule_id: int) -> None:
             db.commit()
     finally:
         db.close()
+
+
+def _within_plan(db, schedule: ForecastSchedule) -> bool:
+    """After Premium ends (or the admin lowers limits) only the oldest schedules up to the limit keep running."""
+    from app.models import User
+    from app.services.premium import max_schedules
+    user = db.get(User, schedule.user_id)
+    if user is None or user.disabled:
+        return False
+    allowed = [sid for (sid,) in db.query(ForecastSchedule.id).filter(ForecastSchedule.user_id == user.id,
+                                                                      ForecastSchedule.active.is_(True))
+               .order_by(ForecastSchedule.id).limit(max_schedules(user)).all()]
+    return schedule.id in allowed
 
 
 def _create_forecast(db, schedule: ForecastSchedule) -> None:

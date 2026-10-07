@@ -98,10 +98,25 @@ def _current_values(alerts: list[PriceAlert]) -> Dict[tuple, float]:
     return values
 
 
+def _within_limits(db: Session, alerts: list[PriceAlert]) -> list[PriceAlert]:
+    """Only a user's oldest alerts up to the current plan's limit fire (Premium may have ended); blocked users get none."""
+    by_user: Dict[int, list] = {}
+    for alert in sorted(alerts, key=lambda a: a.id):
+        by_user.setdefault(alert.user_id, []).append(alert)
+    kept = []
+    for user_id, rows in by_user.items():
+        user = db.get(User, user_id)
+        if user is None or user.disabled:
+            continue
+        kept.extend(rows[:alert_limit(user)])
+    return kept
+
+
 def check_alerts(db: Session) -> int:
     alerts = db.query(PriceAlert).filter(PriceAlert.active.is_(True)).all()
     if not alerts:
         return 0
+    alerts = _within_limits(db, alerts)
     values = _current_values(alerts)
     deliveries = []
     now = datetime.now(timezone.utc).replace(tzinfo=None)

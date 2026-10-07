@@ -131,7 +131,7 @@ def send_weekly_digests(db: Session, now: Optional[datetime] = None) -> int:
     week = _week_stats(db, since)
     sent = 0
     for user in db.query(User).filter(User.digest_opt_in.is_(True), User.email.isnot(None),
-                                      User.email_verified.isnot(False)).all():
+                                      User.email_verified.isnot(False), User.disabled.isnot(True)).all():
         rendered = render_digest(user, week, _user_stats(db, user.id, since))
         if rendered and send_email(user.email, *rendered):
             sent += 1

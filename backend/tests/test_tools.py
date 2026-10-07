@@ -114,6 +114,8 @@ def test_scanner_free_preview_and_premium(registered, monkeypatch):
     client, username, _p = registered
     rows = [{"coin": c, "price": 1.0, "expected_24h_pct": 0.1, "rsi": 50, "signal": "neutral"} for c in ("BTC", "PEPE", "ETH", "SUI")]
     monkeypatch.setattr(insights, "scan_market", lambda: rows)
+    assert client.get("/api/tools/scanner").json()["locked"] == 0          # Premium off: nothing is locked
+    set_app_settings(premium_mode=True)
     free = client.get("/api/tools/scanner").json()
     assert [r["coin"] for r in free["rows"]] == ["BTC", "ETH"] and free["locked"] == 2
     _premium(username)

@@ -294,3 +294,12 @@ class PortfolioSnapshot(Base):
     value_usd: Mapped[float] = mapped_column(Float, nullable=False)
     cost_usd: Mapped[float] = mapped_column(Float, nullable=False)
 
+
+
+class StripeEvent(Base):
+    """Stripe webhook events already handled; Stripe retries deliveries, each event must apply once."""
+
+    __tablename__ = "stripe_events"
+
+    id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)

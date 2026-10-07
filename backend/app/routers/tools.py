@@ -76,7 +76,7 @@ def simulate(payload: SimulateIn, user: User = Depends(get_current_user), db: Se
 @router.get("/scanner", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
 def scanner(user: User = Depends(get_current_user)) -> dict:
     rows = insights.scan_market()
-    full = is_premium(user)
+    full = is_premium(user) or not app_settings.premium_mode()      # no paywall while Premium is switched off
     visible = rows if full else [r for r in rows if r["coin"] in insights.FREE_SCANNER_COINS]
     return {"rows": visible, "locked": 0 if full else len(rows) - len(visible),
             "premium_mode": app_settings.premium_mode()}

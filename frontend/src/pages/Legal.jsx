@@ -37,12 +37,12 @@ function Operator({ t }) {
   );
 }
 
-const PRIVACY_SECTIONS = ["dataCollected", "purposes", "cookies", "analytics", "alertsData", "waitlist", "payments",
-  "thirdParty", "retention", "rights", "contact"];
+const PRIVACY_SECTIONS = ["dataCollected", "purposes", "cookies", "analytics", "alertsData", "premiumData", "waitlist",
+  "payments", "thirdParty", "retention", "rights", "contact"];
 const TERMS_SECTIONS = ["notAdvice", "eligibility", "account", "premium", "referrals", "withdrawal", "acceptableUse",
   "liability", "law", "changes"];
 // Sections that only apply while the paid plan exists.
-const PAID_ONLY = new Set(["waitlist", "payments", "premium", "referrals", "withdrawal"]);
+const PAID_ONLY = new Set(["premiumData", "waitlist", "payments", "premium", "referrals", "withdrawal"]);
 
 function LegalSections({ prefix, t }) {
   const { mode } = usePremium();

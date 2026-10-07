@@ -80,8 +80,9 @@ export default function PortfolioTracker() {
 
   const { total, risk } = data;
   const locale = localeForLang(lang);
-  const history = data.history.map((h) => ({ ...h, d: new Date(`${h.day}T00:00:00Z`).toLocaleDateString(locale, { day: "numeric", month: "numeric" }) }));
+  const history = data.history.map((h) => ({ ...h, d: new Date(`${h.day}T00:00:00Z`).toLocaleDateString(locale, { day: "numeric", month: "numeric", timeZone: "UTC" }) }));
   const full = data.positions.length >= data.max;
+  const noPrices = data.unpriced > 0 && data.unpriced === data.positions.length;
 
   return (
     <>
@@ -105,9 +106,9 @@ export default function PortfolioTracker() {
       {data.positions.length > 0 && (
         <>
           <div className="track-stats track-stats-4" style={{ marginTop: 16 }}>
-            <div className="card track-stat"><span className="track-stat-value">{formatPrice(total.value)}</span><span className="text-sub">{t("tracker.value")}</span></div>
+            <div className="card track-stat"><span className="track-stat-value">{noPrices ? "—" : formatPrice(total.value)}</span><span className="text-sub">{t("tracker.value")}</span></div>
             <div className="card track-stat">
-              <span className={`track-stat-value ${tone(total.pnl)}`}>{money(total.pnl)}</span>
+              <span className={`track-stat-value ${tone(total.pnl)}`}>{noPrices ? "—" : money(total.pnl)}</span>
               <span className="text-sub">{t("tracker.pnl")} · {signed(total.pnl_pct)}</span>
             </div>
             <div className="card track-stat">

@@ -15,6 +15,7 @@ import { useToast } from "../context/ToastContext";
 import { usePageTitle } from "../hooks/usePageTitle";
 import { usePremium } from "../hooks/usePremium";
 import { trackEvent } from "../utils/analytics";
+import { localizePriceLabel } from "../utils/price";
 
 const HIGHLIGHTS = [
   { icon: Scale, key: "consensus" },
@@ -28,9 +29,9 @@ const HIGHLIGHTS = [
   { icon: FileDown, key: "report" },
 ];
 
-function Cell({ value }) {
-  if (value === true) return <Check size={15} className="plan-yes" aria-label="✓" />;
-  if (value === false) return <Minus size={15} className="plan-no" aria-label="—" />;
+function Cell({ value, t }) {
+  if (value === true) return <><Check size={15} className="plan-yes" aria-hidden="true" /><span className="sr-only">{t("premium.included")}</span></>;
+  if (value === false) return <><Minus size={15} className="plan-no" aria-hidden="true" /><span className="sr-only">{t("premium.notIncluded")}</span></>;
   return <span>{value}</span>;
 }
 
@@ -50,7 +51,8 @@ export default function Premium() {
 
   useEffect(() => { api.premiumInfo().then(setInfo).catch(() => setInfo({ enabled: false })); }, []);
 
-  if (loaded && !mode) return <Navigate to="/" replace />;
+  if (!loaded) return null;
+  if (!mode || info?.enabled === false) return <Navigate to="/" replace />;
 
   const status = params.get("status");
   const free = info?.limits?.free || { schedules: 5, alerts: 1 };
@@ -58,7 +60,7 @@ export default function Premium() {
   const trial = info?.trial_days || 0;
   const yearly = Boolean(info?.yearly);
   const chosen = yearly ? plan : "monthly";
-  const price = chosen === "yearly" ? info?.price_label_yearly : info?.price_label;
+  const price = localizePriceLabel(chosen === "yearly" ? info?.price_label_yearly : info?.price_label, t);
 
   const rows = [
     ["rowForecasts", true, true],
@@ -168,7 +170,7 @@ export default function Premium() {
           <thead><tr><th /><th>{t("premium.freeTitle")}</th><th className="premium-col">Premium</th></tr></thead>
           <tbody>
             {rows.map(([key, a, b]) => (
-              <tr key={key}><td>{t(`premium.${key}`)}</td><td><Cell value={a} /></td><td className="premium-col"><Cell value={b} /></td></tr>
+              <tr key={key}><td>{t(`premium.${key}`)}</td><td><Cell value={a} t={t} /></td><td className="premium-col"><Cell value={b} t={t} /></td></tr>
             ))}
           </tbody>
         </table>

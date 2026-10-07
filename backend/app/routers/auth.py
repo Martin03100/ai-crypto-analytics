@@ -94,8 +94,7 @@ def register(payload: RegisterRequest, response: Response, request: Request, bac
         send_verification_code(db, user, background_tasks)
 
     _set_auth_cookie(response, user)
-    return TokenResponse(access_token=create_access_token(user.id, user.username, user.token_version),
-                          username=user.username, user_id=user.id, email=user.email,
+    return TokenResponse(username=user.username, user_id=user.id, email=user.email,
                           email_verified=user.email_verified, totp_enabled=bool(user.totp_enabled),
                           premium=is_premium(user), admin=is_admin(user))
 
@@ -152,8 +151,7 @@ def login(payload: LoginRequest, response: Response, request: Request, backgroun
         _send_new_login_alert(background_tasks, user, now, user_agent, ip)
 
     _set_auth_cookie(response, user)
-    return TokenResponse(access_token=create_access_token(user.id, user.username, user.token_version),
-                          username=user.username, user_id=user.id, email=user.email,
+    return TokenResponse(username=user.username, user_id=user.id, email=user.email,
                           email_verified=user.email_verified, totp_enabled=bool(user.totp_enabled),
                           premium=is_premium(user), admin=is_admin(user))
 

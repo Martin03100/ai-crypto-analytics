@@ -11,6 +11,7 @@ import io
 import json
 import logging
 import re
+import threading
 import time
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, wait
@@ -30,6 +31,8 @@ _fast = TTLCache(ttl_seconds=300)        # derivatives, prices
 _medium = TTLCache(ttl_seconds=900)      # options, stablecoins, network, regulators
 _slow = TTLCache(ttl_seconds=6 * 3600)   # daily macro series
 _bundle = TTLCache(ttl_seconds=300)
+_locks: Dict[str, Any] = {}
+_locks_guard = threading.Lock()
 
 GROUPS = ("derivatives", "options", "flows", "market", "network", "macro", "events", "regulation", "predictions")
 OPTION_COINS = ("BTC", "ETH")
@@ -66,8 +69,12 @@ def headline(items: List[Dict[str, Any]], lang: str, limit: int = 4) -> List[str
     return [f"{LABELS.get(s['key'], (s['key'],) * 3)[idx]}: {s['display']} {'▲' if s['tone'] == 'bullish' else '▼'}" for s in picked]
 
 
-def signal(group: str, key: str, value: Optional[float], display: str, tone: str, source: str, note: str) -> Dict[str, Any]:
-    return {"group": group, "key": key, "value": value, "display": display, "tone": tone, "source": source, "note": note}
+def signal(group: str, key: str, value: Optional[float], display: str, tone: str, source: str, note: str,
+           meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    out = {"group": group, "key": key, "value": value, "display": display, "tone": tone, "source": source, "note": note}
+    if meta:
+        out["meta"] = meta                # lets the web app phrase the item in the reader's language
+    return out
 
 
 def _headers(url: str) -> Dict[str, str]:
@@ -355,36 +362,41 @@ def _change(values: List[float], back: int) -> Optional[float]:
     return (values[-1] / values[-1 - back] - 1) * 100
 
 
+_FRED = {"VIXCLS": 400, "NASDAQCOM": 400, "SP500": 400, "DTWEXBGS": 400, "DGS10": 400, "DCOILWTICO": 400,
+         "FEDFUNDS": 120, "CPIAUCSL": 520}
+
+
 def macro() -> List[Dict[str, Any]]:
+    with ThreadPoolExecutor(max_workers=len(_FRED)) as pool:       # one slow series must not delay the others
+        series = dict(zip(_FRED, pool.map(lambda sid: fred_series(sid, _FRED[sid]), _FRED)))
     out = []
-    vix = fred_series("VIXCLS")
+    vix = series["VIXCLS"]
     if vix:
         level = vix[-1]
         out.append(signal("macro", "vix", level, f"{level:.1f}", "bearish" if level >= 25 else "bullish" if level <= 15 else "neutral",
                           "fred", f"VIX fear index {level:.1f} (above 25 = stock-market stress, crypto usually falls with risk assets)"))
-    for key, series, back, label in (("nasdaq", "NASDAQCOM", 5, "Nasdaq"), ("sp500", "SP500", 5, "S&P 500")):
-        change = _change(fred_series(series), back)
+    for key, sid, back, label in (("nasdaq", "NASDAQCOM", 5, "Nasdaq"), ("sp500", "SP500", 5, "S&P 500")):
+        change = _change(series[sid], back)
         if change is not None:
             out.append(signal("macro", key, round(change, 2), f"{_pct(change, 1)} 1w",
                               "bullish" if change >= 2 else "bearish" if change <= -2 else "neutral", "fred",
                               f"{label} {_pct(change, 1)} over the last week (crypto tracks tech stocks closely)"))
-    dollar = _change(fred_series("DTWEXBGS"), 20)
+    dollar = _change(series["DTWEXBGS"], 20)
     if dollar is not None:
         out.append(signal("macro", "dollar", round(dollar, 2), f"{_pct(dollar, 1)} 1m",
                           "bearish" if dollar >= 1.5 else "bullish" if dollar <= -1.5 else "neutral", "fred",
                           f"US dollar index {_pct(dollar, 1)} over a month (a stronger dollar usually weighs on crypto)"))
-    bonds = fred_series("DGS10")
+    bonds = series["DGS10"]
     if bonds:
         change = bonds[-1] - bonds[-21] if len(bonds) > 21 else None
         out.append(signal("macro", "us10y", bonds[-1], f"{bonds[-1]:.2f}%" + (f" ({change:+.2f} 1m)" if change is not None else ""),
                           "bearish" if (change or 0) >= 0.3 else "bullish" if (change or 0) <= -0.3 else "neutral", "fred",
                           f"US 10-year yield {bonds[-1]:.2f}%" + (f", {change:+.2f} pp over a month (rising yields = tighter money)" if change is not None else "")))
-    oil = _change(fred_series("DCOILWTICO"), 20)
+    oil = _change(series["DCOILWTICO"], 20)
     if oil is not None:
         out.append(signal("macro", "oil", round(oil, 1), f"{_pct(oil, 1)} 1m", "neutral", "fred",
                           f"WTI oil {_pct(oil, 1)} over a month (an oil spike feeds inflation fears)"))
-    fed = fred_series("FEDFUNDS", 120)
-    cpi = fred_series("CPIAUCSL", 520)
+    fed, cpi = series["FEDFUNDS"], series["CPIAUCSL"]
     if fed:
         out.append(signal("macro", "fed_rate", fed[-1], f"{fed[-1]:.2f}%", "neutral", "fred", f"Fed funds rate {fed[-1]:.2f}%"))
     if len(cpi) >= 13:
@@ -403,17 +415,18 @@ def macro() -> List[Dict[str, Any]]:
 
 # ---------- calendar, regulators, prediction markets ----------
 
-def events(today: Optional[date] = None) -> List[Dict[str, Any]]:
+def events(today: Optional[date] = None, lang: str = "en") -> List[Dict[str, Any]]:
     from app.services.market_data import get_upcoming_market_events
     today = today or datetime.now(timezone.utc).date()
     out = []
-    for e in get_upcoming_market_events("en", limit=3, today=today):
+    for e in get_upcoming_market_events(lang, limit=3, today=today):
         day = datetime.strptime(e["datum"], "%d.%m.%Y").date()
         days = (day - today).days
         if days <= 14:
             when = "today" if days == 0 else "tomorrow" if days == 1 else f"in {days} days"
             out.append(signal("events", "event", days, f"{e['udalost']} · {when}", "neutral", "calendar",
-                              f"Scheduled: {e['udalost']} {when} ({day.isoformat()}) - volatility often rises around it"))
+                              f"Scheduled: {e['udalost']} {when} ({day.isoformat()}) - volatility often rises around it",
+                              {"name": e["udalost"], "days": days}))
     return out
 
 
@@ -475,7 +488,8 @@ def prediction_markets(symbol: str) -> List[Dict[str, Any]]:
         if yes is None or not 0.03 <= yes <= 0.97:
             continue                      # settled-looking markets say nothing new
         out.append(signal("predictions", "polymarket", round(yes * 100), f"{question[:90]} · {yes * 100:.0f}% yes",
-                          "neutral", "polymarket", f"Polymarket odds: \"{question}\" - {yes * 100:.0f}% yes"))
+                          "neutral", "polymarket", f"Polymarket odds: \"{question[:200]}\" - {yes * 100:.0f}% yes",
+                          {"question": question[:120], "yes": round(yes * 100)}))
         if len(out) >= 3:
             break
     return out
@@ -489,6 +503,21 @@ def collect(symbol: str = "BTC", timeout: float = 12.0) -> Dict[str, Any]:
     cached = _bundle.get(symbol)
     if cached is not None:
         return cached
+    with _locks_guard:
+        lock = _locks.setdefault(symbol, threading.Lock())
+    with lock:                          # concurrent requests for one coin share a single fetch
+        cached = _bundle.get(symbol)
+        if cached is not None:
+            return cached
+        return _collect(symbol, timeout)
+
+
+def latest(symbol: str = "BTC") -> Optional[Dict[str, Any]]:
+    """The last bundle even if expired (what the AI most recently saw), without fetching."""
+    return _bundle.get((symbol or "BTC").upper(), allow_stale=True)
+
+
+def _collect(symbol: str, timeout: float) -> Dict[str, Any]:
     jobs: List[Callable[[], List[Dict[str, Any]]]] = [
         lambda: derivatives(symbol), lambda: liquidations(symbol), lambda: options(symbol), stablecoins,
         coinbase_premium, global_market, btc_network, macro, events, regulation, lambda: prediction_markets(symbol),

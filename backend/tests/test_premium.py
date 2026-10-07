@@ -211,3 +211,70 @@ def test_yearly_plan_uses_yearly_price(registered, stripe_on, monkeypatch):
     assert stripe_on[-1][1]["line_items[0][price]"] == "price_year"
     body["plan"] = "lifetime"
     assert client.post("/api/billing/checkout", json=body, headers=csrf_headers(client)).status_code == 422
+
+
+def test_webhook_events_apply_once(registered, stripe_on, monkeypatch):
+    import json as _json
+    import time as _time
+    import hashlib
+    import hmac
+    from app.models import Notification
+    client, username, _p = registered
+    uid = _user(username).id
+    event = {"id": "evt_1", "type": "checkout.session.completed",
+             "data": {"object": {"client_reference_id": str(uid), "customer": "cus_1"}}}
+    body = _json.dumps(event).encode()
+    ts = str(int(_time.time()))
+    sig = hmac.new(b"whsec_test", ts.encode() + b"." + body, hashlib.sha256).hexdigest()
+    headers = {"stripe-signature": f"t={ts},v1={sig}", "content-type": "application/json"}
+    assert client.post("/api/billing/webhook", content=body, headers=headers).json() == {"received": True}
+    assert client.post("/api/billing/webhook", content=body, headers=headers).json()["duplicate"] is True
+    db = SessionLocal()
+    try:
+        assert db.query(Notification).filter(Notification.user_id == uid, Notification.kind == "premium_started").count() == 1
+    finally:
+        db.close()
+
+
+def test_account_deletion_cancels_the_subscription(registered, stripe_on, monkeypatch):
+    from app.services import billing
+    client, username, password = registered
+    db = SessionLocal()
+    try:
+        db.query(User).filter(User.username == username).update({"stripe_customer_id": "cus_9"})
+        db.commit()
+    finally:
+        db.close()
+    calls = []
+
+    def fake_call(method, path, data=None):
+        calls.append((method, path))
+        if method == "GET":
+            return {"data": [{"id": "sub_1", "status": "active"}, {"id": "sub_old", "status": "canceled"}]}
+        if fake_call.fail:
+            raise billing.BillingError("down")
+        return {}
+    fake_call.fail = True
+    monkeypatch.setattr(billing, "_call", fake_call)
+    res = client.post("/api/account/delete", json={"password": password}, headers=csrf_headers(client))
+    assert res.status_code == 409 and _user(username) is not None                  # never delete while billing runs
+    fake_call.fail = False
+    assert client.post("/api/account/delete", json={"password": password}, headers=csrf_headers(client)).status_code == 200
+    assert ("DELETE", "/subscriptions/sub_1") in calls and ("DELETE", "/subscriptions/sub_old") not in calls
+    assert _user(username) is None
+
+
+def test_limits_apply_when_premium_ends(registered, monkeypatch):
+    from app.services import alerts
+    client, username, _p = registered
+    _make_premium(username)
+    _alert(client, price=1000)
+    _alert(client, price=2000)
+    db = SessionLocal()
+    try:
+        db.query(User).filter(User.username == username).update({"premium_until": None})
+        db.commit()
+        kept = alerts._within_limits(db, db.query(PriceAlert).all())
+        assert [a.target_price for a in kept] == [1000.0]                         # free plan: only the oldest one
+    finally:
+        db.close()

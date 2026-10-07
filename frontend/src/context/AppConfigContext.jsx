@@ -5,7 +5,7 @@ import { api } from "../api";
 
 const DEFAULTS = {
   signups_enabled: true, chat_enabled: true, compare_enabled: true, backtest_enabled: true, tipsters_enabled: true,
-  waitlist_enabled: true, digest_enabled: true, referrals_enabled: true, announcement: "", announcement_level: "info",
+  waitlist_enabled: false, digest_enabled: true, referrals_enabled: true, announcement: "", announcement_level: "info",
   operator_name: "", operator_business_id: "", operator_address: "",
   premium: null, loaded: false,
 };

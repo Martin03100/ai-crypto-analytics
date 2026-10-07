@@ -204,8 +204,31 @@ def totp_uri(secret_b32: str, username: str) -> str:
 import json as _json  # noqa: E402
 
 
-def _forecast_message(user_id: int, provider: str, coin: str, horizon: str, prices, created: str) -> bytes:
+def _canonical(value):
+    """JSON round trips through the browser turn 100.0 into 100; numbers are compared as floats."""
+    if isinstance(value, bool) or value is None or isinstance(value, str):
+        return value
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, dict):
+        return {str(k): _canonical(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_canonical(v) for v in value]
+    return str(value)
+
+
+def forecast_digest(data: dict) -> str:
+    """Covers the whole forecast (reasoning, confidence, risk, prices...) except the signature itself."""
+    content = {k: v for k, v in data.items() if k != "podpis"}
+    return hashlib.sha256(_json.dumps(_canonical(content), sort_keys=True, separators=(",", ":"),
+                                      ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
+def _forecast_message(user_id: int, provider: str, coin: str, horizon: str, prices, created: str,
+                      content: Optional[dict] = None) -> bytes:
     payload = [int(user_id), str(provider), str(coin).upper(), str(horizon), [float(p) for p in prices], str(created)]
+    if content is not None:
+        payload.append(forecast_digest(content))
     return _json.dumps(payload, separators=(",", ":")).encode("utf-8")
 
 
@@ -213,17 +236,18 @@ def _forecast_key() -> bytes:
     return hashlib.sha256(f"forecast-signature:{JWT_SECRET_KEY}".encode("utf-8")).digest()
 
 
-def sign_forecast(user_id: int, provider: str, coin: str, horizon: str, prices, created: str) -> str:
-    msg = _forecast_message(user_id, provider, coin, horizon, prices, created)
+def sign_forecast(user_id: int, provider: str, coin: str, horizon: str, prices, created: str,
+                  content: Optional[dict] = None) -> str:
+    msg = _forecast_message(user_id, provider, coin, horizon, prices, created, content)
     return hmac.new(_forecast_key(), msg, hashlib.sha256).hexdigest()
 
 
 def verify_forecast_signature(signature: object, user_id: int, provider: str, coin: str, horizon: str,
-                              prices, created: str) -> bool:
+                              prices, created: str, content: Optional[dict] = None) -> bool:
     if not isinstance(signature, str):
         return False
     try:
-        expected = sign_forecast(user_id, provider, coin, horizon, prices, created)
+        expected = sign_forecast(user_id, provider, coin, horizon, prices, created, content)
     except (TypeError, ValueError):
         return False
     return hmac.compare_digest(expected, signature)

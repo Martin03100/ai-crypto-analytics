@@ -1,7 +1,7 @@
 /** Grouped list of market signals with a coloured direction mark. */
 
 import { useLanguage } from "../context/LanguageContext";
-import { TEXT_SIGNALS, groupSignals, signalLabel } from "../utils/signals";
+import { TEXT_SIGNALS, groupSignals, signalLabel, signalText } from "../utils/signals";
 
 const MARK = { bullish: "▲", bearish: "▼", neutral: "•" };
 
@@ -22,7 +22,7 @@ export default function SignalList({ items, compact = false }) {
               <li key={`${s.key}-${i}`} className={`signal-row tone-${s.tone}`} title={sourceName(s.source)}>
                 <span className="signal-mark" aria-label={t(`signals.tone.${s.tone}`)}>{MARK[s.tone]}</span>
                 {TEXT_SIGNALS.has(s.key) ? (
-                  <span className="signal-text">{s.display}</span>
+                  <span className="signal-text">{signalText(s, t)}</span>
                 ) : (
                   <>
                     <span className="signal-label">{signalLabel(s, t)}</span>

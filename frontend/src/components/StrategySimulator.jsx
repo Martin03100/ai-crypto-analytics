@@ -10,6 +10,7 @@ import { usePremium } from "../hooks/usePremium";
 import { humanizeError } from "../i18n/errorMessages";
 import { localeForLang } from "../i18n/locale";
 import { COINS } from "../utils/coins";
+import { parseServerDate } from "../utils/formatPrice";
 import { QUANT_LABEL } from "../utils/models";
 import { Card } from "./Card";
 import InfoTip from "./InfoTip";
@@ -63,9 +64,10 @@ export default function StrategySimulator() {
   };
 
   const locale = localeForLang(lang);
-  const curve = (result?.curve || []).map((p, i) => ({
-    ...p, d: p.date ? new Date(p.date).toLocaleDateString(locale, { day: "numeric", month: "numeric" }) : String(i),
-  }));
+  const curve = (result?.curve || []).map((p, i) => {
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(p.date || "") ? new Date(`${p.date}T00:00:00Z`) : parseServerDate(p.date);
+    return { ...p, d: date ? date.toLocaleDateString(locale, { day: "numeric", month: "numeric", timeZone: "UTC" }) : String(i) };
+  });
   const edge = result ? result.strategy_return_pct - result.hodl_return_pct : null;
 
   return (
