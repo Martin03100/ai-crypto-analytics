@@ -113,7 +113,7 @@ def record_sample(db) -> int:
 
 
 def history(db, now: datetime | None = None) -> Dict:
-    """Per service and day: share of checks that were up (days without checks have no data)."""
+    """Per service and day: share of checks where the service was reachable (days without checks have no data)."""
     from datetime import timedelta
     from app.models import StatusSample
     now = now or datetime.now(timezone.utc).replace(tzinfo=None)
@@ -123,7 +123,7 @@ def history(db, now: datetime | None = None) -> Dict:
     for service, status, checked in (db.query(StatusSample.service, StatusSample.status, StatusSample.checked_at)
                                      .filter(StatusSample.checked_at >= since).all()):
         day = per.setdefault(service, {}).setdefault(checked.date().isoformat(), [0, 0])
-        day[0] += status == "up"
+        day[0] += status in ("up", "degraded")  # reachable; slow or rate-limited is not an outage
         day[1] += 1
     services = []
     for service, by_day in sorted(per.items()):

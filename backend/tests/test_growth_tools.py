@@ -87,20 +87,22 @@ def test_challenge_endpoints(registered, prices):
 
 def test_status_history_records_and_aggregates(client, monkeypatch):
     monkeypatch.setattr(status_check, "collect_status", lambda: {"services": [
-        {"id": "backend", "status": "up", "latency_ms": 1}, {"id": "coingecko", "status": "down", "latency_ms": None}]})
+        {"id": "backend", "status": "up", "latency_ms": 1}, {"id": "coingecko", "status": "down", "latency_ms": None},
+        {"id": "blockchair", "status": "degraded", "latency_ms": 900}]})
     db = SessionLocal()
     try:
         status_check.record_sample(db)
         db.add(StatusSample(checked_at=datetime(2020, 1, 1), service="backend", status="down"))
         db.commit()
         status_check.record_sample(db)                  # also prunes samples older than ~35 days
-        assert db.query(StatusSample).count() == 4
+        assert db.query(StatusSample).count() == 6
     finally:
         db.close()
     hist = client.get("/api/public/status/history").json()
     assert len(hist["days"]) == 30
     by_id = {s["id"]: s for s in hist["services"]}
     assert by_id["backend"]["uptime_pct"] == 100.0 and by_id["coingecko"]["uptime_pct"] == 0.0
+    assert by_id["blockchair"]["uptime_pct"] == 100.0           # slow or rate-limited is not an outage
     assert by_id["backend"]["days"][-1]["uptime_pct"] == 100.0 and by_id["backend"]["days"][0]["uptime_pct"] is None
 
 
