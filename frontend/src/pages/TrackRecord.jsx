@@ -10,6 +10,7 @@ import LoadError from "../components/LoadError";
 import ShareBar from "../components/ShareBar";
 import TipsterBoard from "../components/TipsterBoard";
 import { SkeletonLines } from "../components/Skeleton";
+import { useAppConfig } from "../context/AppConfigContext";
 import { useLanguage } from "../context/LanguageContext";
 import { localeForLang } from "../i18n/locale";
 import { usePageTitle } from "../hooks/usePageTitle";
@@ -29,6 +30,7 @@ function Stat({ label, value }) {
 export default function TrackRecord() {
   const { t, lang } = useLanguage();
   usePageTitle("track.pageTitle");
+  const { tipsters_enabled } = useAppConfig();
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState(false);
 
@@ -134,7 +136,7 @@ export default function TrackRecord() {
             </p>
           )}
 
-          <TipsterBoard />
+          {tipsters_enabled && <TipsterBoard />}
           <ShareBar text={t("track.shareText")} />
           <div style={{ marginTop: 20 }}>
             <Link to="/auth?tab=register" className="btn btn-primary">{t("track.cta")} <ArrowRight size={15} /></Link>

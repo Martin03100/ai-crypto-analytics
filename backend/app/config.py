@@ -177,6 +177,9 @@ STRIPE_WEBHOOK_SECRET: Final[str] = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 PREMIUM_PRICE_LABEL: Final[str] = os.environ.get("PREMIUM_PRICE_LABEL", "€4.99 / month")
 APP_PUBLIC_URL: Final[str] = os.environ.get("APP_PUBLIC_URL", "https://aicryptopredictor.netlify.app").rstrip("/")
 REFERRAL_REWARD_DAYS: Final[int] = 30
+# Usernames with access to the admin panel (comma separated, case-insensitive). Admins must have 2FA on.
+ADMIN_USERNAMES: Final[frozenset] = frozenset(
+    u.strip().lower() for u in os.environ.get("ADMIN_USERNAMES", "").split(",") if u.strip())
 MAX_REWARDED_REFERRALS: Final[int] = 12
 
 CSRF_COOKIE_NAME: Final[str] = "aca_csrf"

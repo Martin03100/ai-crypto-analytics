@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.config import APP_PUBLIC_URL, JWT_SECRET_KEY, QUANT_LABEL
 from app.models import ForecastEvaluation, PriceTip, User
+from app.services import app_settings
 from app.services.email_service import email_lang, email_shell, is_email_configured, send_email
 
 logger = logging.getLogger("aca.digest")
@@ -124,7 +125,7 @@ def render_digest(user: User, week: dict, mine: dict) -> Optional[tuple[str, str
 
 
 def send_weekly_digests(db: Session, now: Optional[datetime] = None) -> int:
-    if not is_email_configured():
+    if not is_email_configured() or not app_settings.get("digest_enabled"):
         return 0
     since = (now or datetime.now(timezone.utc)).replace(tzinfo=None) - timedelta(days=7)
     week = _week_stats(db, since)

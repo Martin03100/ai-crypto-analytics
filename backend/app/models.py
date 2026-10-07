@@ -50,6 +50,8 @@ class User(Base):
     referral_code: Mapped[Optional[str]] = mapped_column(String(16), unique=True, index=True, nullable=True, default=None)
     referred_by_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=None)
     referral_rewarded: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=None)
+    # Blocked by an admin: cannot sign in and existing sessions stop working.
+    disabled: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=None)
 
     reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
@@ -236,3 +238,12 @@ class JobRun(Base):
     name: Mapped[str] = mapped_column(String(48), primary_key=True)
     last_run_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
+
+class AppSetting(Base):
+    """A setting the admin changes from the web; defaults live in app.services.app_settings."""
+
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(48), primary_key=True)
+    value_json: Mapped[str] = mapped_column(Text, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)

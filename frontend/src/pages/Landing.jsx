@@ -3,8 +3,10 @@
 import { ArrowRight, BarChart3, Brain, Database, ShieldCheck, Trophy, Users } from "lucide-react";
 import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
+import AnnouncementBar from "../components/AnnouncementBar";
 import CandlestickArt from "../components/CandlestickArt";
 import WaitlistForm from "../components/WaitlistForm";
+import { useAppConfig } from "../context/AppConfigContext";
 import { useLanguage } from "../context/LanguageContext";
 import { usePageTitle } from "../hooks/usePageTitle";
 import { LANGUAGES } from "../i18n/translations";
@@ -18,6 +20,7 @@ const FEATURES = [
 
 export default function Landing() {
   const { t, lang, setLang } = useLanguage();
+  const { waitlist_enabled } = useAppConfig();
   usePageTitle("landing.pageTitle");
   const { hash } = useLocation();
   useEffect(() => {
@@ -25,6 +28,7 @@ export default function Landing() {
   }, [hash]);
   return (
     <main className="landing">
+      <AnnouncementBar />
       <header className="landing-nav">
         <div className="landing-brand"><div className="brand-mark"><BarChart3 size={18} /></div><strong>AI Crypto Analytics</strong></div>
         <div className="landing-nav-actions">
@@ -69,7 +73,7 @@ export default function Landing() {
         </ol>
       </section>
 
-      <WaitlistForm />
+      {waitlist_enabled && <WaitlistForm />}
 
       <section className="card landing-honest">
         <ShieldCheck size={18} />

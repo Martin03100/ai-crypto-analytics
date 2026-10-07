@@ -7,6 +7,7 @@ import { api } from "../api";
 import CandlestickArt from "../components/CandlestickArt";
 import PasswordInput from "../components/PasswordInput";
 import Turnstile from "../components/Turnstile";
+import { useAppConfig } from "../context/AppConfigContext";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { usePageTitle } from "../hooks/usePageTitle";
@@ -63,6 +64,7 @@ export default function Auth() {
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaKey, setCaptchaKey] = useState(0);
   const { login, register } = useAuth();
+  const { signups_enabled } = useAppConfig();
   const { t, lang } = useLanguage();
   usePageTitle("auth.pageTitle");
   const navigate = useNavigate();
@@ -228,6 +230,7 @@ export default function Auth() {
             </div>
           )}
 
+          {tab === "register" && !signups_enabled && <div className="alert alert-warn">{t("auth.signupsClosed")}</div>}
           {error && <div className="alert alert-error">{error}</div>}
           {info && <div className={`alert ${info === "__expired__" ? "alert-warn" : "alert-success"}`}>{info === "__expired__" ? <AlertTriangle size={14} style={{ marginRight: 6 }} /> : <CheckCircle2 size={14} style={{ marginRight: 6 }} />}{info === "__expired__" ? t("auth.sessionExpiredNote") : info}</div>}
           {tab !== "login" && <Turnstile key={captchaKey} onToken={setCaptchaToken} />}

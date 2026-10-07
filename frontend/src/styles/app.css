@@ -1186,3 +1186,23 @@ input[type="checkbox"] { accent-color: var(--cyan); }
 .tipsters-score { font-size: 14px; font-weight: 600; margin: 0 0 12px; }
 .premium-crown { color: var(--amber-fg); margin-left: 6px; vertical-align: -1px; }
 .links-soon { opacity: 0.6; cursor: default; }
+
+/* ---------- Announcement & admin ---------- */
+.announcement {
+  display: flex; align-items: center; gap: 10px; justify-content: space-between;
+  margin: 0 0 14px; padding: 10px 14px; border-radius: var(--radius-md); font-size: 13.5px;
+  background: var(--cyan-dim); color: var(--cyan-fg); border: 1px solid color-mix(in srgb, var(--cyan) 30%, transparent);
+}
+.announcement-success { background: var(--emerald-dim); color: var(--emerald-fg); border-color: color-mix(in srgb, var(--emerald) 30%, transparent); }
+.announcement-warn { background: var(--amber-dim); color: var(--amber-fg); border-color: color-mix(in srgb, var(--amber) 30%, transparent); }
+.announcement button { background: none; border: none; color: inherit; cursor: pointer; padding: 2px; display: inline-flex; }
+.landing > .announcement { max-width: 760px; margin: 16px auto 0; }
+.admin-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.admin-search { display: flex; align-items: center; gap: 8px; color: var(--text-tertiary); }
+.admin-search .input { flex: 1; }
+.admin-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.admin-table td { vertical-align: top; }
+.admin-row-disabled td { opacity: 0.55; }
+.admin-badge { margin-left: 6px; font-size: 10.5px; }
+.admin-pager { display: flex; gap: 10px; align-items: center; justify-content: center; margin-top: 12px; }
+.admin-switches { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }

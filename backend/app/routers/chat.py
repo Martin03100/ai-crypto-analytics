@@ -13,6 +13,7 @@ from app.deps import get_current_user, get_db, get_decrypted_api_key
 from app.models import User
 from app.rate_limit import rate_limit_by_user
 from app.schemas import AIResultOut
+from app.services.app_settings import require_feature
 from app.services import jobs
 from app.services.ai_engine import chat_with_ai
 
@@ -33,6 +34,7 @@ class ChatRequest(BaseModel):
 @router.post("", response_model=AIResultOut, dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_CHAT))])
 def send_chat_message(payload: ChatRequest, request: Request, user: User = Depends(get_current_user),
                       db: Session = Depends(get_db)):
+    require_feature("chat_enabled")
     api_key = get_decrypted_api_key(db, user.id, payload.provider)
     messages = [
         {**m.model_dump(), "content": str(m.content)[:4000]}

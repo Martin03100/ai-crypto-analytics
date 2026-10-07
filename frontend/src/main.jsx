@@ -5,6 +5,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { AppConfigProvider } from "./context/AppConfigContext";
 import { AuthProvider } from "./context/AuthContext";
 import { ConfirmProvider } from "./context/ConfirmContext";
 import { ProvidersProvider } from "./context/ProvidersContext";
@@ -33,19 +34,21 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <ErrorBoundary>
       <BrowserRouter>
         <LanguageProvider>
-          <ThemeProvider>
-            <CurrencyProvider>
-              <AuthProvider>
-                <ProvidersProvider>
-                  <ToastProvider>
-                    <ConfirmProvider>
-                      <App />
-                    </ConfirmProvider>
-                  </ToastProvider>
-                </ProvidersProvider>
-              </AuthProvider>
-            </CurrencyProvider>
-          </ThemeProvider>
+          <AppConfigProvider>
+            <ThemeProvider>
+              <CurrencyProvider>
+                <AuthProvider>
+                  <ProvidersProvider>
+                    <ToastProvider>
+                      <ConfirmProvider>
+                        <App />
+                      </ConfirmProvider>
+                    </ToastProvider>
+                  </ProvidersProvider>
+                </AuthProvider>
+              </CurrencyProvider>
+            </ThemeProvider>
+          </AppConfigProvider>
         </LanguageProvider>
       </BrowserRouter>
     </ErrorBoundary>

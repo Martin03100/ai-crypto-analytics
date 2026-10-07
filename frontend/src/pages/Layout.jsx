@@ -3,6 +3,7 @@
 import { Menu, MoreHorizontal, RefreshCw, WifiOff } from "lucide-react";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
+import AnnouncementBar from "../components/AnnouncementBar";
 import ChatWidget from "../components/ChatWidget";
 import ErrorBoundary from "../components/ErrorBoundary";
 import NotificationBell from "../components/NotificationBell";
@@ -13,6 +14,7 @@ import VerifyEmailGate from "../components/VerifyEmailGate";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { useNavLinks } from "../hooks/useNavLinks";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
+import { useAppConfig } from "../context/AppConfigContext";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { PWA_UPDATE_EVENT, updateApp } from "../pwa";
@@ -88,6 +90,7 @@ export default function Layout() {
   const { t } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
   const { user } = useAuth();
+  const { chat_enabled } = useAppConfig();
   const [showShortcuts, setShowShortcuts] = useState(false);
   const closeShortcuts = useCallback(() => setShowShortcuts(false), []);
   useKeyboardShortcuts(useCallback(() => setShowShortcuts(true), []));
@@ -105,6 +108,7 @@ export default function Layout() {
           </button>
         </div>
         <OfflineBanner />
+        <AnnouncementBar />
 
         <Suspense fallback={<ContentLoader />}>
           <PageTransition>
@@ -116,7 +120,7 @@ export default function Layout() {
       <NotificationBell />
       <BottomNav onMore={() => setMenuOpen(true)} />
       <UpdatePrompt />
-      <ChatWidget />
+      {chat_enabled && <ChatWidget />}
       <OnboardingTour onNeedSidebar={setMenuOpen} />
       {showShortcuts && <ShortcutsHelp onClose={closeShortcuts} />}
     </div>

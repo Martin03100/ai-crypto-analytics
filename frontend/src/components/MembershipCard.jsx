@@ -4,6 +4,7 @@ import { Copy, Crown, Gift, Mail, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
+import { useAppConfig } from "../context/AppConfigContext";
 import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../context/ToastContext";
 import { localeForLang } from "../i18n/locale";
@@ -12,6 +13,7 @@ import { Card } from "./Card";
 
 export default function MembershipCard() {
   const { t, lang } = useLanguage();
+  const { referrals_enabled, digest_enabled } = useAppConfig();
   const { push } = useToast();
   const [m, setM] = useState(null);
   const [nickname, setNickname] = useState("");
@@ -83,15 +85,19 @@ export default function MembershipCard() {
         )}
       </div>
 
-      <hr className="divider" />
+      {referrals_enabled && (
+        <>
+          <hr className="divider" />
 
-      <h3 className="membership-h"><Gift size={14} /> {t("membership.inviteTitle")}</h3>
-      <p className="text-sub">{t("membership.inviteText", { days: m.referral_days })}</p>
-      <div className="invite-row">
-        <input className="input mono" readOnly value={m.referral_link} aria-label={t("membership.inviteTitle")} onFocus={(e) => e.target.select()} />
-        <button className="btn btn-ghost btn-sm" onClick={copyInvite}><Copy size={13} /> {t("shareBar.copy")}</button>
-      </div>
-      <p className="text-sub" style={{ marginTop: 6 }}>{t("membership.inviteCount", { n: m.referrals_rewarded, max: m.referrals_max })}</p>
+          <h3 className="membership-h"><Gift size={14} /> {t("membership.inviteTitle")}</h3>
+          <p className="text-sub">{t("membership.inviteText", { days: m.referral_days })}</p>
+          <div className="invite-row">
+            <input className="input mono" readOnly value={m.referral_link} aria-label={t("membership.inviteTitle")} onFocus={(e) => e.target.select()} />
+            <button className="btn btn-ghost btn-sm" onClick={copyInvite}><Copy size={13} /> {t("shareBar.copy")}</button>
+          </div>
+          <p className="text-sub" style={{ marginTop: 6 }}>{t("membership.inviteCount", { n: m.referrals_rewarded, max: m.referrals_max })}</p>
+        </>
+      )}
 
       <hr className="divider" />
 
@@ -103,15 +109,19 @@ export default function MembershipCard() {
         <button className="btn btn-ghost btn-sm" type="submit" disabled={busy}>{t("common.save")}</button>
       </form>
 
-      <hr className="divider" />
+      {digest_enabled && (
+        <>
+          <hr className="divider" />
 
-      <label className="toggle-row">
-        <input type="checkbox" checked={m.digest_opt_in} onChange={toggleDigest} />
-        <span>
-          <strong><Mail size={13} style={{ verticalAlign: -2, marginRight: 4 }} />{t("membership.digestTitle")}</strong>
-          <span className="text-sub" style={{ display: "block" }}>{t("membership.digestText")}</span>
-        </span>
-      </label>
+          <label className="toggle-row">
+            <input type="checkbox" checked={m.digest_opt_in} onChange={toggleDigest} />
+            <span>
+              <strong><Mail size={13} style={{ verticalAlign: -2, marginRight: 4 }} />{t("membership.digestTitle")}</strong>
+              <span className="text-sub" style={{ display: "block" }}>{t("membership.digestText")}</span>
+            </span>
+          </label>
+        </>
+      )}
     </Card>
   );
 }

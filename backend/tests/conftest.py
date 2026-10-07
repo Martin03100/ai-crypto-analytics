@@ -28,6 +28,8 @@ from app.rate_limit import _hits as _rate_limit_hits  # noqa: E402
 
 @pytest.fixture(autouse=True)
 def _reset_rate_limiter():
+    from app.services import app_settings
+    app_settings.invalidate()
     _rate_limit_hits.clear()
     yield
     _rate_limit_hits.clear()

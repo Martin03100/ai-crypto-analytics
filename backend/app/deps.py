@@ -60,8 +60,20 @@ def get_current_user(
     token_version = payload.get("tv", 0)
     if token_version != user.token_version:
         raise credentials_error
+    if user.disabled:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tento účet je zablokovaný.")
     if user.email_verified is False and not request.url.path.startswith(_UNVERIFIED_ALLOWED_PATHS):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Najprv si over email kódom, ktorý sme ti poslali.")
+    return user
+
+
+def get_admin_user(user: User = Depends(get_current_user)) -> User:
+    from app.services.roles import is_admin
+
+    if not is_admin(user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Prístup len pre administrátora.")
+    if not user.totp_enabled:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrátor musí mať zapnuté 2FA.")
     return user
 
 

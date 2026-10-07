@@ -8,11 +8,12 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from app.config import MAX_REWARDED_REFERRALS, REFERRAL_REWARD_DAYS
+from app.config import MAX_REWARDED_REFERRALS
 from app.models import User
+from app.services import app_settings
 from app.services.notifications import notify
 
-FREE_SCHEDULES = 5
+FREE_SCHEDULES = 5          # defaults; the admin can change both in the admin panel
 PREMIUM_SCHEDULES = 20
 _CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
@@ -39,7 +40,7 @@ def set_premium_until(user: User, until: Optional[datetime]) -> None:
 
 
 def max_schedules(user: User) -> int:
-    return PREMIUM_SCHEDULES if is_premium(user) else FREE_SCHEDULES
+    return app_settings.get("premium_schedules" if is_premium(user) else "free_schedules")
 
 
 def ensure_referral_code(db: Session, user: User) -> str:
@@ -66,14 +67,15 @@ def rewarded_referrals(db: Session, referrer_id: int) -> int:
 
 def grant_referral_reward(db: Session, user: User) -> bool:
     """Both people get Premium days once the invited user has a confirmed account; the caller commits."""
-    if not user.referred_by_id or user.referral_rewarded:
+    if not user.referred_by_id or user.referral_rewarded or not app_settings.get("referrals_enabled"):
         return False
+    days = app_settings.get("referral_reward_days")
     referrer = db.get(User, user.referred_by_id)
     referrer_eligible = referrer is not None and rewarded_referrals(db, referrer.id) < MAX_REWARDED_REFERRALS
     user.referral_rewarded = True
-    extend_premium(user, REFERRAL_REWARD_DAYS)
-    notify(db, user.id, "referral_reward", days=REFERRAL_REWARD_DAYS)
+    extend_premium(user, days)
+    notify(db, user.id, "referral_reward", days=days)
     if referrer_eligible:
-        extend_premium(referrer, REFERRAL_REWARD_DAYS)
-        notify(db, referrer.id, "referral_reward", days=REFERRAL_REWARD_DAYS)
+        extend_premium(referrer, days)
+        notify(db, referrer.id, "referral_reward", days=days)
     return True

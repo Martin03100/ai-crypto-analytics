@@ -27,6 +27,7 @@ from app.schemas import (
     AIResultOut, CostEstimateOut, ForecastAccuracyOut, ForecastHistoryOut, ForecastRequest, PaginatedForecastHistory, SaveForecastRequest, TipRequest, BulkDeleteRequest,
 )
 from app.services import audit, jobs
+from app.services.app_settings import require_feature
 from app.services.notifications import notify
 from app.services.backtest import BACKTEST_SETUP, run_backtest
 from app.services.demo_data import DEMO_LABEL_LIKE, demo_accuracy, is_demo_label
@@ -70,6 +71,7 @@ def generate_forecast(payload: ForecastRequest, request: Request, user: User = D
 @router.get("/backtest", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
 def backtest(coin: str = Query(min_length=2, max_length=10), horizon: str = Query(max_length=4),
              user: User = Depends(get_current_user)) -> dict:
+    require_feature("backtest_enabled")
     if coin.upper() not in DEFAULT_COIN_IDS or horizon not in BACKTEST_SETUP:
         raise HTTPException(status_code=400, detail="Backtest podporuje základné mince a horizonty 24h, 1T a 1M.")
     ok, data, error = run_backtest(coin, horizon)

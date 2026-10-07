@@ -11,14 +11,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.config import APP_PUBLIC_URL, MAX_REWARDED_REFERRALS, PREMIUM_PRICE_LABEL, RATE_LIMIT_ACCOUNT_SENSITIVE, REFERRAL_REWARD_DAYS
+from app.config import APP_PUBLIC_URL, MAX_REWARDED_REFERRALS, RATE_LIMIT_ACCOUNT_SENSITIVE
 from app.deps import get_current_user, get_db
 from app.models import User
 from app.rate_limit import rate_limit_by_user
-from app.services import billing, notifications
-from app.services.premium import (
-    FREE_SCHEDULES, PREMIUM_SCHEDULES, ensure_referral_code, is_premium, rewarded_referrals,
-)
+from app.services import app_settings, billing, notifications
+from app.services.premium import ensure_referral_code, is_premium, rewarded_referrals
 
 logger = logging.getLogger("aca.community")
 router = APIRouter(tags=["community"])
@@ -27,9 +25,10 @@ NICKNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{3,20}$")
 
 
 def premium_info() -> dict:
-    return {"billing_enabled": billing.billing_enabled(), "price_label": PREMIUM_PRICE_LABEL,
-            "limits": {"free": {"schedules": FREE_SCHEDULES}, "premium": {"schedules": PREMIUM_SCHEDULES}},
-            "referral_days": REFERRAL_REWARD_DAYS}
+    s = app_settings.all_settings()
+    return {"billing_enabled": billing.billing_enabled(), "price_label": s["premium_price_label"],
+            "limits": {"free": {"schedules": s["free_schedules"]}, "premium": {"schedules": s["premium_schedules"]}},
+            "referral_days": s["referral_reward_days"], "referrals_enabled": s["referrals_enabled"]}
 
 
 @router.get("/api/account/membership")

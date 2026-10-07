@@ -29,6 +29,9 @@ statistical model and real market data. Bachelor's thesis project (Software Deve
 - **Premium:** Stripe Checkout subscription (off until configured), Premium waitlist, and **invite rewards**
   (both people get 30 days of Premium once the invited user confirms their email).
 - **20 coins** (incl. TON, SUI, PEPE…) and a **4-hour horizon** next to 24h / 1 week / 1 month / 1 year.
+- **Admin panel** (`/admin`, users listed in `ADMIN_USERNAMES`, 2FA required): stats, user search, granting or removing
+  Premium, blocking accounts, waitlist CSV export, feature switches, limits, Premium price label and a site-wide
+  announcement banner. Stripe keys stay in environment variables, never editable from the browser.
 - Transactional emails in **English, Slovak and Czech**, following the user's app language.
 - **Demo mode** for presentations: one click fills the whole app with clearly labelled test data ("Gemini test", "Claude test", ...)
   on synthetic prices - forecasts, evaluated accuracy, leaderboard, tips and portfolio analyses, visible only to the user who loaded it.

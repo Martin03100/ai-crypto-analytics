@@ -21,6 +21,7 @@ import SchedulePanel from "../components/SchedulePanel";
 import { useToast } from "../context/ToastContext";
 import { useProviders } from "../context/ProvidersContext";
 import { useConfirm } from "../context/ConfirmContext";
+import { useAppConfig } from "../context/AppConfigContext";
 import { useLanguage } from "../context/LanguageContext";
 import { humanizeError } from "../i18n/errorMessages";
 import { localeForLang } from "../i18n/locale";
@@ -191,6 +192,7 @@ export default function Forecast() {
   const { t, lang } = useLanguage();
   usePageTitle("forecast.title");
   const { currency } = useCurrency();
+  const { compare_enabled, backtest_enabled } = useAppConfig();
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState(() => (["history", "schedule", "leaderboard", "compare", "backtest"].includes(searchParams.get("tab")) ? searchParams.get("tab") : "new"));
   const urlTab = searchParams.get("tab");
@@ -344,8 +346,8 @@ export default function Forecast() {
         <button className={`tab ${tab === "history" ? "active" : ""}`} onClick={() => setTab("history")}>{t("forecast.tabHistory")}</button>
         <button className={`tab ${tab === "schedule" ? "active" : ""}`} onClick={() => setTab("schedule")}>{t("forecast.tabSchedule")}</button>
         <button className={`tab ${tab === "leaderboard" ? "active" : ""}`} onClick={() => setTab("leaderboard")}>{t("forecast.tabLeaderboard")}</button>
-        <button className={`tab ${tab === "compare" ? "active" : ""}`} onClick={() => setTab("compare")}>{t("forecast.tabCompare")}</button>
-        <button className={`tab ${tab === "backtest" ? "active" : ""}`} onClick={() => setTab("backtest")}>{t("forecast.tabBacktest")}</button>
+        {compare_enabled && <button className={`tab ${tab === "compare" ? "active" : ""}`} onClick={() => setTab("compare")}>{t("forecast.tabCompare")}</button>}
+        {backtest_enabled && <button className={`tab ${tab === "backtest" ? "active" : ""}`} onClick={() => setTab("backtest")}>{t("forecast.tabBacktest")}</button>}
       </div>
 
       {tab === "new" && (
@@ -430,8 +432,8 @@ export default function Forecast() {
 
       {tab === "schedule" && <SchedulePanel onOpenHistory={() => setTab("history")} />}
       {tab === "leaderboard" && <Leaderboard />}
-      {tab === "compare" && <ComparePanel />}
-      {tab === "backtest" && <BacktestPanel />}
+      {tab === "compare" && compare_enabled && <ComparePanel />}
+      {tab === "backtest" && backtest_enabled && <BacktestPanel />}
 
       {tab === "history" && (
         <div>

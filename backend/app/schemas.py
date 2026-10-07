@@ -40,6 +40,7 @@ class TokenResponse(BaseModel):
     email_verified: Optional[bool] = None
     totp_enabled: bool = False
     premium: bool = False
+    admin: bool = False
 
 
 class ApiKeyIn(BaseModel):

@@ -24,6 +24,7 @@ from app.rate_limit import rate_limit_by_ip
 from app.routers.forecast import _MIN_SAMPLE, _tip_summary, provider_stats
 from app.routers.community import premium_info
 from app.services import cards
+from app.services.app_settings import public_settings, require_feature
 from app.services.digest import check_unsubscribe_token
 from app.services.premium import is_premium
 from app.services.status_check import collect_status
@@ -118,6 +119,7 @@ class WaitlistRequest(BaseModel):
 
 @router.post("/waitlist", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_WAITLIST))])
 def join_waitlist(payload: WaitlistRequest, db: Session = Depends(get_db)) -> dict:
+    require_feature("waitlist_enabled")
     email = payload.email.strip().lower()
     if not _EMAIL_RE.match(email):
         raise HTTPException(status_code=400, detail="Zadaj platnú e-mailovú adresu.")
@@ -173,6 +175,7 @@ def week_start(now: datetime) -> datetime:
 @router.get("/tipsters", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_MARKET_PUBLIC))])
 def tipsters(period: Literal["week", "all"] = Query(default="week"), db: Session = Depends(get_db)) -> dict:
     """Best price tippers who chose a public nickname; the weekly board is the "Beat the AI" challenge."""
+    require_feature("tipsters_enabled")
     since = week_start(datetime.now(timezone.utc).replace(tzinfo=None))
     settled = (PriceTip.outcome.isnot(None)) & (PriceTip.is_demo.isnot(True))
     if period == "week":
@@ -193,6 +196,12 @@ def tipsters(period: Literal["week", "all"] = Query(default="week"), db: Session
 @router.get("/premium")
 def premium() -> dict:
     return premium_info()
+
+
+@router.get("/config")
+def public_config() -> dict:
+    """Feature switches and the announcement banner the admin controls, plus the Premium offer."""
+    return {**public_settings(), "premium": premium_info()}
 
 
 class UnsubscribeRequest(BaseModel):

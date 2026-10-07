@@ -6,6 +6,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { Card } from "../components/Card";
 import WaitlistForm from "../components/WaitlistForm";
+import { useAppConfig } from "../context/AppConfigContext";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../context/ToastContext";
@@ -23,6 +24,7 @@ export default function Premium() {
   const [info, setInfo] = useState(null);
   const [busy, setBusy] = useState(false);
   usePageTitle("premium.pageTitle");
+  const { waitlist_enabled, referrals_enabled } = useAppConfig();
 
   useEffect(() => { api.premiumInfo().then(setInfo).catch(() => setInfo({ billing_enabled: false })); }, []);
 
@@ -74,12 +76,14 @@ export default function Premium() {
         </Card>
       </div>
 
-      {info && !info.billing_enabled && <div style={{ marginTop: 20 }}><WaitlistForm id="premium-waitlist" /></div>}
+      {info && !info.billing_enabled && waitlist_enabled && <div style={{ marginTop: 20 }}><WaitlistForm id="premium-waitlist" /></div>}
 
-      <Card title={t("premium.inviteTitle")} style={{ marginTop: 20 }}>
-        <p className="text-sub">{t("premium.inviteText", { days: info?.referral_days ?? 30 })}</p>
-        <Link to={user ? "/settings" : "/auth?tab=register"} className="key-link">{t("premium.inviteCta")}</Link>
-      </Card>
+      {referrals_enabled && (
+        <Card title={t("premium.inviteTitle")} style={{ marginTop: 20 }}>
+          <p className="text-sub">{t("premium.inviteText", { days: info?.referral_days ?? 30 })}</p>
+          <Link to={user ? "/settings" : "/auth?tab=register"} className="key-link">{t("premium.inviteCta")}</Link>
+        </Card>
+      )}
       <p className="text-sub standalone-disclaimer">{t("track.disclaimer")}</p>
     </main>
   );

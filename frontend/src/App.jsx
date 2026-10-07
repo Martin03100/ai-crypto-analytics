@@ -15,6 +15,7 @@ const Portfolio = lazy(() => import("./pages/Portfolio"));
 const Market = lazy(() => import("./pages/Market"));
 const Account = lazy(() => import("./pages/Account"));
 const Settings = lazy(() => import("./pages/Settings"));
+const Admin = lazy(() => import("./pages/Admin"));
 const SharedForecast = lazy(() => import("./pages/SharedForecast"));
 const StatusPage = lazy(() => import("./pages/StatusPage"));
 const About = lazy(() => import("./pages/About"));
@@ -73,6 +74,7 @@ export default function App() {
           <Route path="market" element={<Market />} />
           <Route path="account" element={<Account />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="admin" element={<Admin />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -11,7 +11,7 @@ const AuthContext = createContext(null);
 function toUser(res) {
   return {
     username: res.username, id: res.user_id, email: res.email,
-    emailVerified: res.email_verified, totpEnabled: Boolean(res.totp_enabled), premium: Boolean(res.premium),
+    emailVerified: res.email_verified, totpEnabled: Boolean(res.totp_enabled), premium: Boolean(res.premium), admin: Boolean(res.admin),
   };
 }
 

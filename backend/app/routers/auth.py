@@ -36,7 +36,9 @@ from app.services.email_service import (
     is_email_configured, render_lockout_email, render_new_login_email, render_reset_password_email, send_email,
     subject as email_subject,
 )
+from app.services.app_settings import require_feature
 from app.services.premium import find_referrer, grant_referral_reward, is_premium
+from app.services.roles import is_admin
 from app.services.verification import send_verification_code
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -54,6 +56,7 @@ def _set_auth_cookie(response: Response, user: User) -> None:
              dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_LOGIN))])
 def register(payload: RegisterRequest, response: Response, request: Request, background_tasks: BackgroundTasks,
              db: Session = Depends(get_db)) -> TokenResponse:
+    require_feature("signups_enabled")
     if not verify_captcha(payload.captcha_token, get_client_ip(request)):
         raise HTTPException(status_code=400, detail="Overenie, že nie si robot, zlyhalo. Skús to znova.")
     username = sanitize_text(payload.username, max_length=64)
@@ -96,7 +99,7 @@ def register(payload: RegisterRequest, response: Response, request: Request, bac
     return TokenResponse(access_token=create_access_token(user.id, user.username, user.token_version),
                           username=user.username, user_id=user.id, email=user.email,
                           email_verified=user.email_verified, totp_enabled=bool(user.totp_enabled),
-                          premium=is_premium(user))
+                          premium=is_premium(user), admin=is_admin(user))
 
 
 @router.post("/login", response_model=TokenResponse, dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_LOGIN))])
@@ -124,6 +127,8 @@ def login(payload: LoginRequest, response: Response, request: Request, backgroun
     if not verify_password(payload.password, user.password_hash):
         _register_failed_attempt(db, user, now, background_tasks, request)
         raise generic_error
+    if user.disabled:
+        raise HTTPException(status_code=403, detail="Tento účet je zablokovaný.")
 
     if user.totp_enabled:
         if not payload.totp_code:
@@ -152,7 +157,7 @@ def login(payload: LoginRequest, response: Response, request: Request, backgroun
     return TokenResponse(access_token=create_access_token(user.id, user.username, user.token_version),
                           username=user.username, user_id=user.id, email=user.email,
                           email_verified=user.email_verified, totp_enabled=bool(user.totp_enabled),
-                          premium=is_premium(user))
+                          premium=is_premium(user), admin=is_admin(user))
 
 
 @router.post("/logout")
@@ -165,7 +170,7 @@ def logout(response: Response) -> dict:
 def me(user: User = Depends(get_current_user)) -> TokenResponse:
     return TokenResponse(access_token="", username=user.username, user_id=user.id, email=user.email,
                          email_verified=user.email_verified, totp_enabled=bool(user.totp_enabled),
-                         premium=is_premium(user))
+                         premium=is_premium(user), admin=is_admin(user))
 
 
 @router.post("/forgot-password", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_LOGIN))])
