@@ -125,7 +125,7 @@ def test_preferences_and_unsubscribe_link(registered):
     from app.services.digest import unsubscribe_token
     client, username, _p = registered
     res = client.put("/api/account/preferences", json={"digest_opt_in": True, "lang": "sk"}, headers=csrf_headers(client))
-    assert res.json() == {"digest_opt_in": True, "lang": "sk"}
+    assert res.json() == {"digest_opt_in": True, "lang": "sk", "briefing_opt_in": False}
     uid = _db_user(username).id
     client.cookies.clear()
     headers = anon_csrf_headers(client)
@@ -167,7 +167,7 @@ def test_premium_info_and_billing_off_by_default(registered):
     client, _u, _p = registered
     info = client.get("/api/public/premium").json()
     assert info["billing_enabled"] is False and info["limits"]["premium"]["schedules"] > info["limits"]["free"]["schedules"]
-    assert client.post("/api/billing/checkout", headers=csrf_headers(client)).status_code == 503
+    assert client.post("/api/billing/checkout", json={}, headers=csrf_headers(client)).status_code == 503
 
 
 def _signed(payload: bytes, secret: str, ts=None):
@@ -237,19 +237,23 @@ def test_weekly_digest_sends_only_to_opted_in(registered, monkeypatch):
 
 def test_periodic_jobs_run_once_per_slot(client, monkeypatch):
     from app.routers import forecast as forecast_router
-    from app.services import background, digest
+    from app.services import alerts, background, briefing, digest
     calls = []
     monkeypatch.setattr(forecast_router, "_evaluate_pending", lambda db, **k: calls.append("eval"))
+    monkeypatch.setattr(alerts, "check_alerts", lambda db: calls.append("alerts"))
+    monkeypatch.setattr(briefing, "send_morning_briefings", lambda db: calls.append("briefing"))
     monkeypatch.setattr(digest, "send_weekly_digests", lambda db: calls.append("digest"))
     monday = datetime(2026, 10, 12, 8, 30)
-    assert background.run_periodic_jobs(monday) == ["evaluate_forecasts", "weekly_digest"]
-    assert background.run_periodic_jobs(monday + timedelta(minutes=5)) == []
-    assert background.run_periodic_jobs(monday + timedelta(minutes=11)) == ["evaluate_forecasts"]
-    assert background.run_periodic_jobs(datetime(2026, 10, 14, 9, 0)) == ["evaluate_forecasts"]   # Wednesday: no digest
-    assert calls.count("digest") == 1
+    assert background.run_periodic_jobs(monday) == ["evaluate_forecasts", "price_alerts", "morning_briefing", "weekly_digest"]
+    assert background.run_periodic_jobs(monday + timedelta(minutes=4)) == []
+    assert background.run_periodic_jobs(monday + timedelta(minutes=11)) == ["evaluate_forecasts", "price_alerts"]
+    wednesday = datetime(2026, 10, 14, 9, 0)
+    assert background.run_periodic_jobs(wednesday) == ["evaluate_forecasts", "price_alerts", "morning_briefing"]
+    assert background.run_periodic_jobs(datetime(2026, 10, 14, 15, 0)) == ["evaluate_forecasts", "price_alerts"]
+    assert calls.count("digest") == 1 and calls.count("briefing") == 2
     db = SessionLocal()
     try:
-        assert {r.name for r in db.query(JobRun).all()} == {"evaluate_forecasts", "weekly_digest"}
+        assert {r.name for r in db.query(JobRun).all()} == {"evaluate_forecasts", "price_alerts", "morning_briefing", "weekly_digest"}
     finally:
         db.close()
 

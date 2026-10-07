@@ -17,7 +17,8 @@ import { usePageTitle } from "../hooks/usePageTitle";
 const TABS = [["overview", LayoutGrid], ["users", Users], ["waitlist", Download], ["settings", Settings2]];
 const SWITCHES = ["signups_enabled", "chat_enabled", "compare_enabled", "backtest_enabled", "tipsters_enabled",
   "waitlist_enabled", "digest_enabled", "referrals_enabled"];
-const NUMBERS = ["free_schedules", "premium_schedules", "referral_reward_days"];
+const NUMBERS = ["free_schedules", "premium_schedules", "free_alerts", "premium_alerts", "premium_trial_days", "referral_reward_days"];
+const OPERATOR = [["operator_name", 120], ["operator_business_id", 60], ["operator_address", 200]];
 
 function Overview() {
   const { t } = useLanguage();
@@ -202,6 +203,17 @@ function SettingsTab() {
           ))}
         </div>
         <p className="text-sub">{t("admin.stripeNote")}</p>
+      </Card>
+      <Card title={t("admin.operator")} style={{ marginTop: 16 }}>
+        <p className="text-sub" style={{ marginTop: 0 }}>{t("admin.operatorNote")}</p>
+        <div className="grid grid-2">
+          {OPERATOR.map(([k, max]) => (
+            <div key={k} className="field">
+              <label>{t(`admin.set.${k}`)}</label>
+              <input className="input" maxLength={max} value={values[k]} onChange={(e) => set(k, e.target.value)} />
+            </div>
+          ))}
+        </div>
       </Card>
       <Card title={t("admin.announcement")} style={{ marginTop: 16 }}>
         <div className="field">

@@ -6,11 +6,11 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     ApiKey, AuditEvent, CommunityVote, EmailVerificationCode, ForecastEvaluation, ForecastHistory, ForecastSchedule,
-    Notification, PasswordResetToken, PortfolioHistory, PriceTip, User,
+    Notification, PasswordResetToken, PortfolioHistory, PriceAlert, PriceTip, User,
 )
 
 _USER_TABLES = (ApiKey, ForecastHistory, PortfolioHistory, CommunityVote, PasswordResetToken, ForecastEvaluation,
-                PriceTip, EmailVerificationCode, AuditEvent, ForecastSchedule, Notification)
+                PriceTip, EmailVerificationCode, AuditEvent, ForecastSchedule, Notification, PriceAlert)
 
 
 def delete_user_data(db: Session, user: User) -> None:

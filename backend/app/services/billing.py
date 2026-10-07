@@ -31,6 +31,13 @@ def billing_enabled() -> bool:
     return bool(STRIPE_SECRET_KEY and STRIPE_PRICE_ID and STRIPE_WEBHOOK_SECRET)
 
 
+def checkout_ready() -> bool:
+    """Selling also needs the seller's identity on the Terms page (EU consumer law)."""
+    from app.services import app_settings
+
+    return billing_enabled() and bool(app_settings.get("operator_name") and app_settings.get("operator_address"))
+
+
 def _post(path: str, data: dict) -> dict:
     try:
         res = requests.post(f"{STRIPE_API}{path}", data=data, auth=(STRIPE_SECRET_KEY, ""), timeout=15)
@@ -42,7 +49,7 @@ def _post(path: str, data: dict) -> dict:
     return res.json()
 
 
-def create_checkout_url(user: User) -> str:
+def create_checkout_url(user: User, trial_days: int = 0) -> str:
     data = {
         "mode": "subscription",
         "line_items[0][price]": STRIPE_PRICE_ID,
@@ -52,7 +59,10 @@ def create_checkout_url(user: User) -> str:
         "client_reference_id": str(user.id),
         "allow_promotion_codes": "true",
         "subscription_data[metadata][user_id]": str(user.id),
+        "billing_address_collection": "auto",
     }
+    if trial_days > 0 and not user.stripe_customer_id:   # one free trial per customer
+        data["subscription_data[trial_period_days]"] = str(trial_days)
     if user.stripe_customer_id:
         data["customer"] = user.stripe_customer_id
     elif user.email:

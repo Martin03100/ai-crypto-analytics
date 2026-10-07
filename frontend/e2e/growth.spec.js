@@ -61,7 +61,7 @@ test("signed-in user gets a bell, membership card, invite link, 4h horizon and n
   await page.getByRole("textbox", { name: "Public nickname" }).fill(nick);
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("Nickname saved.")).toBeVisible();
-  await page.getByRole("checkbox").check();
+  await page.getByRole("checkbox", { name: /Weekly "AI vs reality" email/ }).check();
   await page.goto("/track-record");
   await expect(page.getByText("Beat the AI: top tippers")).toBeVisible();
   await page.goto("/forecast");
@@ -72,4 +72,28 @@ test("signed-in user gets a bell, membership card, invite link, 4h horizon and n
 test("invalid unsubscribe link explains what to do", async ({ page }) => {
   await page.goto("/unsubscribe?u=1&t=short");
   await expect(page.getByText("This unsubscribe link is not valid.")).toBeVisible();
+});
+
+test("price alerts, Premium gate and the Premium page", async ({ page }) => {
+  await register(page);
+  await page.goto("/dashboard");
+  await page.getByPlaceholder("Price in USD").fill("1000000");
+  await page.getByRole("button", { name: "Add alert" }).click();
+  await expect(page.getByText("Alert set. We'll let you know.")).toBeVisible();
+  await expect(page.getByText("Active alerts: 1 of 1")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add alert" })).toBeDisabled();
+
+  await page.goto("/forecast?tab=mystats");
+  await expect(page.getByText("Your personal accuracy")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Unlock with Premium" })).toBeVisible();
+
+  await page.goto("/premium");
+  await expect(page.getByRole("heading", { name: /Let the app watch the market for you/ })).toBeVisible();
+  await expect(page.getByRole("row", { name: /Active price alerts/ })).toContainText("25");
+  await page.getByText("Can I get my money back?").click();
+  await expect(page.getByText("within 14 days of your first payment")).toBeVisible();
+
+  await page.goto("/terms");
+  await expect(page.getByRole("heading", { name: "Refunds and withdrawal" })).toBeVisible();
+  await expect(page.getByText("Operator and data controller")).toBeVisible();
 });

@@ -1,5 +1,7 @@
 /** Human-readable notification texts. */
 
+import { formatPrice } from "./formatPrice";
+
 export function notificationText(n, t) {
   const d = n.data || {};
   switch (n.kind) {
@@ -10,6 +12,8 @@ export function notificationText(n, t) {
       return t(`notif.duel_${d.outcome}`);
     case "referral_reward":
       return t("notif.referral", { days: d.days });
+    case "price_alert":
+      return t(d.direction === "above" ? "notif.alertAbove" : "notif.alertBelow", { coin: d.coin, price: formatPrice(d.price) });
     case "premium_started":
       return t("notif.premium");
     default:

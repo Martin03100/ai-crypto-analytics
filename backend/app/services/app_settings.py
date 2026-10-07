@@ -29,12 +29,19 @@ SCHEMA: dict[str, tuple[Any, str, tuple]] = {
     "free_schedules": (5, "int", (0, 50)),
     "premium_schedules": (20, "int", (1, 200)),
     "referral_reward_days": (REFERRAL_REWARD_DAYS, "int", (1, 365)),
+    "free_alerts": (1, "int", (0, 50)),
+    "premium_alerts": (25, "int", (1, 200)),
+    "premium_trial_days": (7, "int", (0, 30)),
+    "operator_name": ("", "str", (120,)),
+    "operator_business_id": ("", "str", (60,)),
+    "operator_address": ("", "str", (200,)),
     "announcement": ("", "str", (280,)),
     "announcement_level": ("info", "choice", ("info", "warn", "success")),
 }
 
 PUBLIC_KEYS = ("signups_enabled", "chat_enabled", "compare_enabled", "backtest_enabled", "tipsters_enabled",
-               "waitlist_enabled", "digest_enabled", "referrals_enabled", "announcement", "announcement_level")
+               "waitlist_enabled", "digest_enabled", "referrals_enabled", "announcement", "announcement_level",
+               "operator_name", "operator_business_id", "operator_address")
 
 _TTL_SECONDS = 30
 _cache: dict[str, Any] = {}

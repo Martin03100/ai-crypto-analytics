@@ -1,6 +1,6 @@
 /** Settings page. */
 
-import { AtSign, Compass, Info, Key, Languages, LogOut, Moon, ShieldCheck, Sun, Trash2, Wallet2 } from "lucide-react";
+import { AtSign, Compass, Download, Info, Key, Languages, LogOut, Moon, ShieldCheck, Sun, Trash2, Wallet2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Card } from "../components/Card";
@@ -214,6 +214,11 @@ export default function Settings() {
             </button>
             <p className="text-sub" style={{ marginTop: 8 }}>{t("shortcuts.hint")}</p>
           </div>
+        </Card>
+
+        <Card title={t("settings.dataTitle")} icon={Download}>
+          <p className="text-sub" style={{ marginTop: 0 }}>{t("settings.dataText")}</p>
+          <a className="btn btn-ghost btn-sm" href={api.exportDataUrl()} download><Download size={14} /> {t("settings.dataButton")}</a>
         </Card>
 
         <Card title={t("settings.deleteAccountTitle")} icon={Trash2} className="danger-zone">

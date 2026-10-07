@@ -1,4 +1,4 @@
-"""Periodic background jobs, run by the scheduler thread: scoring matured forecasts and the weekly digest."""
+"""Periodic background jobs run by the scheduler thread: scoring forecasts, price alerts and scheduled emails."""
 
 from __future__ import annotations
 
@@ -14,7 +14,9 @@ from app.models import JobRun
 logger = logging.getLogger("aca.background")
 
 EVALUATE_EVERY = timedelta(minutes=10)
+ALERTS_EVERY = timedelta(minutes=5)
 DIGEST_WEEKDAY, DIGEST_HOUR = 0, 8      # Monday 08:00 UTC
+BRIEFING_HOUR = 7                       # every day 07:00 UTC
 
 
 def _claim(name: str, due_after: datetime, now: datetime) -> bool:
@@ -45,6 +47,11 @@ def last_digest_slot(now: datetime) -> datetime:
     return monday if now >= monday else monday - timedelta(days=7)
 
 
+def last_briefing_slot(now: datetime) -> datetime:
+    today = now.replace(hour=BRIEFING_HOUR, minute=0, second=0, microsecond=0)
+    return today if now >= today else today - timedelta(days=1)
+
+
 def _run(name: str, job: Callable) -> None:
     db = SessionLocal()
     try:
@@ -57,6 +64,8 @@ def _run(name: str, job: Callable) -> None:
 
 def run_periodic_jobs(now: Optional[datetime] = None) -> list[str]:
     from app.routers.forecast import _evaluate_pending
+    from app.services.alerts import check_alerts
+    from app.services.briefing import send_morning_briefings
     from app.services.digest import send_weekly_digests
 
     now = (now or datetime.now(timezone.utc)).replace(tzinfo=None)
@@ -64,6 +73,13 @@ def run_periodic_jobs(now: Optional[datetime] = None) -> list[str]:
     if _claim("evaluate_forecasts", now - EVALUATE_EVERY, now):
         _run("evaluate_forecasts", lambda db: _evaluate_pending(db, limit=10, deadline_seconds=20.0))
         ran.append("evaluate_forecasts")
+    if _claim("price_alerts", now - ALERTS_EVERY, now):
+        _run("price_alerts", check_alerts)
+        ran.append("price_alerts")
+    briefing = last_briefing_slot(now)
+    if now - briefing < timedelta(hours=3) and _claim("morning_briefing", briefing, now):
+        _run("morning_briefing", send_morning_briefings)
+        ran.append("morning_briefing")
     slot = last_digest_slot(now)
     if now - slot < timedelta(days=1) and _claim("weekly_digest", slot, now):
         _run("weekly_digest", send_weekly_digests)

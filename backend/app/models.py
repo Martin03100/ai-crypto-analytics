@@ -52,6 +52,7 @@ class User(Base):
     referral_rewarded: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=None)
     # Blocked by an admin: cannot sign in and existing sessions stop working.
     disabled: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=None)
+    briefing_opt_in: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=None)
 
     reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
@@ -247,3 +248,19 @@ class AppSetting(Base):
     key: Mapped[str] = mapped_column(String(48), primary_key=True)
     value_json: Mapped[str] = mapped_column(Text, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+
+class PriceAlert(Base):
+    """One-shot alert: fires once when the price crosses the target, then switches itself off."""
+
+    __tablename__ = "price_alerts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    coin: Mapped[str] = mapped_column(String(16), nullable=False)
+    direction: Mapped[str] = mapped_column(String(8), nullable=False)
+    target_price: Mapped[float] = mapped_column(Float, nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    triggered_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, default=None)
+    triggered_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=None)

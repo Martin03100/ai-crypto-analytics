@@ -9,6 +9,7 @@ import { Card } from "../components/Card";
 import DailyDigest from "../components/DailyDigest";
 import InfoTip from "../components/InfoTip";
 import { SkeletonLines } from "../components/Skeleton";
+import PriceAlerts from "../components/PriceAlerts";
 import Watchlist from "../components/Watchlist";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -101,6 +102,8 @@ export default function Dashboard() {
       <DailyDigest />
 
       <Watchlist />
+
+      <PriceAlerts />
 
       {loading ? (
         <div className="grid grid-2" style={{ marginTop: 16 }}><Card><SkeletonLines count={4} /></Card><Card><SkeletonLines count={4} /></Card></div>

@@ -1,6 +1,6 @@
 /** Settings: Premium status, invite link, public nickname and the weekly email. */
 
-import { Copy, Crown, Gift, Mail, UserRound } from "lucide-react";
+import { Copy, Crown, Gift, Mail, Sun, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
@@ -36,6 +36,17 @@ export default function MembershipCard() {
       push(err?.message || "error", "error");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const toggleBriefing = async () => {
+    const next = !m.briefing_opt_in;
+    setM((prev) => ({ ...prev, briefing_opt_in: next }));
+    try {
+      await api.setPreferences({ briefing_opt_in: next });
+    } catch (err) {
+      setM((prev) => ({ ...prev, briefing_opt_in: !next }));
+      push(err?.message || "error", "error");
     }
   };
 
@@ -108,6 +119,18 @@ export default function MembershipCard() {
                aria-label={t("membership.nicknameTitle")} onChange={(e) => setNickname(e.target.value)} />
         <button className="btn btn-ghost btn-sm" type="submit" disabled={busy}>{t("common.save")}</button>
       </form>
+
+      <hr className="divider" />
+
+      <label className={`toggle-row ${m.premium ? "" : "toggle-locked"}`}>
+        <input type="checkbox" checked={m.briefing_opt_in} disabled={!m.premium} onChange={toggleBriefing} />
+        <span>
+          <strong><Sun size={13} style={{ verticalAlign: -2, marginRight: 4 }} />{t("membership.briefingTitle")}</strong>
+          <span className="text-sub" style={{ display: "block" }}>
+            {t("membership.briefingText")} {!m.premium && <Link to="/premium" className="key-link">{t("gate.cta")}</Link>}
+          </span>
+        </span>
+      </label>
 
       {digest_enabled && (
         <>

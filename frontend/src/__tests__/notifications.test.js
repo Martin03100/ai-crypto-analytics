@@ -10,6 +10,8 @@ describe("notifications", () => {
       .toBe("✓ Your BTC 4H forecast got the direction right (98.1% accuracy).");
     expect(notificationText({ kind: "duel_settled", data: { outcome: "loss" } }, t)).toContain("AI won");
     expect(notificationText({ kind: "referral_reward", data: { days: 30 } }, t)).toContain("30 days");
+    expect(notificationText({ kind: "price_alert", data: { coin: "ETH", direction: "below", price: 2450.5 } }, t))
+      .toBe("🔔 ETH fell below your alert — now $2,450.50.");
     expect(notificationText({ kind: "unknown", data: {} }, t)).toBe("");
   });
 

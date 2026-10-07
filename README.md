@@ -29,6 +29,9 @@ statistical model and real market data. Bachelor's thesis project (Software Deve
 - **Premium:** Stripe Checkout subscription (off until configured), Premium waitlist, and **invite rewards**
   (both people get 30 days of Premium once the invited user confirms their email).
 - **20 coins** (incl. TON, SUI, PEPE…) and a **4-hour horizon** next to 24h / 1 week / 1 month / 1 year.
+- **Premium** (Stripe, 7-day trial): up to 25 email **price alerts**, a **morning briefing** for the watchlist,
+  **personal accuracy stats** by model/coin/horizon and 20 scheduled forecasts. Checkout requires accepting the Terms,
+  and stays off until the seller details are filled in. **GDPR data export** for every user.
 - **Admin panel** (`/admin`, users listed in `ADMIN_USERNAMES`, 2FA required): stats, user search, granting or removing
   Premium, blocking accounts, waitlist CSV export, feature switches, limits, Premium price label and a site-wide
   announcement banner. Stripe keys stay in environment variables, never editable from the browser.

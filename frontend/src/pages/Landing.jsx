@@ -1,8 +1,9 @@
 /** Landing page. */
 
-import { ArrowRight, BarChart3, Brain, Database, ShieldCheck, Trophy, Users } from "lucide-react";
-import { useEffect } from "react";
+import { ArrowRight, BarChart3, Brain, Check, Crown, Database, ShieldCheck, Trophy, Users } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { api } from "../api";
 import AnnouncementBar from "../components/AnnouncementBar";
 import CandlestickArt from "../components/CandlestickArt";
 import WaitlistForm from "../components/WaitlistForm";
@@ -21,6 +22,12 @@ const FEATURES = [
 export default function Landing() {
   const { t, lang, setLang } = useLanguage();
   const { waitlist_enabled } = useAppConfig();
+  const [stats, setStats] = useState(null);
+  useEffect(() => {
+    api.trackRecord()
+      .then((d) => setStats({ evaluated: d.totals?.evaluated ?? 0, direction_hit_pct: d.totals?.direction_hit_pct, providers: d.providers.length }))
+      .catch(() => {});
+  }, []);
   usePageTitle("landing.pageTitle");
   const { hash } = useLocation();
   useEffect(() => {
@@ -64,6 +71,15 @@ export default function Landing() {
         ))}
       </section>
 
+      {stats?.evaluated > 0 && (
+        <Link to="/track-record" className="landing-stats" aria-label={t("track.landingLink")}>
+          <span><strong>{stats.evaluated}</strong> {t("landing.statChecked")}</span>
+          <span><strong>{stats.direction_hit_pct}%</strong> {t("landing.statHit")}</span>
+          <span><strong>{stats.providers}</strong> {t("landing.statModels")}</span>
+          <span className="landing-stats-link">{t("track.landingLink")} <ArrowRight size={13} /></span>
+        </Link>
+      )}
+
       <section className="landing-steps">
         <h2>{t("landing.howTitle")}</h2>
         <ol>
@@ -71,6 +87,15 @@ export default function Landing() {
             <li key={n}><strong>{t(`landing.step${n}Title`)}</strong> <span className="text-sub">{t(`landing.step${n}Text`)}</span></li>
           ))}
         </ol>
+      </section>
+
+      <section className="card landing-premium">
+        <span className="premium-pill"><Crown size={13} /> Premium</span>
+        <h2>{t("landing.premiumTitle")}</h2>
+        <ul>
+          {["alerts", "briefing", "stats", "schedules"].map((k) => <li key={k}><Check size={14} /> {t(`landing.premium.${k}`)}</li>)}
+        </ul>
+        <Link to="/premium" className="btn btn-primary btn-sm">{t("landing.premiumCta")} <ArrowRight size={14} /></Link>
       </section>
 
       {waitlist_enabled && <WaitlistForm />}

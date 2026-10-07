@@ -1,12 +1,13 @@
 /** Forecast page. */
 
-import { Brain, CheckCircle2, ChevronDown, Copy, Download, Link2, Loader2, RefreshCw, Rocket, Save, Share2, Sparkles, Trash2 } from "lucide-react";
+import { Brain, CheckCircle2, ChevronDown, Crown, Copy, Download, Link2, Loader2, RefreshCw, Rocket, Save, Share2, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { AccuracyBadge, ConfidenceBadge, FallbackBadge, MockBadge, RiskBadge } from "../components/Badge";
 import { Card } from "../components/Card";
 import BacktestPanel from "../components/BacktestPanel";
+import MyStats from "../components/MyStats";
 import ComparePanel from "../components/ComparePanel";
 import CostConfirmModal from "../components/CostConfirmModal";
 import DataSources from "../components/DataSources";
@@ -194,10 +195,10 @@ export default function Forecast() {
   const { currency } = useCurrency();
   const { compare_enabled, backtest_enabled } = useAppConfig();
   const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState(() => (["history", "schedule", "leaderboard", "compare", "backtest"].includes(searchParams.get("tab")) ? searchParams.get("tab") : "new"));
+  const [tab, setTab] = useState(() => (["history", "schedule", "leaderboard", "compare", "backtest", "mystats"].includes(searchParams.get("tab")) ? searchParams.get("tab") : "new"));
   const urlTab = searchParams.get("tab");
   useEffect(() => {
-    if (["history", "schedule", "leaderboard", "compare", "backtest"].includes(urlTab)) setTab(urlTab);
+    if (["history", "schedule", "leaderboard", "compare", "backtest", "mystats"].includes(urlTab)) setTab(urlTab);
   }, [urlTab]);
   const providersCtx = useProviders();
   const providers = useMemo(
@@ -348,6 +349,7 @@ export default function Forecast() {
         <button className={`tab ${tab === "leaderboard" ? "active" : ""}`} onClick={() => setTab("leaderboard")}>{t("forecast.tabLeaderboard")}</button>
         {compare_enabled && <button className={`tab ${tab === "compare" ? "active" : ""}`} onClick={() => setTab("compare")}>{t("forecast.tabCompare")}</button>}
         {backtest_enabled && <button className={`tab ${tab === "backtest" ? "active" : ""}`} onClick={() => setTab("backtest")}>{t("forecast.tabBacktest")}</button>}
+        <button className={`tab ${tab === "mystats" ? "active" : ""}`} onClick={() => setTab("mystats")}><Crown size={13} style={{ marginRight: 5 }} />{t("mystats.tab")}</button>
       </div>
 
       {tab === "new" && (
@@ -434,6 +436,7 @@ export default function Forecast() {
       {tab === "leaderboard" && <Leaderboard />}
       {tab === "compare" && compare_enabled && <ComparePanel />}
       {tab === "backtest" && backtest_enabled && <BacktestPanel />}
+      {tab === "mystats" && <MyStats />}
 
       {tab === "history" && (
         <div>

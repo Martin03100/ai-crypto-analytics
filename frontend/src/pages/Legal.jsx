@@ -2,6 +2,7 @@
 
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { useAppConfig } from "../context/AppConfigContext";
 import { useLanguage } from "../context/LanguageContext";
 import { usePageTitle } from "../hooks/usePageTitle";
 
@@ -15,14 +16,30 @@ function LegalPage({ titleKey, sections }) {
       </Link>
       <h1 style={{ fontSize: 24, marginBottom: 4 }}>{t(titleKey)}</h1>
       <p className="text-sub" style={{ marginBottom: 28 }}>{t("legal.lastUpdated")}</p>
-      <p style={{ lineHeight: 1.7, marginBottom: 28 }}>{t(`${sections}.intro`)}</p>
+      <p style={{ lineHeight: 1.7, marginBottom: 20 }}>{t(`${sections}.intro`)}</p>
+      <Operator t={t} />
       <LegalSections prefix={sections} t={t} />
     </main>
   );
 }
 
-const PRIVACY_SECTIONS = ["dataCollected", "cookies", "analytics", "waitlist", "payments", "thirdParty", "rights", "contact"];
-const TERMS_SECTIONS = ["notAdvice", "account", "premium", "acceptableUse", "liability", "changes"];
+function Operator({ t }) {
+  const { operator_name: name, operator_business_id: businessId, operator_address: address } = useAppConfig();
+  return (
+    <div className="card legal-operator">
+      <strong>{t("legal.operatorTitle")}</strong>
+      <p className="text-sub">
+        {name ? <>{name}{businessId ? `, ${t("legal.businessId")} ${businessId}` : ""}{address ? `, ${address}` : ""}<br /></> : null}
+        {t("legal.contact")}: <a href="mailto:aicryptoanalytics7@gmail.com" className="key-link">aicryptoanalytics7@gmail.com</a>
+      </p>
+    </div>
+  );
+}
+
+const PRIVACY_SECTIONS = ["dataCollected", "purposes", "cookies", "analytics", "waitlist", "payments", "thirdParty",
+  "retention", "rights", "contact"];
+const TERMS_SECTIONS = ["notAdvice", "eligibility", "account", "premium", "withdrawal", "acceptableUse", "liability",
+  "law", "changes"];
 
 function LegalSections({ prefix, t }) {
   const sections = prefix === "privacy" ? PRIVACY_SECTIONS : TERMS_SECTIONS;
