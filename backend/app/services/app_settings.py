@@ -1,6 +1,6 @@
 """Settings the admin changes from the web (feature switches, limits, prices, announcement).
 
-Secrets such as Stripe keys stay in environment variables and are never editable from the browser."""
+Stripe credentials are stored separately and encrypted (see stripe_connect)."""
 
 from __future__ import annotations
 

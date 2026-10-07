@@ -28,6 +28,13 @@ test("admin turns on 2FA, manages users and switches a feature off", async ({ pa
 
   await page.getByRole("link", { name: "Admin" }).click();
   await expect(page.getByText("users", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Payments" }).click();
+  await expect(page.getByText("Ready to sell?")).toBeVisible();
+  await expect(page.getByText("Paste your Stripe secret key below.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Connect Stripe" })).toBeDisabled();
+  await page.getByLabel("Stripe secret key").fill("pk_test_wrong");
+  await page.getByRole("button", { name: "Connect Stripe" }).click();
+  await expect(page.getByText("Paste the secret key from Stripe (starts with sk_live_ or sk_test_).")).toBeVisible();
   await page.getByRole("button", { name: "Settings" }).click();
   await expect(page.getByText("Premium is OFF — the app looks completely free")).toBeVisible();
   await page.getByTestId("premium-mode").check();

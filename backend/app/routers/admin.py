@@ -16,7 +16,9 @@ from sqlalchemy.orm import Session
 from app.deps import get_admin_user, get_db
 from app.models import ForecastEvaluation, ForecastHistory, PriceTip, User, WaitlistEntry
 from app.schemas import MAX_DB_ID
-from app.services import app_settings, audit, billing
+from app.config import RATE_LIMIT_ACCOUNT_SENSITIVE
+from app.rate_limit import rate_limit_by_user
+from app.services import app_settings, audit, billing, stripe_connect
 from app.services.premium import extend_premium, is_premium
 from app.services.roles import is_admin
 
@@ -153,3 +155,64 @@ def put_settings(payload: SettingsChange, request: Request, admin: User = Depend
     audit.record(db, admin.id, "admin_settings_changed", request, ", ".join(sorted(payload.values))[:255])
     db.commit()
     return {"values": values}
+
+
+# ---------- payments (Stripe connected from the browser) ----------
+
+def _payments_status() -> dict:
+    creds = billing.credentials()
+    s = app_settings.all_settings()
+    out: dict[str, Any] = {"connected": bool(creds.get("secret_key")), "source": creds.get("source"),
+                           "webhook_url": stripe_connect.webhook_url(), "account": None, "account_error": None,
+                           "currency": creds.get("currency", "eur"), "monthly_cents": creds.get("monthly_cents"),
+                           "yearly_cents": creds.get("yearly_cents"), "yearly": bool(creds.get("price_yearly")),
+                           "key_hint": stripe_connect.key_hint(creds["secret_key"]) if creds.get("secret_key") else None}
+    if creds.get("secret_key"):
+        try:
+            out["account"] = stripe_connect.account_status(creds["secret_key"])
+        except stripe_connect.StripeSetupError as exc:
+            out["account_error"] = str(exc)
+    account = out["account"] or {}
+    out["checklist"] = {
+        "seller": bool(s["operator_name"] and s["operator_address"]),
+        "stripe": out["connected"],
+        "payouts": bool(account.get("charges_enabled") and account.get("payouts_enabled")),
+        "live": account.get("mode") == "live",
+        "premium_mode": bool(s["premium_mode"]),
+    }
+    out["selling"] = billing.checkout_ready()
+    return out
+
+
+@router.get("/payments")
+def payments_status() -> dict:
+    return _payments_status()
+
+
+class PaymentsConnect(BaseModel):
+    secret_key: str = Field(default="", max_length=255)
+    currency: str = Field(default="eur", pattern="^(eur|czk|usd)$")
+    monthly_cents: int = Field(ge=50, le=100_000_00)
+    yearly_cents: Optional[int] = Field(default=None, ge=50, le=1_000_000_00)
+
+
+@router.put("/payments", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
+def payments_connect(payload: PaymentsConnect, request: Request, admin: User = Depends(get_admin_user),
+                     db: Session = Depends(get_db)) -> dict:
+    if billing.STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=409, detail="Stripe je nastavený v premenných prostredia na serveri.")
+    try:
+        stripe_connect.connect(db, payload.secret_key, payload.monthly_cents, payload.yearly_cents, payload.currency)
+    except stripe_connect.StripeSetupError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    audit.record(db, admin.id, "admin_payments_connected", request, payload.currency)
+    db.commit()
+    return _payments_status()
+
+
+@router.delete("/payments")
+def payments_disconnect(request: Request, admin: User = Depends(get_admin_user), db: Session = Depends(get_db)) -> dict:
+    stripe_connect.disconnect(db)
+    audit.record(db, admin.id, "admin_payments_disconnected", request, "")
+    db.commit()
+    return _payments_status()

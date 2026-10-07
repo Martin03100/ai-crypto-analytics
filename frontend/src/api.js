@@ -266,6 +266,9 @@ export const api = {
   adminWaitlistCsvUrl: () => `${BASE}/admin/waitlist.csv`,
   adminSettings: () => request("/admin/settings").then(obj),
   adminSaveSettings: (values) => request("/admin/settings", { method: "PUT", body: { values } }),
+  adminPayments: () => request("/admin/payments").then(obj),
+  adminConnectPayments: (body) => request("/admin/payments", { method: "PUT", body }).then(obj),
+  adminDisconnectPayments: () => request("/admin/payments", { method: "DELETE" }).then(obj),
   premiumInfo: () => request("/public/premium").then(obj),
   tipsters: (period) => request(`/public/tipsters?period=${period === "all" ? "all" : "week"}`).then((r) => withArrays(r, ["leaders"])),
   unsubscribeDigest: async (userId, token) => {

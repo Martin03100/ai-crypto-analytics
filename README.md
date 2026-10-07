@@ -40,8 +40,9 @@ statistical model and real market data. Bachelor's thesis project (Software Deve
 - **Invites:** a friend who signs up with your link gets a 14-day trial; when they pay, the inviter gets 30 days of
   Premium. With Premium off, invites earn bronze / silver / gold **ambassador badges** on the public board.
 - **Admin panel** (`/admin`, users listed in `ADMIN_USERNAMES`, 2FA required): stats, user search, granting or removing
-  Premium, blocking accounts, waitlist CSV export, the Premium mode switch, feature switches, limits, prices and a site-wide
-  announcement banner. Stripe keys stay in environment variables, never editable from the browser.
+  Premium, blocking accounts, waitlist CSV export, the Premium mode switch, feature switches, limits and a site-wide
+  announcement banner. **Payments tab:** paste one Stripe secret key (stored encrypted) and set prices; the app creates
+  the Stripe product, prices, webhook and customer portal and shows a checklist of what is still missing before selling.
 - Transactional emails in **English, Slovak and Czech**, following the user's app language.
 - **Demo mode** for presentations: one click fills the whole app with clearly labelled test data ("Gemini test", "Claude test", ...)
   on synthetic prices - forecasts, evaluated accuracy, leaderboard, tips and portfolio analyses, visible only to the user who loaded it.

@@ -1,9 +1,10 @@
 /** Admin panel: overview, users, waitlist and app settings. Visible only to admins (ADMIN_USERNAMES + 2FA). */
 
-import { Ban, Crown, Download, LayoutGrid, Search, Settings2, ShieldAlert, Users } from "lucide-react";
+import { Ban, CreditCard, Crown, Download, LayoutGrid, Search, Settings2, ShieldAlert, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { api } from "../api";
+import AdminPayments from "../components/AdminPayments";
 import { Card } from "../components/Card";
 import LoadError from "../components/LoadError";
 import { useAppConfig } from "../context/AppConfigContext";
@@ -14,12 +15,11 @@ import { useToast } from "../context/ToastContext";
 import { localeForLang } from "../i18n/locale";
 import { usePageTitle } from "../hooks/usePageTitle";
 
-const TABS = [["overview", LayoutGrid], ["users", Users], ["waitlist", Download], ["settings", Settings2]];
+const TABS = [["overview", LayoutGrid], ["users", Users], ["waitlist", Download], ["payments", CreditCard], ["settings", Settings2]];
 const SWITCHES = ["signups_enabled", "chat_enabled", "compare_enabled", "backtest_enabled", "tipsters_enabled",
   "waitlist_enabled", "digest_enabled", "referrals_enabled"];
 const NUMBERS = ["free_schedules", "premium_schedules", "free_alerts", "premium_alerts", "premium_trial_days", "referral_reward_days",
   "referral_trial_days"];
-const LABELS = ["premium_price_label", "premium_price_label_yearly"];
 const OPERATOR = [["operator_name", 120], ["operator_business_id", 60], ["operator_address", 200]];
 
 function Overview() {
@@ -204,12 +204,6 @@ function SettingsTab() {
       </Card>
       <Card title={t("admin.premiumSettings")} style={{ marginTop: 16 }}>
         <div className="grid grid-2">
-          {LABELS.map((k) => (
-            <div key={k} className="field">
-              <label>{t(`admin.set.${k}`)}</label>
-              <input className="input" maxLength={40} value={values[k]} onChange={(e) => set(k, e.target.value)} />
-            </div>
-          ))}
           {NUMBERS.map((k) => (
             <div key={k} className="field">
               <label>{t(`admin.set.${k}`)}</label>
@@ -278,6 +272,7 @@ export default function Admin() {
           {tab === "overview" && <Overview />}
           {tab === "users" && <UsersTab />}
           {tab === "waitlist" && <WaitlistTab />}
+          {tab === "payments" && <AdminPayments />}
           {tab === "settings" && <SettingsTab />}
         </>
       )}

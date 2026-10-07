@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.config import APP_PUBLIC_URL, STRIPE_PRICE_ID, STRIPE_PRICE_ID_YEARLY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
 from app.models import User
+from app.services import stripe_connect
 from app.services.notifications import notify
 from app.services.premium import reward_referrer_for_purchase, set_premium_until, trial_days_for
 
@@ -27,8 +28,18 @@ class BillingError(Exception):
     pass
 
 
+def credentials() -> dict:
+    """Environment variables win; otherwise what the admin connected in the admin panel."""
+    if STRIPE_SECRET_KEY:
+        return {"source": "env", "secret_key": STRIPE_SECRET_KEY, "price_monthly": STRIPE_PRICE_ID,
+                "price_yearly": STRIPE_PRICE_ID_YEARLY, "webhook_secret": STRIPE_WEBHOOK_SECRET, "portal_id": ""}
+    saved = stripe_connect.stored()
+    return {"source": "admin", **saved} if saved.get("secret_key") else {}
+
+
 def billing_enabled() -> bool:
-    return bool(STRIPE_SECRET_KEY and STRIPE_PRICE_ID and STRIPE_WEBHOOK_SECRET)
+    c = credentials()
+    return bool(c.get("secret_key") and c.get("price_monthly") and c.get("webhook_secret"))
 
 
 def checkout_ready() -> bool:
@@ -40,12 +51,12 @@ def checkout_ready() -> bool:
 
 
 def yearly_available() -> bool:
-    return bool(STRIPE_PRICE_ID_YEARLY)
+    return bool(credentials().get("price_yearly"))
 
 
 def _post(path: str, data: dict) -> dict:
     try:
-        res = requests.post(f"{STRIPE_API}{path}", data=data, auth=(STRIPE_SECRET_KEY, ""), timeout=15)
+        res = requests.post(f"{STRIPE_API}{path}", data=data, auth=(credentials().get("secret_key", ""), ""), timeout=15)
     except requests.RequestException as exc:
         raise BillingError(str(exc)) from exc
     if res.status_code >= 400:
@@ -55,7 +66,8 @@ def _post(path: str, data: dict) -> dict:
 
 
 def create_checkout_url(user: User, plan: str = "monthly") -> str:
-    price = STRIPE_PRICE_ID_YEARLY if plan == "yearly" and STRIPE_PRICE_ID_YEARLY else STRIPE_PRICE_ID
+    c = credentials()
+    price = c["price_yearly"] if plan == "yearly" and c.get("price_yearly") else c["price_monthly"]
     trial_days = trial_days_for(user)
     data = {
         "mode": "subscription",
@@ -80,12 +92,14 @@ def create_checkout_url(user: User, plan: str = "monthly") -> str:
 def create_portal_url(user: User) -> str:
     if not user.stripe_customer_id:
         raise BillingError("no customer")
-    return _post("/billing_portal/sessions", {"customer": user.stripe_customer_id,
-                                              "return_url": f"{APP_PUBLIC_URL}/settings"})["url"]
+    data = {"customer": user.stripe_customer_id, "return_url": f"{APP_PUBLIC_URL}/settings"}
+    if portal := credentials().get("portal_id"):
+        data["configuration"] = portal
+    return _post("/billing_portal/sessions", data)["url"]
 
 
 def verify_signature(payload: bytes, header: Optional[str], secret: str = "", now: Optional[float] = None) -> bool:
-    secret = secret or STRIPE_WEBHOOK_SECRET
+    secret = secret or credentials().get("webhook_secret", "")
     if not header or not secret:
         return False
     parts = [p.split("=", 1) for p in header.split(",") if "=" in p]

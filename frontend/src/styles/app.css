@@ -1358,3 +1358,9 @@ input[type="checkbox"] { accent-color: var(--cyan); }
 @media (max-width: 640px) { .premium-compare td:not(:first-child) { font-size: 12px; line-height: 1.3; } }
 .track-stats-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 @media (max-width: 760px) { .track-stats-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.pay-checklist { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.pay-checklist li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; }
+.pay-checklist li > svg { flex: none; margin-top: 2px; color: var(--text-tertiary); }
+.pay-checklist li.ok > svg { color: var(--emerald-fg); }
+.pay-steps { margin: 0 0 14px; padding-left: 18px; display: grid; gap: 4px; font-size: 13px; }
+.pay-actions { display: flex; gap: 8px; flex-wrap: wrap; }

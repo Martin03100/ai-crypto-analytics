@@ -20,7 +20,8 @@ ACTIONS = frozenset({
     "register", "login_success", "login_failed", "account_locked", "logout", "logout_all",
     "password_changed", "password_reset", "email_changed", "api_key_saved", "api_key_deleted",
     "twofa_enabled", "twofa_disabled", "share_created", "share_revoked", "demo_data_loaded",
-    "admin_settings_changed", "admin_user_changed", "premium_checkout_consent",
+    "admin_settings_changed", "admin_payments_connected", "admin_payments_disconnected", "admin_user_changed",
+    "premium_checkout_consent",
 })
 
 
