@@ -9,6 +9,7 @@ import { Card } from "../components/Card";
 import DailyDigest from "../components/DailyDigest";
 import InfoTip from "../components/InfoTip";
 import { SkeletonLines } from "../components/Skeleton";
+import ChallengeCard from "../components/ChallengeCard";
 import MarketSignals from "../components/MarketSignals";
 import PriceAlerts from "../components/PriceAlerts";
 import Watchlist from "../components/Watchlist";
@@ -105,6 +106,8 @@ export default function Dashboard() {
       <Watchlist />
 
       <PriceAlerts />
+
+      <ChallengeCard style={{ marginTop: 16 }} />
 
       <MarketSignals compact style={{ marginTop: 16 }} />
 

@@ -23,7 +23,8 @@ from app.models import ForecastEvaluation, ForecastHistory, PriceTip, User, Wait
 from app.rate_limit import rate_limit_by_ip
 from app.routers.forecast import _MIN_SAMPLE, _tip_summary, provider_stats
 from app.routers.community import premium_info
-from app.services import cards
+from app.services import accuracy, cards, challenge, coin_page, status_check
+from app.utils.ttl_cache import TTLCache
 from app.services.app_settings import public_settings, require_feature
 from app.services.digest import check_unsubscribe_token
 from app.services.premium import ambassador_badge, invited_signups, is_premium
@@ -117,6 +118,37 @@ class WaitlistRequest(BaseModel):
     source: Optional[str] = Field(default=None, max_length=32, pattern=r"^[A-Za-z0-9_.-]*$")
 
 
+_insights_cache = TTLCache(ttl_seconds=600)
+
+
+@router.get("/accuracy-insights", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_MARKET_PUBLIC))])
+def accuracy_insights(db: Session = Depends(get_db)) -> dict:
+    """Confidence calibration and accuracy in rising, falling and sideways markets."""
+    cached = _insights_cache.get("all")
+    if cached is None:
+        cached = accuracy.insights(db)
+        _insights_cache.set("all", cached)
+    return cached
+
+
+@router.get("/coin/{coin}", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_MARKET_PUBLIC))])
+def coin_page_data(coin: str = Path(min_length=2, max_length=10, pattern=r"^[A-Za-z0-9]+$"), db: Session = Depends(get_db)) -> dict:
+    page = coin_page.build(db, coin)
+    if page is None:
+        raise HTTPException(status_code=404, detail="Táto minca nie je podporovaná.")
+    return page
+
+
+@router.get("/status/history", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_MARKET_PUBLIC))])
+def status_history(db: Session = Depends(get_db)) -> dict:
+    return status_check.history(db)
+
+
+@router.get("/challenge", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_MARKET_PUBLIC))])
+def public_challenge(db: Session = Depends(get_db)) -> dict:
+    return challenge.summary(db)
+
+
 @router.post("/waitlist", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_WAITLIST))])
 def join_waitlist(payload: WaitlistRequest, db: Session = Depends(get_db)) -> dict:
     require_feature("waitlist_enabled")
@@ -158,12 +190,16 @@ def track_record_card(db: Session = Depends(get_db)) -> Response:
 
 @router.get("/forecasts/{token}/card.png", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_MARKET_PUBLIC))])
 def shared_forecast_card(token: str = Path(min_length=16, max_length=64, pattern=r"^[A-Za-z0-9_-]+$"),
+                         fmt: Literal["wide", "square", "story"] = Query(default="wide"),
                          db: Session = Depends(get_db)) -> Response:
     shared = shared_forecast(token, db)
     data = shared["forecast_data"]
     prices = [p for p in data.get("ceny", []) if isinstance(p, (int, float)) and not isinstance(p, bool)]
     start = data.get("aktualna_cena") if isinstance(data.get("aktualna_cena"), (int, float)) else None
     state = "done" if shared["evaluation"] else "pending"
+    if fmt != "wide":
+        return _png(f"forecast:{token}:{state}:{fmt}", lambda: cards.forecast_card_tall(
+            fmt, shared["coin"], shared["horizon"], shared["model"], prices, start, shared["evaluation"]))
     return _png(f"forecast:{token}:{state}", lambda: cards.forecast_card(
         shared["coin"], shared["horizon"], shared["model"], prices, start, shared["evaluation"]))
 
@@ -188,7 +224,8 @@ def tipsters(period: Literal["week", "all"] = Query(default="week"), db: Session
     return {
         "period": period, "week_start": since.isoformat() + "Z",
         "leaders": [{"nickname": u.nickname, "duels": n, "wins": int(w or 0), "win_pct": round((w or 0) / n * 100),
-                     "premium": is_premium(u), "badge": ambassador_badge(invited_signups(db, u.id))}
+                     "premium": is_premium(u), "badge": ambassador_badge(invited_signups(db, u.id)),
+                     "challenge_wins": challenge.wins(db, u.id)}
                     for u, n, w in rows],
         "humans_vs_ai": {"wins": outcomes.get("win", 0), "losses": outcomes.get("loss", 0), "ties": outcomes.get("tie", 0)},
     }

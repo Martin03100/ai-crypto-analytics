@@ -8,6 +8,7 @@ import { AccuracyBadge, ConfidenceBadge, FallbackBadge, MockBadge, RiskBadge } f
 import { Card } from "../components/Card";
 import BacktestPanel from "../components/BacktestPanel";
 import MyStats from "../components/MyStats";
+import ShareImages from "../components/ShareImages";
 import SmartModelHint from "../components/SmartModelHint";
 import StrategySimulator from "../components/StrategySimulator";
 import ComparePanel from "../components/ComparePanel";
@@ -149,6 +150,7 @@ function HistoryItem({ entry, onDelete }) {
               <button className="btn btn-danger-ghost btn-sm" onClick={handleUnshare}>{t("share.revoke")}</button>
             </div>
           )}
+          {shareToken && <ShareImages token={shareToken} coin={entry.crypto_symbol} />}
           {hasChart ? (
             <>
               <ForecastChart data={entry.forecast_data} t={t} createdAt={entry.created_at} horizon={entry.timeframe} locale={locale} actualPrices={accuracy?.status === "completed" ? accuracy.actual_prices : undefined} />
@@ -157,6 +159,12 @@ function HistoryItem({ entry, onDelete }) {
                   {entry.forecast_data.confidence_score !== undefined && <ConfidenceBadge score={entry.forecast_data.confidence_score} />}
                   {entry.forecast_data.risk_level && <RiskBadge level={entry.forecast_data.risk_level} />}
                   {accuracy?.status === "completed" && <><AccuracyBadge score={accuracy.accuracy_pct} /><InfoTip text={t("help.accuracy")} /></>}
+                  {accuracy?.status === "completed" && accuracy.baseline_accuracy_pct != null && accuracy.accuracy_pct != null && (
+                    <span className={`badge ${accuracy.accuracy_pct > accuracy.baseline_accuracy_pct ? "badge-buy" : "badge-neutral"}`}>
+                      <span className="badge-dot" /> {t(accuracy.accuracy_pct > accuracy.baseline_accuracy_pct ? "forecast.beatNaive" : "forecast.lostNaive",
+                        { diff: Math.abs(accuracy.accuracy_pct - accuracy.baseline_accuracy_pct).toFixed(1) })}
+                    </span>
+                  )}
                   {accuracy?.status === "completed" && typeof accuracy.direction_correct === "boolean" && (
                     <span className={`badge ${accuracy.direction_correct ? "badge-buy" : "badge-sell"}`}>
                       <span className="badge-dot" /> {t(accuracy.direction_correct ? "forecast.directionCorrect" : "forecast.directionWrong")}

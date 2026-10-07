@@ -100,3 +100,44 @@ def track_record_card(totals: dict, providers: list[dict]) -> bytes:
         draw.rounded_rectangle((520, y + 6, 520 + max(bar, 6), y + 30), radius=8, fill=CYAN if i == 0 else (82, 82, 91))
         draw.text((540 + max(bar, 6), y), f"{p['direction_hit_pct']}%", font=_font(24), fill=MUTED)
     return _png(img)
+
+
+FORMATS = {"square": (1080, 1080), "story": (1080, 1920)}
+
+
+def forecast_card_tall(fmt: str, coin: str, horizon: str, model: str, prices: Sequence[float],
+                       start_price: Optional[float], evaluation: Optional[dict]) -> bytes:
+    """Instagram / TikTok formats: 1:1 post or 9:16 story with the forecast chart in the middle."""
+    w, h = FORMATS[fmt]
+    story = fmt == "story"
+    img = Image.new("RGB", (w, h), BG)
+    draw = ImageDraw.Draw(img)
+    top = 140 if story else 70
+    draw.rounded_rectangle((70, top, 116, top + 46), radius=11, fill=CYAN)
+    draw.text((134, top + 4), "AI Crypto Analytics", font=_font(36), fill=TEXT)
+    y = top + (150 if story else 110)
+    draw.text((70, y), coin[:10], font=_font(120 if story else 96), fill=TEXT)
+    y += 150 if story else 118
+    draw.text((70, y), f"{HORIZON_NAMES.get(horizon, horizon)} forecast"[:30], font=_font(40), fill=MUTED)
+    draw.text((70, y + 52), f"by {_model_name(model)}"[:34], font=_font(40), fill=MUTED)
+    rising = bool(prices) and start_price is not None and prices[-1] >= start_price
+    chart_top = y + (150 if story else 120)
+    chart_bottom = chart_top + (720 if story else 320)
+    _line_chart(draw, (70, chart_top, w - 70, chart_bottom), prices, start_price, GREEN if rising else RED)
+    y = chart_bottom + (70 if story else 40)
+    if evaluation:
+        ok = bool(evaluation.get("direction_correct"))
+        draw.text((70, y), "Direction: correct" if ok else "Direction: wrong", font=_font(64 if story else 54),
+                  fill=GREEN if ok else RED)
+        if evaluation.get("accuracy_pct") is not None:
+            draw.text((70, y + 84), f"Accuracy {evaluation['accuracy_pct']}%", font=_font(44), fill=TEXT)
+    else:
+        change = (prices[-1] - start_price) / start_price * 100 if prices and start_price else None
+        label = ("Up" if rising else "Down") + (f"  {change:+.1f}%" if change is not None else "")
+        draw.text((70, y), label, font=_font(72 if story else 60), fill=GREEN if rising else RED)
+        draw.text((70, y + 90), "Checked automatically when the horizon ends", font=_font(34), fill=AMBER)
+    if story:
+        draw.text((70, h - 300), "Think you know better? Beat the AI.", font=_font(44), fill=TEXT)
+    draw.text((70, h - (170 if story else 90)), "aicryptopredictor.netlify.app", font=_font(38), fill=CYAN)
+    draw.text((70, h - (120 if story else 50)), "Not financial advice", font=_font(28), fill=MUTED)
+    return _png(img)

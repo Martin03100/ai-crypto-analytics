@@ -9,6 +9,8 @@ import InfoTip from "../components/InfoTip";
 import LoadError from "../components/LoadError";
 import ShareBar from "../components/ShareBar";
 import TipsterBoard from "../components/TipsterBoard";
+import AccuracyInsights from "../components/AccuracyInsights";
+import ChallengeCard from "../components/ChallengeCard";
 import { SkeletonLines } from "../components/Skeleton";
 import { useAppConfig } from "../context/AppConfigContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -136,6 +138,8 @@ export default function TrackRecord() {
             </p>
           )}
 
+          <AccuracyInsights />
+          <ChallengeCard style={{ marginTop: 16 }} />
           {tipsters_enabled && <TipsterBoard />}
           <ShareBar text={t("track.shareText")} />
           <div style={{ marginTop: 20 }}>

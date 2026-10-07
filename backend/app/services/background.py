@@ -19,6 +19,7 @@ TELEGRAM_EVERY = timedelta(minutes=1)
 DIGEST_WEEKDAY, DIGEST_HOUR = 0, 8      # Monday 08:00 UTC
 BRIEFING_HOUR = 7                       # every day 07:00 UTC
 SNAPSHOT_HOUR = 0                       # portfolio values at 00:00 UTC
+STATUS_EVERY = timedelta(minutes=15)    # service checks for the 30-day status history
 
 
 def _claim(name: str, due_after: datetime, now: datetime) -> bool:
@@ -67,6 +68,8 @@ def _run(name: str, job: Callable) -> None:
 def run_periodic_jobs(now: Optional[datetime] = None) -> list[str]:
     from app.routers.forecast import _evaluate_pending
     from app.services.alerts import check_alerts
+    from app.services.challenge import settle_due, week_start
+    from app.services.status_check import record_sample
     from app.services.briefing import send_morning_briefings
     from app.services.digest import send_weekly_digests
     from app.services.telegram import enabled as telegram_enabled, poll_updates
@@ -91,6 +94,12 @@ def run_periodic_jobs(now: Optional[datetime] = None) -> list[str]:
     if _claim("portfolio_snapshots", snapshot, now):
         _run("portfolio_snapshots", take_snapshots)
         ran.append("portfolio_snapshots")
+    if _claim("status_history", now - STATUS_EVERY, now):
+        _run("status_history", record_sample)
+        ran.append("status_history")
+    if _claim("weekly_challenge", week_start(now), now):
+        _run("weekly_challenge", settle_due)
+        ran.append("weekly_challenge")
     slot = last_digest_slot(now)
     if now - slot < timedelta(days=1) and _claim("weekly_digest", slot, now):
         _run("weekly_digest", send_weekly_digests)

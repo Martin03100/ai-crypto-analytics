@@ -9,7 +9,7 @@ from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.models import (
-    AuditEvent, CommunityVote, ForecastEvaluation, ForecastHistory, ForecastSchedule, Notification, PortfolioHistory,
+    AuditEvent, ChallengeEntry, CommunityVote, ForecastEvaluation, ForecastHistory, ForecastSchedule, Notification, PortfolioHistory,
     PortfolioPosition, PortfolioSnapshot, PriceAlert, PriceTip, User,
 )
 
@@ -81,6 +81,7 @@ def export_user_data(db: Session, user: User) -> dict:
                                                         "triggered_at")),
         "portfolio_positions": _rows(db, PortfolioPosition, user.id, ("coin", "amount", "avg_buy_price", "created_at")),
         "portfolio_history": _rows(db, PortfolioSnapshot, user.id, ("day", "value_usd", "cost_usd")),
+        "weekly_challenge_guesses": _rows(db, ChallengeEntry, user.id, ("week", "price", "created_at")),
         "community_votes": _rows(db, CommunityVote, user.id, ("sentiment_vote", "voted_at")),
         "notifications": _rows(db, Notification, user.id, ("kind", "data_json", "created_at", "read_at")),
         "account_activity": _rows(db, AuditEvent, user.id, ("action", "ip", "user_agent", "details", "created_at")),

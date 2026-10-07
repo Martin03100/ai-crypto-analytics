@@ -186,7 +186,7 @@ def test_tipster_board_shows_only_public_nicknames(client):
     _add_tip(a, "win", 4, demo=True)
     _add_tip(b, "win", 5)
     week = client.get("/api/public/tipsters").json()
-    assert week["leaders"] == [{"nickname": "Ace", "duels": 2, "wins": 1, "win_pct": 50, "premium": False, "badge": None}]
+    assert week["leaders"] == [{"nickname": "Ace", "duels": 2, "wins": 1, "win_pct": 50, "premium": False, "badge": None, "challenge_wins": 0}]
     assert week["humans_vs_ai"]["wins"] == 2 and week["humans_vs_ai"]["losses"] == 1
     assert client.get("/api/public/tipsters?period=all").json()["leaders"][0]["wins"] == 2
     assert client.get("/api/public/tipsters?period=year").status_code == 422
@@ -274,8 +274,10 @@ def test_weekly_digest_sends_only_to_opted_in(registered, monkeypatch):
 
 def test_periodic_jobs_run_once_per_slot(client, monkeypatch):
     from app.routers import forecast as forecast_router
-    from app.services import alerts, background, briefing, digest, tracker
+    from app.services import alerts, background, briefing, challenge, digest, status_check, tracker
     calls = []
+    monkeypatch.setattr(status_check, "record_sample", lambda db: calls.append("status"))
+    monkeypatch.setattr(challenge, "settle_due", lambda db: calls.append("challenge"))
     monkeypatch.setattr(tracker, "take_snapshots", lambda db: calls.append("snap"))
     monkeypatch.setattr(forecast_router, "_evaluate_pending", lambda db, **k: calls.append("eval"))
     monkeypatch.setattr(alerts, "check_alerts", lambda db: calls.append("alerts"))
@@ -283,18 +285,22 @@ def test_periodic_jobs_run_once_per_slot(client, monkeypatch):
     monkeypatch.setattr(digest, "send_weekly_digests", lambda db: calls.append("digest"))
     monday = datetime(2026, 10, 12, 8, 30)
     assert background.run_periodic_jobs(monday) == ["evaluate_forecasts", "price_alerts", "morning_briefing",
-                                                 "portfolio_snapshots", "weekly_digest"]
+                                                 "portfolio_snapshots", "status_history", "weekly_challenge",
+                                                 "weekly_digest"]
     assert background.run_periodic_jobs(monday + timedelta(minutes=4)) == []
     assert background.run_periodic_jobs(monday + timedelta(minutes=11)) == ["evaluate_forecasts", "price_alerts"]
     wednesday = datetime(2026, 10, 14, 9, 0)
     assert background.run_periodic_jobs(wednesday) == ["evaluate_forecasts", "price_alerts", "morning_briefing",
-                                                       "portfolio_snapshots"]
-    assert background.run_periodic_jobs(datetime(2026, 10, 14, 15, 0)) == ["evaluate_forecasts", "price_alerts"]
+                                                       "portfolio_snapshots", "status_history"]
+    assert background.run_periodic_jobs(datetime(2026, 10, 14, 15, 0)) == ["evaluate_forecasts", "price_alerts",
+                                                                           "status_history"]
     assert calls.count("digest") == 1 and calls.count("briefing") == 2 and calls.count("snap") == 2
+    assert calls.count("challenge") == 1 and calls.count("status") == 3
     db = SessionLocal()
     try:
         assert {r.name for r in db.query(JobRun).all()} == {"evaluate_forecasts", "price_alerts", "morning_briefing",
-                                                  "portfolio_snapshots", "weekly_digest"}
+                                                  "portfolio_snapshots", "status_history", "weekly_challenge",
+                                                  "weekly_digest"}
     finally:
         db.close()
 

@@ -6,6 +6,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import { AccuracyBadge, ConfidenceBadge, RiskBadge } from "../components/Badge";
 import ShareBar from "../components/ShareBar";
+import ShareImages from "../components/ShareImages";
 import { Card } from "../components/Card";
 import DataSources from "../components/DataSources";
 import ForecastChart, { hasForecastSeries } from "../components/ForecastChart";
@@ -62,6 +63,7 @@ export default function SharedForecast() {
         </Card>
       )}
       {shared && <ShareBar text={t("share.shareText", { coin: shared.coin, horizon: shared.horizon })} />}
+      {shared && <ShareImages token={token} coin={shared.coin} />}
 
       <p className="text-sub standalone-disclaimer">{t("share.disclaimer")}</p>
     </main>

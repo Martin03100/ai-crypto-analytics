@@ -52,7 +52,33 @@ function apiError(message, extra = {}) {
  * A read that hits a gateway error (502-504) is retried once: on the free hosting plan the first request after a
  * pause only wakes the backend and the proxy gives up before it is ready; the second one then succeeds.
  */
-async function request(path, options = {}) {
+export const SLOW_SERVER_EVENT = "aca:slow-server";
+const SLOW_AFTER_MS = 3500;
+let slowRequests = 0;
+
+/** Tells the UI when the backend takes long to answer (a sleeping free-tier server waking up). */
+function trackSlow(promise) {
+  let flagged = false;
+  const timer = setTimeout(() => {
+    flagged = true;
+    slowRequests += 1;
+    window.dispatchEvent(new CustomEvent(SLOW_SERVER_EVENT, { detail: { slow: true } }));
+  }, SLOW_AFTER_MS);
+  const done = () => {
+    clearTimeout(timer);
+    if (!flagged) return;
+    slowRequests = Math.max(0, slowRequests - 1);
+    if (slowRequests === 0) window.dispatchEvent(new CustomEvent(SLOW_SERVER_EVENT, { detail: { slow: false } }));
+  };
+  promise.then(done, done);
+  return promise;
+}
+
+function request(path, options = {}) {
+  return trackSlow(requestWithRetry(path, options));
+}
+
+async function requestWithRetry(path, options = {}) {
   try {
     return await requestOnce(path, options);
   } catch (err) {
@@ -241,6 +267,14 @@ export const api = {
   checkout: (body) => request("/billing/checkout", { method: "POST", body }),
   telegramLink: () => request("/account/telegram/link", { method: "POST" }).then(obj),
   telegramUnlink: () => request("/account/telegram", { method: "DELETE" }),
+  challenge: () => request("/challenge").then(obj),
+  publicChallenge: () => request("/public/challenge").then(obj),
+  enterChallenge: (price) => request("/challenge/entry", { method: "POST", body: { price } }).then(obj),
+  statusHistory: () => request("/public/status/history").then((r) => withArrays(r, ["days", "services"])),
+  accuracyInsights: () => request("/public/accuracy-insights").then((r) => withArrays(r, ["calibration", "regimes"])),
+  coinPage: (coin) => request(`/public/coin/${encodeURIComponent(coin)}`).then((r) => withArrays(r, ["outlook", "signals", "accuracy"])),
+  adminBackupUrl: () => `${BASE}/admin/backup`,
+  shareCardUrl: (token, fmt) => `${BASE}/public/forecasts/${encodeURIComponent(token)}/card.png?fmt=${fmt}`,
   marketSignals: (coin = "BTC", lang = "en") =>
     request(`/market/signals?coin=${encodeURIComponent(coin)}&lang=${encodeURIComponent(lang)}`).then((r) => withArrays(r, ["items", "sources"])),
   scanner: () => request("/tools/scanner").then((r) => withArrays(r, ["rows"])),

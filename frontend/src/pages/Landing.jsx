@@ -12,6 +12,7 @@ import { useLanguage } from "../context/LanguageContext";
 import { usePageTitle } from "../hooks/usePageTitle";
 import { usePremium } from "../hooks/usePremium";
 import { LANGUAGES } from "../i18n/translations";
+import { SEO_LANGS } from "../utils/seoCoins";
 
 const FEATURES = [
   { icon: Brain, title: "landing.f1Title", text: "landing.f1Text" },
@@ -124,7 +125,7 @@ export default function Landing() {
       </section>
 
       <footer className="landing-footer">
-        <Link to="/about">{t("about.title")}</Link> · <Link to="/track-record">{t("track.title")}</Link> · {mode && <><Link to="/premium">Premium</Link> · </>}<Link to="/status">{t("status.title")}</Link> ·{" "}
+        <Link to="/about">{t("about.title")}</Link> · <Link to="/track-record">{t("track.title")}</Link> · <Link to={SEO_LANGS[lang] || SEO_LANGS.en}>{t("coin.indexTitle")}</Link> · {mode && <><Link to="/premium">Premium</Link> · </>}<Link to="/status">{t("status.title")}</Link> ·{" "}
         <Link to="/privacy">{t("privacy.title")}</Link> · <Link to="/terms">{t("terms.title")}</Link>
       </footer>
     </main>

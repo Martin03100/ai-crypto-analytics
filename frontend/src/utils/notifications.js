@@ -28,6 +28,8 @@ export function notificationText(n, t) {
       return t("notif.referral", { days: d.days });
     case "price_alert":
       return alertNotification(d, t);
+    case "challenge_won":
+      return t("notif.challengeWon", { coin: d.coin, price: formatPrice(d.price) });
     case "premium_started":
       return t("notif.premium");
     default:

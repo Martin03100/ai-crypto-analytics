@@ -6,6 +6,7 @@ import Landing from "./pages/Landing";
 import { useAuth } from "./context/AuthContext";
 import { useLanguage } from "./context/LanguageContext";
 import Layout from "./pages/Layout";
+import WakeBanner from "./components/WakeBanner";
 
 import Auth from "./pages/Auth";
 import { PrivacyPolicy, TermsOfService } from "./pages/Legal";
@@ -23,6 +24,8 @@ const TrackRecord = lazy(() => import("./pages/TrackRecord"));
 const Links = lazy(() => import("./pages/Links"));
 const Premium = lazy(() => import("./pages/Premium"));
 const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
+const CoinPage = lazy(() => import("./pages/CoinPage"));
+const CoinIndex = lazy(() => import("./pages/CoinPage").then((m) => ({ default: m.CoinIndex })));
 
 function FullScreenLoader() {
   const { t } = useLanguage();
@@ -48,6 +51,7 @@ export default function App() {
 
   return (
     <>
+      <WakeBanner />
       <Routes>
         <Route path="/auth" element={user ? <Navigate to="/forecast" replace /> : <Auth />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
@@ -58,6 +62,10 @@ export default function App() {
         <Route path="/links" element={<Suspense fallback={<FullScreenLoader />}><Links /></Suspense>} />
         <Route path="/premium" element={<Suspense fallback={<FullScreenLoader />}><Premium /></Suspense>} />
         <Route path="/unsubscribe" element={<Suspense fallback={<FullScreenLoader />}><Unsubscribe /></Suspense>} />
+        {["/prediction", "/sk/predikcia", "/cs/predikce"].map((base) => [
+          <Route key={base} path={base} element={<Suspense fallback={<FullScreenLoader />}><CoinIndex /></Suspense>} />,
+          <Route key={`${base}/slug`} path={`${base}/:slug`} element={<Suspense fallback={<FullScreenLoader />}><CoinPage /></Suspense>} />,
+        ])}
         <Route path="/share/:token" element={<Suspense fallback={<FullScreenLoader />}><SharedForecast /></Suspense>} />
         <Route
           path="/"

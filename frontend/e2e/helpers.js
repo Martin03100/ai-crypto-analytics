@@ -62,7 +62,7 @@ async function csrf(ctx) {
 }
 
 /** API session of a second admin account (with 2FA) used to change settings from tests. */
-async function ownerSession() {
+export async function ownerSession() {
   const ctx = await request.newContext({ baseURL: "http://localhost:5173" });
   let token = await csrf(ctx);
   let secret = null;

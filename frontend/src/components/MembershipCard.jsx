@@ -1,6 +1,6 @@
 /** Settings: plan, invite link and badge, Telegram, public nickname and the e-mail options. */
 
-import { Copy, Crown, Gift, Mail, Send, Sun, UserRound } from "lucide-react";
+import { Copy, Crown, Gift, Mail, Send, Sun, Trophy, UserRound } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
@@ -11,6 +11,7 @@ import { usePremium } from "../hooks/usePremium";
 import { localeForLang } from "../i18n/locale";
 import { copyToClipboard } from "../utils/copyToClipboard";
 import AmbassadorBadge from "./AmbassadorBadge";
+import InviteQr from "./InviteQr";
 import { Card } from "./Card";
 
 const NEXT_BADGE = [[1, "bronze"], [5, "silver"], [10, "gold"]];
@@ -122,7 +123,8 @@ export default function MembershipCard() {
 
       {referrals_enabled && (
         <>
-          <h3 className="membership-h"><Gift size={14} /> {t("membership.inviteTitle")} <AmbassadorBadge level={m.badge} /></h3>
+          <h3 className="membership-h"><Gift size={14} /> {t("membership.inviteTitle")} <AmbassadorBadge level={m.badge} />
+            {m.challenge_wins > 0 && <span className="challenge-badge" title={t("weekly.winsTitle")}><Trophy size={12} /> {m.challenge_wins}×</span>}</h3>
           <p className="text-sub">
             {mode
               ? t("membership.inviteTextPremium", { days: m.referral_days, trial: m.referral_trial_days })
@@ -132,6 +134,7 @@ export default function MembershipCard() {
             <input className="input mono" readOnly value={m.referral_link} aria-label={t("membership.inviteTitle")} onFocus={(e) => e.target.select()} />
             <button className="btn btn-ghost btn-sm" onClick={copyInvite}><Copy size={13} /> {t("shareBar.copy")}</button>
           </div>
+          <div style={{ marginTop: 8 }}><InviteQr link={m.referral_link} /></div>
           <p className="text-sub" style={{ marginTop: 6 }}>
             {t("membership.inviteSignups", { n: m.referral_signups })}
             {next && <> · {t("membership.nextBadge", { n: next[0] - m.referral_signups, badge: t(`badge.${next[1]}`) })}</>}

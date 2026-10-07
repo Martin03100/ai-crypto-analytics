@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Notification
 
-KINDS = {"forecast_evaluated", "duel_settled", "referral_reward", "premium_started", "price_alert"}
+KINDS = {"forecast_evaluated", "duel_settled", "referral_reward", "premium_started", "price_alert", "challenge_won"}
 KEEP_PER_USER = 50
 
 

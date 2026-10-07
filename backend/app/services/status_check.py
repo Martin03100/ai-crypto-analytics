@@ -94,3 +94,41 @@ def collect_status(checks: List[Tuple[str, str, Callable[[], Tuple[str, int]]]] 
               "services": services}
     _cache.set("status", result)
     return result
+
+
+HISTORY_DAYS = 30
+
+
+def record_sample(db) -> int:
+    """Background job: store one result per service and keep only the last ~35 days."""
+    from datetime import timedelta
+    from app.models import StatusSample
+    result = collect_status()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    for s in result["services"]:
+        db.add(StatusSample(checked_at=now, service=s["id"], status=s["status"], latency_ms=s["latency_ms"]))
+    db.query(StatusSample).filter(StatusSample.checked_at < now - timedelta(days=HISTORY_DAYS + 5)).delete()
+    db.commit()
+    return len(result["services"])
+
+
+def history(db, now: datetime | None = None) -> Dict:
+    """Per service and day: share of checks that were up (days without checks have no data)."""
+    from datetime import timedelta
+    from app.models import StatusSample
+    now = now or datetime.now(timezone.utc).replace(tzinfo=None)
+    since = (now - timedelta(days=HISTORY_DAYS - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    days = [(since + timedelta(days=i)).date().isoformat() for i in range(HISTORY_DAYS)]
+    per: Dict[str, Dict[str, List[int]]] = {}
+    for service, status, checked in (db.query(StatusSample.service, StatusSample.status, StatusSample.checked_at)
+                                     .filter(StatusSample.checked_at >= since).all()):
+        day = per.setdefault(service, {}).setdefault(checked.date().isoformat(), [0, 0])
+        day[0] += status == "up"
+        day[1] += 1
+    services = []
+    for service, by_day in sorted(per.items()):
+        ups, total = sum(v[0] for v in by_day.values()), sum(v[1] for v in by_day.values())
+        services.append({"id": service, "uptime_pct": round(ups / total * 100, 2) if total else None,
+                         "days": [{"day": d, "uptime_pct": round(by_day[d][0] / by_day[d][1] * 100, 1) if d in by_day else None}
+                                  for d in days]})
+    return {"days": days, "services": services}

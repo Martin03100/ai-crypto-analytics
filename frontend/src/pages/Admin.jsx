@@ -1,6 +1,6 @@
 /** Admin panel: overview, users, waitlist and app settings. Visible only to admins (ADMIN_USERNAMES + 2FA). */
 
-import { Ban, CreditCard, Crown, Download, LayoutGrid, Search, Settings2, ShieldAlert, Users } from "lucide-react";
+import { Ban, CreditCard, Crown, Database, Download, LayoutGrid, Search, Settings2, ShieldAlert, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { api } from "../api";
@@ -46,6 +46,10 @@ function Overview() {
         {Object.keys(s.waitlist_by_source).length > 0 && (
           <p className="text-sub">{t("admin.sources")}: {Object.entries(s.waitlist_by_source).map(([k, v]) => `${k} ${v}`).join(" · ")}</p>
         )}
+      </Card>
+      <Card title={t("admin.backupTitle")} icon={Database} style={{ marginTop: 16 }}>
+        <p className="text-sub" style={{ marginTop: 0 }}>{t("admin.backupText")}</p>
+        <a className="btn btn-ghost btn-sm" href={api.adminBackupUrl()} download><Download size={14} /> {t("admin.backupButton")}</a>
       </Card>
     </>
   );

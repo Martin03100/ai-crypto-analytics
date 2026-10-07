@@ -59,6 +59,10 @@ const KNOWN_BACKEND_PATTERNS = [
   { test: /m[oô][zž]e[sš] ma[tť] najviac (\d+) pl[aá]nov/i, key: "errors.scheduleLimit", params: (m) => ({ max: m[1] }) },
   { test: /podporuje len z[aá]kladn[eé] mince/i, key: "errors.basicCoinsOnly" },
   { test: /pl[aá]n predikcie nebol n[aá]jden[yý]/i, key: "errors.scheduleNotFound" },
+  { test: /tento t[yý][zž]de[nň] u[zž] m[aá][sš] tip/i, key: "errors.challengeAlready" },
+  { test: /tipy na tento t[yý][zž]de[nň] s[uú] u[zž] uzavret[eé]/i, key: "errors.challengeClosed" },
+  { test: /tip je mimo rozumn[eé]ho rozsahu/i, key: "errors.challengeRange" },
+  { test: /v[yý]zvu sa teraz nepodarilo na[cč][ií]ta[tť]/i, key: "errors.challengeUnavailable" },
   { test: /bezplatn[yý] model|chyba pri na[cč][ií]tan[ií] historick[yý]ch d[aá]t|nedostatok historick[yý]ch d[aá]t|trhov[eé] d[aá]ta moment[aá]lne|trhove data sa nepodarilo/i, key: "errors.quantUnavailable" },
 ];
 

@@ -17,7 +17,7 @@ from app.config import APP_PUBLIC_URL, MAX_REWARDED_REFERRALS, RATE_LIMIT_ACCOUN
 from app.deps import get_current_user, get_db
 from app.models import StripeEvent, User
 from app.rate_limit import rate_limit_by_user
-from app.services import app_settings, audit, billing, notifications, telegram
+from app.services import app_settings, audit, billing, challenge, notifications, telegram
 from app.services.account_data import export_user_data, personal_stats
 from app.services.premium import (
     ambassador_badge, ensure_referral_code, invited_signups, is_premium, require_premium, rewarded_referrals,
@@ -58,7 +58,7 @@ def membership(user: User = Depends(get_current_user), db: Session = Depends(get
         "briefing_opt_in": bool(user.briefing_opt_in) and premium,
         "telegram": {"available": telegram.enabled(), "linked": bool(user.telegram_chat_id)},
         "referral_code": code, "referral_link": f"{APP_PUBLIC_URL}/?ref={code}",
-        "referral_signups": signups, "badge": ambassador_badge(signups),
+        "referral_signups": signups, "badge": ambassador_badge(signups), "challenge_wins": challenge.wins(db, user.id),
         **({"referrals_rewarded": rewarded_referrals(db, user.id), "referrals_max": MAX_REWARDED_REFERRALS}
            if app_settings.premium_mode() else {}),
         **premium_info(),
@@ -199,3 +199,21 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)) -> dic
         db.add(StripeEvent(id=event_id))
     billing.handle_event(db, event)
     return {"received": True}
+
+
+@router.get("/api/challenge")
+def my_challenge(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    return challenge.summary(db, user)
+
+
+class ChallengeEntryIn(BaseModel):
+    price: float = Field(gt=0, lt=1e9)
+
+
+@router.post("/api/challenge/entry", status_code=201, dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
+def enter_challenge(payload: ChallengeEntryIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    try:
+        challenge.enter(db, user, payload.price)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    return challenge.summary(db, user)

@@ -13,6 +13,21 @@ import { usePageTitle } from "../hooks/usePageTitle";
 
 const GROUPS = ["core", "data", "ai"];
 
+function UptimeBars({ data, t, locale }) {
+  const tone = (v) => (v == null ? "none" : v >= 99 ? "up" : v >= 90 ? "degraded" : "down");
+  return (
+    <div className="uptime">
+      <div className="uptime-bars" role="img" aria-label={t("status.uptimeLabel", { pct: data.uptime_pct ?? "—" })}>
+        {data.days.map((d) => (
+          <span key={d.day} className={`uptime-bar ${tone(d.uptime_pct)}`}
+                title={`${new Date(`${d.day}T00:00:00Z`).toLocaleDateString(locale, { timeZone: "UTC" })}: ${d.uptime_pct == null ? t("status.noData") : `${d.uptime_pct} %`}`} />
+        ))}
+      </div>
+      <span className="text-sub uptime-pct">{data.uptime_pct == null ? "" : t("status.uptime30", { pct: data.uptime_pct })}</span>
+    </div>
+  );
+}
+
 export default function StatusPage() {
   const { t, lang } = useLanguage();
   usePageTitle("status.title");
@@ -26,6 +41,10 @@ export default function StatusPage() {
     api.serviceStatus().then(setStatus).catch(() => setFailed(true)).finally(() => setLoading(false));
   }, []);
   useEffect(load, [load]);
+  const [history, setHistory] = useState(null);
+  useEffect(() => { api.statusHistory().then(setHistory).catch(() => setHistory(null)); }, []);
+  const historyOf = (id) => history?.services.find((s) => s.id === id);
+  const locale = localeForLang(lang);
 
   return (
     <main className="standalone-page">
@@ -55,6 +74,7 @@ export default function StatusPage() {
               <span className="status-name">{t(`status.service.${s.id}`)}</span>
               <span className="text-sub mono">{s.latency_ms != null && s.status !== "down" ? `${s.latency_ms} ms` : ""}</span>
               <span className={`status-label ${s.status}`}>{t(`status.state.${s.status}`)}</span>
+              {historyOf(s.id) && <UptimeBars data={historyOf(s.id)} t={t} locale={locale} />}
             </div>
           ))}
           {group === "ai" && <p className="text-sub" style={{ marginTop: 8 }}>{t("status.aiNote")}</p>}

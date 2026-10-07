@@ -1,6 +1,6 @@
 /** Public "Beat the AI" board: best price tippers this week or all time. */
 
-import { Crown, Swords } from "lucide-react";
+import { Crown, Swords, Trophy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
@@ -46,7 +46,8 @@ export default function TipsterBoard() {
               {data.leaders.map((l, i) => (
                 <tr key={l.nickname}>
                   <td>{i + 1}</td>
-                  <td>{l.nickname}{l.premium && <Crown size={12} className="premium-crown" aria-label="Premium" />}<AmbassadorBadge level={l.badge} compact /></td>
+                  <td>{l.nickname}{l.premium && <Crown size={12} className="premium-crown" aria-label="Premium" />}<AmbassadorBadge level={l.badge} compact />
+                    {l.challenge_wins > 0 && <span className="challenge-badge" title={t("weekly.winsTitle")}><Trophy size={11} /> {l.challenge_wins}</span>}</td>
                   <td>{l.wins}</td>
                   <td>{l.duels}</td>
                   <td>{l.win_pct}%</td>

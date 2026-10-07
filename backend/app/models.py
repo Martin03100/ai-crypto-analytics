@@ -303,3 +303,41 @@ class StripeEvent(Base):
 
     id: Mapped[str] = mapped_column(String(255), primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class StatusSample(Base):
+    """One result of the periodic service check, for the 30-day history on the status page."""
+
+    __tablename__ = "status_samples"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    checked_at: Mapped[datetime] = mapped_column(DateTime, index=True, default=_now)
+    service: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    latency_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+
+class Challenge(Base):
+    """Weekly "Beat the AI" round: everyone guesses one coin's price for the end of the week."""
+
+    __tablename__ = "challenges"
+
+    week: Mapped[str] = mapped_column(String(10), primary_key=True)          # e.g. 2026-W41
+    coin: Mapped[str] = mapped_column(String(16), nullable=False)
+    start_price: Mapped[float] = mapped_column(Float, nullable=False)
+    ai_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    end_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    winner_user_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    settled_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class ChallengeEntry(Base):
+    __tablename__ = "challenge_entries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    week: Mapped[str] = mapped_column(String(10), index=True, nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    price: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    week_user: Mapped[str] = mapped_column(String(32), unique=True, index=True, nullable=False)   # one guess per week

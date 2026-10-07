@@ -49,6 +49,15 @@ statistical model and real market data. Bachelor's thesis project (Software Deve
   Premium, blocking accounts, waitlist CSV export, the Premium mode switch, feature switches, limits and a site-wide
   announcement banner. **Payments tab:** paste one Stripe secret key (stored encrypted) and set prices; the app creates
   the Stripe product, prices, webhook and customer portal and shows a checklist of what is still missing before selling.
+- **Beat the AI:** a weekly challenge on one rotating coin - tips close on Thursday, the closest guess wins a badge
+  shown on the tipster board and in the profile.
+- **Honest accuracy:** confidence calibration (claimed vs. real hit rate), accuracy by market situation (rising,
+  falling, sideways) and a comparison of every forecast with a naive "price stays the same" guess.
+- **Sharing:** forecasts as Story (9:16) and post (1:1) images, invite link as a QR code.
+- **SEO coin pages:** 20 coins in English, Slovak and Czech (`/prediction/bitcoin`, `/sk/predikcia/bitcoin`,
+  `/cs/predikce/bitcoin`); a Netlify edge function adds the title, canonical, hreflang, JSON-LD and a text snippet.
+- **Status page** with 30 days of availability history, a "server is waking up" banner on slow responses and a
+  one-click **database backup** (gzipped JSON) in the admin panel.
 - Transactional emails in **English, Slovak and Czech**, following the user's app language.
 - **Demo mode** for presentations: one click fills the whole app with clearly labelled test data ("Gemini test", "Claude test", ...)
   on synthetic prices - forecasts, evaluated accuracy, leaderboard, tips and portfolio analyses, visible only to the user who loaded it.
