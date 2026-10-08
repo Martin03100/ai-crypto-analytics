@@ -9,8 +9,12 @@ import requests
 from app.config import TURNSTILE_SECRET_KEY
 
 
+def is_captcha_enabled() -> bool:
+    return bool(TURNSTILE_SECRET_KEY)
+
+
 def verify_captcha(token: Optional[str], remote_ip: Optional[str] = None) -> bool:
-    if not TURNSTILE_SECRET_KEY:
+    if not is_captcha_enabled():
         return True
     if not token:
         return False

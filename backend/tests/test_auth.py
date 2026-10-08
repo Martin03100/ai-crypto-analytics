@@ -188,8 +188,8 @@ def test_mutating_request_without_csrf_token_rejected(registered):
 
 
 def test_mutating_request_with_csrf_token_succeeds(registered):
-    client, _username, _password = registered
-    res = client.put("/api/account/email", json={"email": "test@example.com"}, headers=csrf_headers(client))
+    client, _username, password = registered
+    res = client.put("/api/account/email", json={"email": "test@example.com", "password": password}, headers=csrf_headers(client))
     assert res.status_code == 200
 
 

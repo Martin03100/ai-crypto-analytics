@@ -232,7 +232,8 @@ export const api = {
   register: (username, password, email, captcha_token, referral_code) => request("/auth/register", {
     method: "POST", body: { username, password, email, captcha_token, lang: currentLang(), referral_code: referral_code || undefined },
   }),
-  login: (username, password, totp_code) => request("/auth/login", { method: "POST", body: { username, password, totp_code } }),
+  login: (username, password, totp_code, captcha_token) =>
+    request("/auth/login", { method: "POST", body: { username, password, totp_code, captcha_token: captcha_token || undefined } }),
   logout: () => request("/auth/logout", { method: "POST" }),
   me: () => request("/auth/me").then(obj),
   forgotPassword: (email, captcha_token) => request("/auth/forgot-password", { method: "POST", body: { email, captcha_token } }),
@@ -253,7 +254,10 @@ export const api = {
   totpSetup: () => request("/account/2fa/setup", { method: "POST" }),
   totpEnable: (code) => request("/account/2fa/enable", { method: "POST", body: { code } }),
   totpDisable: (password, code) => request("/account/2fa/disable", { method: "POST", body: { password, code } }),
-  updateEmail: (email) => request("/account/email", { method: "PUT", body: { email } }),
+  recoveryCodesStatus: () => request("/account/2fa/recovery-codes").then(obj),
+  renewRecoveryCodes: (password, code) =>
+    request("/account/2fa/recovery-codes", { method: "POST", body: { password, code } }).then((r) => arr(obj(r).recovery_codes)),
+  updateEmail: (email, password) => request("/account/email", { method: "PUT", body: { email, password: password || undefined } }),
   backtest: (coin, horizon) =>
     request(`/forecast/backtest?coin=${encodeURIComponent(coin)}&horizon=${encodeURIComponent(horizon)}`).then(obj),
   shareForecast: (id) => request(`/forecast/history/${id}/share`, { method: "POST" }).then(obj),

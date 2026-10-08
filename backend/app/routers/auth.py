@@ -17,7 +17,7 @@ from app.config import (
     RATE_LIMIT_LOGIN, RATE_LIMIT_RESET_CODE,
 )
 from app.deps import get_current_user, get_db
-from app.models import EmailVerificationCode, PasswordResetToken, User
+from app.models import AuditEvent, EmailVerificationCode, PasswordResetToken, User
 from app.rate_limit import check_rate_limit, get_client_ip, rate_limit_by_ip
 from app.schemas import (
     USERNAME_RE, ForgotPasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest, TokenResponse,
@@ -29,12 +29,11 @@ from app.security import (
 )
 from app.services import audit
 from app.services.account_cleanup import release_email_if_unverified
-from app.services.captcha import verify_captcha
+from app.services.captcha import is_captcha_enabled, verify_captcha
 from app.services import totp
-from app.services.totp import consume_totp_code
 from app.services.email_service import (
     is_email_configured, render_lockout_email, render_new_login_email, render_reset_password_email, send_email,
-    subject as email_subject,
+    send_security_notice, subject as email_subject,
 )
 from app.services.app_settings import require_feature
 from app.services.premium import find_referrer, is_premium
@@ -42,6 +41,7 @@ from app.services.roles import is_admin
 from app.services.verification import send_verification_code
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+LOCK_EMAIL_EVERY = timedelta(hours=6)
 
 
 def _set_auth_cookie(response: Response, user: User) -> None:
@@ -115,11 +115,18 @@ def login(payload: LoginRequest, response: Response, request: Request, backgroun
 
     now = datetime.now(timezone.utc)
     if user.locked_until and user.locked_until.replace(tzinfo=timezone.utc) > now:
-        remaining = int((user.locked_until.replace(tzinfo=timezone.utc) - now).total_seconds() / 60) + 1
-        raise HTTPException(
-            status_code=429,
-            detail=f"Účet je dočasne uzamknutý pre priveľa neúspešných pokusov. Skús to znova o {remaining} min.",
-        )
+        if is_captcha_enabled():
+            # After several failed attempts the account asks for a captcha instead of locking: guessing stays
+            # impractical, but nobody can lock a real user out just by knowing the username.
+            if not verify_captcha(payload.captcha_token, get_client_ip(request)):
+                raise HTTPException(status_code=401, detail="Po niekoľkých neúspešných pokusoch potvrď, že nie si robot.",
+                                    headers={"X-Error-Code": "captcha_required"})
+        else:
+            remaining = int((user.locked_until.replace(tzinfo=timezone.utc) - now).total_seconds() / 60) + 1
+            raise HTTPException(
+                status_code=429,
+                detail=f"Účet je dočasne uzamknutý pre priveľa neúspešných pokusov. Skús to znova o {remaining} min.",
+            )
 
     if not verify_password(payload.password, user.password_hash):
         _register_failed_attempt(db, user, now, background_tasks, request)
@@ -127,17 +134,21 @@ def login(payload: LoginRequest, response: Response, request: Request, backgroun
     if user.disabled:
         raise HTTPException(status_code=403, detail="Tento účet je zablokovaný.")
 
+    used_recovery_code = False
     if user.totp_enabled:
         if not payload.totp_code:
             raise HTTPException(status_code=401, detail="Zadaj 6-miestny kód z overovacej aplikácie (2FA).",
                                 headers={"X-Error-Code": "totp_required"})
         secret = decrypt_secret(user.totp_secret or "", user.id)
-        outcome = consume_totp_code(db, user, secret, payload.totp_code)
+        outcome = totp.verify_second_factor(db, user, secret, payload.totp_code)
         if outcome == totp.REUSED:   # the right code, just already spent: not a guessing attempt
             raise HTTPException(status_code=401, detail="Tento kód z overovacej aplikácie už bol použitý. Počkaj na ďalší.")
-        if outcome != totp.OK:
+        if outcome not in (totp.OK, totp.RECOVERY):
             _register_failed_attempt(db, user, now, background_tasks, request, details="2fa")
             raise HTTPException(status_code=401, detail="Nesprávny kód z overovacej aplikácie (2FA).")
+        if outcome == totp.RECOVERY:
+            used_recovery_code = True
+            audit.record(db, user.id, "recovery_code_used", request)
 
     user.failed_login_attempts = 0
     user.locked_until = None
@@ -149,6 +160,8 @@ def login(payload: LoginRequest, response: Response, request: Request, backgroun
     db.commit()
     if new_device and user.email and user.email_verified is not False and is_email_configured():
         _send_new_login_alert(background_tasks, user, now, user_agent, ip)
+    if used_recovery_code:
+        send_security_notice(background_tasks, user, "recovery", n=totp.recovery_codes_left(user))
 
     _set_auth_cookie(response, user)
     return TokenResponse(username=user.username, user_id=user.id, email=user.email,
@@ -267,15 +280,20 @@ def _register_failed_attempt(db: Session, user: User, now, background_tasks: Bac
                              request: Request | None = None, details: str | None = None) -> None:
     user.failed_login_attempts += 1
     locked = False
+    notify = False
     if user.failed_login_attempts >= MAX_FAILED_LOGIN_ATTEMPTS:
         user.locked_until = now + timedelta(minutes=ACCOUNT_LOCKOUT_MINUTES)
         user.failed_login_attempts = 0
         locked = True
+        # At most one warning e-mail per 6 hours, so repeated attempts cannot flood the owner's inbox.
+        since = (now - LOCK_EMAIL_EVERY).replace(tzinfo=None)
+        notify = db.query(AuditEvent.id).filter(AuditEvent.user_id == user.id, AuditEvent.action == "account_locked",
+                                                AuditEvent.created_at >= since).first() is None
     audit.record(db, user.id, "login_failed", request, details)
     if locked:
         audit.record(db, user.id, "account_locked", request)
     db.commit()
-    if locked and user.email and is_email_configured():
+    if notify and user.email and is_email_configured():
         text_body, html_body = render_lockout_email(user.username, ACCOUNT_LOCKOUT_MINUTES, user.lang)
         threading.Thread(target=send_email, daemon=True, args=(
             user.email, email_subject("lock", user.lang), text_body, html_body)).start()

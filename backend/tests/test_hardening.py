@@ -564,7 +564,8 @@ def test_email_change_cannot_be_used_to_delete_the_owner(client, monkeypatch):
         db.query(User).filter(User.username == "vlastnik").update({"email_verified": True}); db.commit()
     finally:
         db.close()
-    assert client.put("/api/account/email", json={"email": "novy@example.com"}, headers=csrf_headers(client)).status_code == 200
+    assert client.put("/api/account/email", json={"email": "novy@example.com", "password": "TestPass123"},
+                      headers=csrf_headers(client)).status_code == 200
     client.cookies.clear()
     assert _register(client, "utocnik2", "novy@example.com").status_code == 400      # owner's pending address stays theirs
     db = SessionLocal()

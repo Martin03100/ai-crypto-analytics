@@ -26,9 +26,12 @@ from app.security import (
 )
 from app.services import audit, jobs
 from app.services.demo_data import create_demo_data, remove_demo_data
-from app.services.totp import OK, consume_totp_code
+from app.services.totp import (
+    OK, RECOVERY, RECOVERY_CODE_COUNT, consume_totp_code, new_recovery_codes, recovery_codes_left, verify_second_factor,
+)
 from app.services.account_cleanup import delete_user_data, release_email_if_unverified
-from app.services.email_service import is_email_configured
+from app.services.email_service import is_email_configured, mask_email, send_security_notice
+from app.services.roles import is_admin
 from app.services.verification import send_verification_code
 from app.services.ai_engine import test_api_key, validate_custom_base_url
 
@@ -83,24 +86,32 @@ def update_email(payload: UpdateEmailRequest, request: Request, background_tasks
     email = sanitize_text(payload.email, max_length=255).lower() if payload.email else ""
     if not email or "@" not in email or "." not in email.split("@")[-1]:
         raise HTTPException(status_code=400, detail="Zadaj platnú emailovú adresu.")
+    previous = user.email
+    changed = previous != email
+    # A confirmed address leads to the password reset, so moving it needs the password (a hijacked session alone
+    # is not enough). Fixing a typo in an address that was never confirmed does not.
+    if changed and user.email_verified is not False and not verify_password(payload.password or "", user.password_hash):
+        raise HTTPException(status_code=400, detail="Aktuálne heslo nie je správne.")
     existing = db.query(User).filter(User.email == email, User.id != user.id).first()
     if existing is not None:
         if not (is_email_configured() and release_email_if_unverified(db, email, requester_id=user.id)):
             raise HTTPException(status_code=400, detail="Tento email už používa iný účet.")
-    changed = user.email != email
+    was_verified = user.email_verified is not False
     user.email = email
     if changed and is_email_configured():
         user.email_verified = False
     if changed:
         audit.record(db, user.id, "email_changed", request)
     db.commit()
+    if changed and previous and was_verified:
+        send_security_notice(background_tasks, user, "email", to_address=previous, email=mask_email(email))
     if changed and user.email_verified is False:
         send_verification_code(db, user, background_tasks)
     return {"success": True, "email": user.email, "email_verified": user.email_verified}
 
 
 @router.post("/change-password", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
-def change_password(payload: ChangePasswordRequest, response: Response, request: Request,
+def change_password(payload: ChangePasswordRequest, response: Response, request: Request, background_tasks: BackgroundTasks,
                      user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     if not verify_password(payload.current_password, user.password_hash):
         raise HTTPException(status_code=400, detail="Aktuálne heslo nie je správne.")
@@ -109,6 +120,7 @@ def change_password(payload: ChangePasswordRequest, response: Response, request:
     audit.record(db, user.id, "password_changed", request)
     db.commit()
     _reissue_cookie(response, user)
+    send_security_notice(background_tasks, user, "password")
     return {"success": True, "message": "Heslo bolo úspešne zmenené."}
 
 
@@ -179,6 +191,10 @@ def delete_account(payload: DeleteAccountRequest, response: Response, user: User
                    db: Session = Depends(get_db)) -> dict:
     if not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=400, detail="Aktuálne heslo nie je správne.")
+    if is_admin(user):
+        # Admin rights follow the username (ADMIN_USERNAMES): a deleted admin account would leave the name free for
+        # anyone to register and become admin.
+        raise HTTPException(status_code=400, detail="Účet administrátora sa nedá zmazať. Najprv ho odober z ADMIN_USERNAMES.")
     from app.services import billing
     try:
         billing.cancel_subscriptions(user)
@@ -204,33 +220,60 @@ def totp_setup(user: User = Depends(get_current_user), db: Session = Depends(get
 
 
 @router.post("/2fa/enable", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
-def totp_enable(payload: TotpCodeRequest, request: Request, user: User = Depends(get_current_user),
-                db: Session = Depends(get_db)) -> dict:
+def totp_enable(payload: TotpCodeRequest, request: Request, background_tasks: BackgroundTasks,
+                user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     secret = decrypt_secret(user.totp_pending_secret or "", user.id)
     if not secret:
         raise HTTPException(status_code=400, detail="Najprv spusti nastavenie 2FA.")
     if consume_totp_code(db, user, secret, payload.code) != OK:
         raise HTTPException(status_code=400, detail="Nesprávny kód z overovacej aplikácie (2FA).")
     user.totp_secret, user.totp_pending_secret, user.totp_enabled = user.totp_pending_secret, None, True
+    codes = new_recovery_codes(user)       # shown once: the way back in if the phone is lost
     audit.record(db, user.id, "twofa_enabled", request)
     db.commit()
-    return {"success": True, "totp_enabled": True}
+    send_security_notice(background_tasks, user, "twofa_on")
+    return {"success": True, "totp_enabled": True, "recovery_codes": codes}
+
+
+def _check_password_and_second_factor(db: Session, user: User, password: str, code: str) -> None:
+    if not verify_password(password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Aktuálne heslo nie je správne.")
+    secret = decrypt_secret(user.totp_secret or "", user.id)
+    if verify_second_factor(db, user, secret, code) not in (OK, RECOVERY):
+        raise HTTPException(status_code=400, detail="Nesprávny kód z overovacej aplikácie (2FA).")
 
 
 @router.post("/2fa/disable", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
-def totp_disable(payload: TotpDisableRequest, request: Request, user: User = Depends(get_current_user),
-                 db: Session = Depends(get_db)) -> dict:
+def totp_disable(payload: TotpDisableRequest, request: Request, background_tasks: BackgroundTasks,
+                 user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     if not user.totp_enabled:
         return {"success": True, "totp_enabled": False}
-    if not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=400, detail="Aktuálne heslo nie je správne.")
-    secret = decrypt_secret(user.totp_secret or "", user.id)
-    if consume_totp_code(db, user, secret, payload.code) != OK:
-        raise HTTPException(status_code=400, detail="Nesprávny kód z overovacej aplikácie (2FA).")
+    _check_password_and_second_factor(db, user, payload.password, payload.code)
     user.totp_secret, user.totp_pending_secret, user.totp_enabled = None, None, False
+    user.totp_recovery_json = None
     audit.record(db, user.id, "twofa_disabled", request)
     db.commit()
+    send_security_notice(background_tasks, user, "twofa_off")
     return {"success": True, "totp_enabled": False}
+
+
+@router.get("/2fa/recovery-codes")
+def recovery_codes_status(user: User = Depends(get_current_user)) -> dict:
+    return {"left": recovery_codes_left(user) if user.totp_enabled else 0, "total": RECOVERY_CODE_COUNT}
+
+
+@router.post("/2fa/recovery-codes", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
+def regenerate_recovery_codes(payload: TotpDisableRequest, request: Request, background_tasks: BackgroundTasks,
+                              user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    """New recovery codes (the old ones stop working); needs the password and a current 2FA code."""
+    if not user.totp_enabled:
+        raise HTTPException(status_code=400, detail="Najprv spusti nastavenie 2FA.")
+    _check_password_and_second_factor(db, user, payload.password, payload.code)
+    codes = new_recovery_codes(user)
+    audit.record(db, user.id, "recovery_codes_created", request)
+    db.commit()
+    send_security_notice(background_tasks, user, "recovery_new")
+    return {"recovery_codes": codes}
 
 
 @router.get("/activity")

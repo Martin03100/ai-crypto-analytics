@@ -28,7 +28,10 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     username: str
     password: str
-    totp_code: Optional[str] = Field(default=None, max_length=10)
+    # A 6-digit authenticator code or a one-time recovery code ("abcd-efgh").
+    totp_code: Optional[str] = Field(default=None, max_length=20)
+    # Needed only after several failed attempts (instead of locking the account, which anyone could do).
+    captcha_token: Optional[str] = Field(default=None, max_length=4096)
 
 
 class TokenResponse(BaseModel):
@@ -59,6 +62,9 @@ class ChangePasswordRequest(BaseModel):
 
 class UpdateEmailRequest(BaseModel):
     email: Optional[str] = None
+    # Required once the current address is confirmed: a stolen session alone must not be able to redirect the
+    # account's emails (and with them the password reset).
+    password: Optional[str] = Field(default=None, max_length=128)
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -75,8 +81,9 @@ class TotpCodeRequest(BaseModel):
 
 
 class TotpDisableRequest(BaseModel):
+    """Also used to issue new recovery codes; `code` may be a recovery code when the phone is lost."""
     password: str = Field(min_length=1, max_length=128)
-    code: str = Field(min_length=6, max_length=6)
+    code: str = Field(min_length=6, max_length=20)
 
 
 class VerifyResetCodeRequest(BaseModel):

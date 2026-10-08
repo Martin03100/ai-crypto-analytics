@@ -57,8 +57,8 @@ export function AuthProvider({ children }) {
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
   }, []);
 
-  const login = useCallback(async (username, password, totpCode) => {
-    const res = await api.login(username, password, totpCode);
+  const login = useCallback(async (username, password, totpCode, captchaToken) => {
+    const res = await api.login(username, password, totpCode, captchaToken);
     await clearOfflineData();   // never show another account's cached data
     rememberOfflineSession(toUser(res));
     setUser(toUser(res));

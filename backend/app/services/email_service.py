@@ -97,7 +97,7 @@ _T = {
         "reset_note": "The code is valid for {m} minutes and can be used once. If you didn't ask for it, ignore this email; your account is safe.",
         "lock_subject": "Warning: sign-in attempts — AI Crypto Analytics",
         "lock_title": "Failed sign-in attempts",
-        "lock_text": "Your account was locked for {m} minutes after several failed sign-in attempts.",
+        "lock_text": "We noticed several failed sign-in attempts on your account. For the next {m} minutes, signing in needs an extra check.",
         "lock_note": "If this wasn't you, change your password and turn on two-factor authentication (2FA) in Settings.",
         "login_subject": "New sign-in to your account — AI Crypto Analytics",
         "login_title": "New sign-in to your account",
@@ -117,7 +117,7 @@ _T = {
         "reset_note": "Kód platí {m} minút a dá sa použiť len raz. Ak si oň nežiadal(a), e-mail ignoruj — tvoj účet je v bezpečí.",
         "lock_subject": "Upozornenie: pokusy o prihlásenie — AI Crypto Analytics",
         "lock_title": "Neúspešné pokusy o prihlásenie",
-        "lock_text": "Tvoj účet bol dočasne uzamknutý na {m} minút po niekoľkých neúspešných pokusoch o prihlásenie.",
+        "lock_text": "Zaznamenali sme niekoľko neúspešných pokusov o prihlásenie do tvojho účtu. Nasledujúcich {m} minút bude prihlásenie vyžadovať ďalšie overenie.",
         "lock_note": "Ak si to nebol(a) ty, zmeň si heslo a v Nastaveniach zapni dvojfaktorové overenie (2FA).",
         "login_subject": "Nové prihlásenie do účtu — AI Crypto Analytics",
         "login_title": "Nové prihlásenie do účtu",
@@ -137,7 +137,7 @@ _T = {
         "reset_note": "Kód platí {m} minut a lze ho použít jen jednou. Pokud jsi o něj nežádal(a), e-mail ignoruj — tvůj účet je v bezpečí.",
         "lock_subject": "Upozornění: pokusy o přihlášení — AI Crypto Analytics",
         "lock_title": "Neúspěšné pokusy o přihlášení",
-        "lock_text": "Tvůj účet byl dočasně uzamčen na {m} minut po několika neúspěšných pokusech o přihlášení.",
+        "lock_text": "Zaznamenali jsme několik neúspěšných pokusů o přihlášení do tvého účtu. Následujících {m} minut bude přihlášení vyžadovat další ověření.",
         "lock_note": "Pokud jsi to nebyl(a) ty, změň si heslo a v Nastavení zapni dvoufázové ověření (2FA).",
         "login_subject": "Nové přihlášení do účtu — AI Crypto Analytics",
         "login_title": "Nové přihlášení do účtu",
@@ -157,7 +157,7 @@ _T = {
         "reset_note": "Der Code ist {m} Minuten gültig und kann nur einmal verwendet werden. Falls du ihn nicht angefordert hast, ignoriere diese E-Mail — dein Konto ist sicher.",
         "lock_subject": "Warnung: Anmeldeversuche — AI Crypto Analytics",
         "lock_title": "Fehlgeschlagene Anmeldeversuche",
-        "lock_text": "Dein Konto wurde nach mehreren fehlgeschlagenen Anmeldeversuchen für {m} Minuten gesperrt.",
+        "lock_text": "Wir haben mehrere fehlgeschlagene Anmeldeversuche bei deinem Konto bemerkt. In den nächsten {m} Minuten braucht die Anmeldung eine zusätzliche Prüfung.",
         "lock_note": "Falls du das nicht warst, ändere dein Passwort und aktiviere in den Einstellungen die Zwei-Faktor-Authentifizierung (2FA).",
         "login_subject": "Neue Anmeldung bei deinem Konto — AI Crypto Analytics",
         "login_title": "Neue Anmeldung bei deinem Konto",
@@ -177,7 +177,7 @@ _T = {
         "reset_note": "Kod jest ważny przez {m} minut i można go użyć tylko raz. Jeśli o niego nie prosiłeś(-aś), zignoruj ten e-mail — twoje konto jest bezpieczne.",
         "lock_subject": "Ostrzeżenie: próby logowania — AI Crypto Analytics",
         "lock_title": "Nieudane próby logowania",
-        "lock_text": "Twoje konto zostało tymczasowo zablokowane na {m} minut po kilku nieudanych próbach logowania.",
+        "lock_text": "Zauważyliśmy kilka nieudanych prób logowania na twoje konto. Przez następne {m} minut logowanie będzie wymagać dodatkowej weryfikacji.",
         "lock_note": "Jeśli to nie byłeś(-aś) ty, zmień hasło i włącz w Ustawieniach uwierzytelnianie dwuskładnikowe (2FA).",
         "login_subject": "Nowe logowanie na twoje konto — AI Crypto Analytics",
         "login_title": "Nowe logowanie na twoje konto",
@@ -270,6 +270,91 @@ def render_lockout_email(username: str, minutes: int, lang: str | None = "en") -
         <p {_P}>{html.escape(hello)} {tr("lock_text", lang, m=minutes)}</p>
         <p {_NOTE}>{tr("lock_note", lang)}</p>""")
     return text_body, html_body
+
+
+# Notices about security changes on the account: title, text (may use {email} / {n}) and the shared note.
+_SECURITY = {
+    "en": {
+        "subject": "Security change on your account — AI Crypto Analytics",
+        "note": "If this wasn't you, reset your password right away (Sign in → Forgot password) and write to aicryptoanalytics7@gmail.com.",
+        "password": ("Your password was changed", "The password of your account was just changed."),
+        "email": ("Your email address was changed", "The email address of your account was changed to {email}. Messages from the app now go there."),
+        "twofa_on": ("Two-factor authentication is on", "2FA is now on for your account. Keep your recovery codes somewhere safe."),
+        "twofa_off": ("Two-factor authentication was turned off", "2FA was turned off for your account."),
+        "recovery": ("A recovery code was used", "Someone signed in to your account with a 2FA recovery code. Codes left: {n}."),
+        "recovery_new": ("New recovery codes", "New 2FA recovery codes were created for your account; the old ones no longer work."),
+    },
+    "sk": {
+        "subject": "Bezpečnostná zmena v účte — AI Crypto Analytics",
+        "note": "Ak si to nebol(a) ty, ihneď si obnov heslo (Prihlásenie → Zabudnuté heslo) a napíš na aicryptoanalytics7@gmail.com.",
+        "password": ("Heslo bolo zmenené", "Heslo k tvojmu účtu bolo práve zmenené."),
+        "email": ("E-mailová adresa bola zmenená", "E-mailová adresa tvojho účtu bola zmenená na {email}. Správy z aplikácie odteraz chodia tam."),
+        "twofa_on": ("Dvojfaktorové overenie je zapnuté", "Pre tvoj účet je teraz zapnuté 2FA. Záložné kódy si ulož na bezpečné miesto."),
+        "twofa_off": ("Dvojfaktorové overenie bolo vypnuté", "Pre tvoj účet bolo vypnuté 2FA."),
+        "recovery": ("Bol použitý záložný kód", "Do tvojho účtu sa niekto prihlásil záložným kódom 2FA. Zostávajúce kódy: {n}."),
+        "recovery_new": ("Nové záložné kódy", "Pre tvoj účet boli vytvorené nové záložné kódy 2FA; staré už neplatia."),
+    },
+    "cs": {
+        "subject": "Bezpečnostní změna v účtu — AI Crypto Analytics",
+        "note": "Pokud jsi to nebyl(a) ty, ihned si obnov heslo (Přihlášení → Zapomenuté heslo) a napiš na aicryptoanalytics7@gmail.com.",
+        "password": ("Heslo bylo změněno", "Heslo k tvému účtu bylo právě změněno."),
+        "email": ("E-mailová adresa byla změněna", "E-mailová adresa tvého účtu byla změněna na {email}. Zprávy z aplikace nyní chodí tam."),
+        "twofa_on": ("Dvoufázové ověření je zapnuté", "Pro tvůj účet je nyní zapnuté 2FA. Záložní kódy si ulož na bezpečné místo."),
+        "twofa_off": ("Dvoufázové ověření bylo vypnuto", "Pro tvůj účet bylo vypnuto 2FA."),
+        "recovery": ("Byl použit záložní kód", "Do tvého účtu se někdo přihlásil záložním kódem 2FA. Zbývající kódy: {n}."),
+        "recovery_new": ("Nové záložní kódy", "Pro tvůj účet byly vytvořeny nové záložní kódy 2FA; staré už neplatí."),
+    },
+    "de": {
+        "subject": "Sicherheitsänderung an deinem Konto — AI Crypto Analytics",
+        "note": "Falls du das nicht warst, setze sofort dein Passwort zurück (Anmelden → Passwort vergessen) und schreib an aicryptoanalytics7@gmail.com.",
+        "password": ("Dein Passwort wurde geändert", "Das Passwort deines Kontos wurde gerade geändert."),
+        "email": ("Deine E-Mail-Adresse wurde geändert", "Die E-Mail-Adresse deines Kontos wurde in {email} geändert. Nachrichten der App gehen jetzt dorthin."),
+        "twofa_on": ("Zwei-Faktor-Authentifizierung ist aktiv", "2FA ist für dein Konto jetzt aktiv. Bewahre deine Wiederherstellungscodes sicher auf."),
+        "twofa_off": ("Zwei-Faktor-Authentifizierung wurde deaktiviert", "2FA wurde für dein Konto deaktiviert."),
+        "recovery": ("Ein Wiederherstellungscode wurde verwendet", "Jemand hat sich mit einem 2FA-Wiederherstellungscode bei deinem Konto angemeldet. Verbleibende Codes: {n}."),
+        "recovery_new": ("Neue Wiederherstellungscodes", "Für dein Konto wurden neue 2FA-Wiederherstellungscodes erstellt; die alten gelten nicht mehr."),
+    },
+    "pl": {
+        "subject": "Zmiana zabezpieczeń konta — AI Crypto Analytics",
+        "note": "Jeśli to nie byłeś(-aś) ty, natychmiast zresetuj hasło (Logowanie → Nie pamiętam hasła) i napisz na aicryptoanalytics7@gmail.com.",
+        "password": ("Hasło zostało zmienione", "Hasło do twojego konta zostało właśnie zmienione."),
+        "email": ("Adres e-mail został zmieniony", "Adres e-mail twojego konta został zmieniony na {email}. Wiadomości z aplikacji trafiają teraz tam."),
+        "twofa_on": ("Uwierzytelnianie dwuskładnikowe jest włączone", "Na twoim koncie włączono 2FA. Przechowuj kody zapasowe w bezpiecznym miejscu."),
+        "twofa_off": ("Uwierzytelnianie dwuskładnikowe zostało wyłączone", "Na twoim koncie wyłączono 2FA."),
+        "recovery": ("Użyto kodu zapasowego", "Ktoś zalogował się na twoje konto kodem zapasowym 2FA. Pozostałe kody: {n}."),
+        "recovery_new": ("Nowe kody zapasowe", "Dla twojego konta utworzono nowe kody zapasowe 2FA; stare już nie działają."),
+    },
+}
+
+
+def mask_email(email: str) -> str:
+    """j***@example.com — enough to recognise the address without exposing it in full."""
+    name, _, domain = (email or "").partition("@")
+    return f"{name[:1]}***@{domain}" if name and domain else "***"
+
+
+def render_security_email(username: str, kind: str, lang: str | None = "en", **params) -> tuple[str, str, str]:
+    """(subject, text, html) of a notice about a security change: kind is password, email, twofa_on, twofa_off,
+    recovery or recovery_new."""
+    texts = _SECURITY[email_lang(lang)]
+    title, body = texts[kind]
+    body = body.format(**params)
+    hello = tr("hello", lang, u=username)
+    text_body = f"{hello}\n\n{body}\n\n{texts['note']}"
+    html_body = email_shell(lang=lang, preheader=title, inner_html=f"""
+        <h1 {_H1}>{html.escape(title)}</h1>
+        <p {_P}>{html.escape(hello)} {html.escape(body)}</p>
+        <p {_NOTE}>{html.escape(texts['note'])}</p>""")
+    return texts["subject"], text_body, html_body
+
+
+def send_security_notice(background_tasks, user, kind: str, to_address: str | None = None, **params) -> None:
+    """Queue a security notice to the account's (or the given, e.g. the previous) address when email is set up."""
+    address = to_address or user.email
+    if not address or not is_email_configured():
+        return
+    title, text_body, html_body = render_security_email(user.username, kind, user.lang, **params)
+    background_tasks.add_task(send_email, address, title, text_body, html_body)
 
 
 def render_new_login_email(username: str, when: str, device: str, ip: str, lang: str | None = "en") -> tuple[str, str]:

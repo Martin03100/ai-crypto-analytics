@@ -60,6 +60,7 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [needTotp, setNeedTotp] = useState(false);
+  const [needCaptcha, setNeedCaptcha] = useState(false);
   const [totpCode, setTotpCode] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaKey, setCaptchaKey] = useState(0);
@@ -93,7 +94,15 @@ export default function Auth() {
     setLoading(true);
     try {
       if (tab === "login") {
-        await login(username, password, needTotp ? totpCode : undefined);
+        try {
+          await login(username, password, needTotp ? totpCode.trim() : undefined, needCaptcha ? captchaToken : undefined);
+        } finally {
+          if (needCaptcha) {        // a Turnstile token works once
+            setCaptchaToken("");
+            setCaptchaKey((k) => k + 1);
+          }
+        }
+        navigate("/forecast");
       } else {
         try {
           await register(username, password, email, captchaToken);
@@ -101,10 +110,11 @@ export default function Auth() {
           setCaptchaToken("");
           setCaptchaKey((k) => k + 1);
         }
+        navigate("/dashboard");    // new users first choose the beginner or full view there
       }
-      navigate("/forecast");
     } catch (err) {
       if (err?.code === "totp_required" || /6-miestny k[oó]d z overovacej aplik/i.test(err?.message || "")) setNeedTotp(true);
+      if (err?.code === "captcha_required") setNeedCaptcha(true);
       setError(humanizeError(err, lang));
     } finally {
       setLoading(false);
@@ -233,7 +243,7 @@ export default function Auth() {
           {tab === "register" && !signups_enabled && <div className="alert alert-warn">{t("auth.signupsClosed")}</div>}
           {error && <div className="alert alert-error">{error}</div>}
           {info && <div className={`alert ${info === "__expired__" ? "alert-warn" : "alert-success"}`}>{info === "__expired__" ? <AlertTriangle size={14} style={{ marginRight: 6 }} /> : <CheckCircle2 size={14} style={{ marginRight: 6 }} />}{info === "__expired__" ? t("auth.sessionExpiredNote") : info}</div>}
-          {tab !== "login" && <Turnstile key={captchaKey} onToken={setCaptchaToken} />}
+          {(tab !== "login" || needCaptcha) && <Turnstile key={captchaKey} onToken={setCaptchaToken} />}
 
           {(tab === "login" || tab === "register") && (
             <form onSubmit={handleSubmit}>
@@ -256,8 +266,9 @@ export default function Auth() {
               {tab === "login" && needTotp && (
                 <div className="field">
                   <label>{t("auth.totpLabel")}</label>
-                  <input className="input" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={totpCode}
-                    onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))} placeholder="123456" autoFocus />
+                  <input className="input" autoComplete="one-time-code" maxLength={11} value={totpCode} autoCapitalize="none"
+                    onChange={(e) => setTotpCode(e.target.value.replace(/[^0-9A-Za-z -]/g, ""))} placeholder="123456" autoFocus />
+                  <span className="text-sub" style={{ display: "block", marginTop: 4 }}>{t("auth.totpRecoveryHint")}</span>
                 </div>
               )}
               {tab === "register" && (

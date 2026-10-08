@@ -47,10 +47,17 @@ def test_update_email_invalid_rejected(registered):
 
 
 def test_update_email_valid_accepted(registered):
-    client, _username, _password = registered
-    res = client.put("/api/account/email", json={"email": "user@example.com"}, headers=csrf_headers(client))
+    client, _username, password = registered
+    res = client.put("/api/account/email", json={"email": "user@example.com", "password": password}, headers=csrf_headers(client))
     assert res.status_code == 200
     assert res.json()["email"] == "user@example.com"
+
+
+def test_update_email_needs_the_password(registered):
+    client, _username, _password = registered
+    for body in ({"email": "user@example.com"}, {"email": "user@example.com", "password": "WrongPass999"}):
+        res = client.put("/api/account/email", json=body, headers=csrf_headers(client))
+        assert res.status_code == 400 and "heslo" in res.json()["detail"]
 
 
 def test_update_email_rejects_clearing_to_empty(registered):

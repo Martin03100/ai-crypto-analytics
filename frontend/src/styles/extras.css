@@ -229,3 +229,7 @@
   color: var(--text-secondary); background: var(--bg-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
 }
 .track-note svg { flex: none; margin-top: 3px; color: var(--cyan-fg); }
+
+/* ---------- 2FA recovery codes ---------- */
+.recovery-box { margin: 0 0 14px; padding: 14px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--bg-inset); }
+.recovery-list { list-style: none; margin: 0 0 12px; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; font-size: 14px; letter-spacing: 0.04em; }

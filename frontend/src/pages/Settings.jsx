@@ -36,7 +36,10 @@ export default function Settings() {
   const { push } = useToast();
 
   const [email, setEmail] = useState(user?.email || "");
+  const [emailPassword, setEmailPassword] = useState("");
   const [savingEmail, setSavingEmail] = useState(false);
+  // Moving a confirmed address needs the password (a stolen session alone must not redirect the password reset).
+  const emailNeedsPassword = email.trim().toLowerCase() !== (user?.email || "").toLowerCase() && user?.emailVerified !== false;
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
@@ -46,8 +49,9 @@ export default function Settings() {
     e.preventDefault();
     setSavingEmail(true);
     try {
-      const res = await api.updateEmail(email.trim() || null);
+      const res = await api.updateEmail(email.trim() || null, emailNeedsPassword ? emailPassword : undefined);
       updateEmail(res.email, { emailVerified: res.email_verified });
+      setEmailPassword("");
       push(t("settings.emailSaved"), "success");
     } catch (err) {
       push(err, "error");
@@ -157,7 +161,13 @@ export default function Settings() {
               <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("settings.emailPlaceholder")} autoComplete="email" maxLength={255} />
               <span className="text-sub" style={{ display: "block", marginTop: 4 }}>{t("settings.emailDesc")}</span>
             </div>
-            <button className="btn btn-ghost btn-sm" type="submit" disabled={savingEmail}>
+            {emailNeedsPassword && (
+              <div className="field">
+                <label>{t("settings.emailPasswordLabel")}</label>
+                <PasswordInput value={emailPassword} onChange={(e) => setEmailPassword(e.target.value)} autoComplete="current-password" />
+              </div>
+            )}
+            <button className="btn btn-ghost btn-sm" type="submit" disabled={savingEmail || (emailNeedsPassword && !emailPassword)}>
               {savingEmail ? t("common.saving") : t("settings.saveEmail")}
             </button>
           </form>

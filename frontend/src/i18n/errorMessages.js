@@ -27,6 +27,8 @@ const KNOWN_BACKEND_PATTERNS = [
   { test: /k[oó]d z overovacej aplik[aá]cie u[zž] bol pou[zž]it[yý]/i, key: "errors.totpReused" },
   { test: /nespr[aá]vny k[oó]d z overovacej aplik/i, key: "errors.totpInvalid" },
   { test: /overenie, [zž]e nie si robot/i, key: "errors.captchaFailed" },
+  { test: /potvr[dď], [zž]e nie si robot/i, key: "errors.captchaRequired" },
+  { test: /[uú][cč]et administr[aá]tora sa ned[aá] zmaza[tť]/i, key: "errors.adminCannotDelete" },
   { test: /2fa u[zž] m[aá][sš] zapnut|najprv spusti nastavenie 2fa/i, key: "errors.totpSetupState" },
   { test: /na uk[aá][zž]kov[eé] d[aá]ta sa tipova[tť] ned[aá]/i, key: "errors.tipMock" },
   { test: /tipova[tť] sa d[aá] len do 2 hod[ií]n|[cč]as na tip pre t[uú]to predikciu u[zž] uplynul/i, key: "errors.tipWindowClosed" },
