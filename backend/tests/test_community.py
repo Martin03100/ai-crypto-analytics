@@ -274,8 +274,10 @@ def test_weekly_digest_sends_only_to_opted_in(registered, monkeypatch):
 
 def test_periodic_jobs_run_once_per_slot(client, monkeypatch):
     from app.routers import forecast as forecast_router
-    from app.services import alerts, background, briefing, challenge, digest, status_check, tracker
+    from app.services import alerts, background, briefing, challenge, digest, flips, status_check, tracker
     calls = []
+    monkeypatch.setattr(flips, "check_flips", lambda db: calls.append("flips"))
+    monkeypatch.setattr(flips, "send_event_reminders", lambda db: calls.append("reminders"))
     monkeypatch.setattr(status_check, "record_sample", lambda db: calls.append("status"))
     monkeypatch.setattr(challenge, "settle_due", lambda db: calls.append("challenge"))
     monkeypatch.setattr(tracker, "take_snapshots", lambda db: calls.append("snap"))
@@ -285,22 +287,25 @@ def test_periodic_jobs_run_once_per_slot(client, monkeypatch):
     monkeypatch.setattr(digest, "send_weekly_digests", lambda db: calls.append("digest"))
     monday = datetime(2026, 10, 12, 8, 30)
     assert background.run_periodic_jobs(monday) == ["evaluate_forecasts", "price_alerts", "morning_briefing",
-                                                 "portfolio_snapshots", "status_history", "weekly_challenge",
-                                                 "weekly_digest"]
+                                                 "portfolio_snapshots", "status_history", "direction_flips",
+                                                 "event_reminders", "weekly_challenge", "weekly_digest"]
     assert background.run_periodic_jobs(monday + timedelta(minutes=4)) == []
-    assert background.run_periodic_jobs(monday + timedelta(minutes=11)) == ["evaluate_forecasts", "price_alerts"]
+    assert background.run_periodic_jobs(monday + timedelta(minutes=11)) == ["evaluate_forecasts", "price_alerts",
+                                                                            "event_reminders"]
     wednesday = datetime(2026, 10, 14, 9, 0)
     assert background.run_periodic_jobs(wednesday) == ["evaluate_forecasts", "price_alerts", "morning_briefing",
-                                                       "portfolio_snapshots", "status_history"]
+                                                       "portfolio_snapshots", "status_history", "direction_flips",
+                                                       "event_reminders"]
     assert background.run_periodic_jobs(datetime(2026, 10, 14, 15, 0)) == ["evaluate_forecasts", "price_alerts",
-                                                                           "status_history"]
+                                                                           "status_history", "direction_flips",
+                                                                           "event_reminders"]
     assert calls.count("digest") == 1 and calls.count("briefing") == 2 and calls.count("snap") == 2
     assert calls.count("challenge") == 1 and calls.count("status") == 3
     db = SessionLocal()
     try:
         assert {r.name for r in db.query(JobRun).all()} == {"evaluate_forecasts", "price_alerts", "morning_briefing",
                                                   "portfolio_snapshots", "status_history", "weekly_challenge",
-                                                  "weekly_digest"}
+                                                  "weekly_digest", "direction_flips", "event_reminders"}
     finally:
         db.close()
 

@@ -58,6 +58,30 @@ _T = {
         "unsub": "Odhlásit týdenní přehled",
         "note": "Nejde o investiční poradenství.",
     },
+    "de": {
+        "subject": "Diese Woche: Welche KI hat Krypto am besten vorhergesagt?",
+        "title": "KI vs. Realität — dein Wochenrückblick",
+        "global": "Bei allen Nutzern wurden diese Woche {n} Prognosen überprüft. Die Richtung stimmte in {hit} % der Fälle.",
+        "best": "Bestes Modell der Woche: {model} ({hit} % Richtung getroffen, {n} Prognosen).",
+        "duels": "Menschen vs. KI: Menschen haben {w} von {t} Preistipp-Duellen gewonnen.",
+        "you": "Deine Woche: {n} deiner Prognosen wurden überprüft, {hits} lagen bei der Richtung richtig.",
+        "you_duels": "Deine Duelle: {w} gewonnen, {l} verloren.",
+        "cta": "Sieh dir die ganze Trefferquote der KI an",
+        "unsub": "Wochenrückblick abbestellen",
+        "note": "Keine Anlageberatung.",
+    },
+    "pl": {
+        "subject": "W tym tygodniu: które AI najlepiej przewidziało krypto?",
+        "title": "AI kontra rzeczywistość — twoje tygodniowe podsumowanie",
+        "global": "U wszystkich użytkowników sprawdzono w tym tygodniu {n} prognoz. Kierunek był trafny w {hit}% przypadków.",
+        "best": "Najlepszy model tygodnia: {model} ({hit}% trafionego kierunku, {n} prognoz).",
+        "duels": "Ludzie kontra AI: ludzie wygrali {w} z {t} pojedynków w typowaniu ceny.",
+        "you": "Twój tydzień: sprawdzono {n} twoich prognoz, {hits} trafiło kierunek.",
+        "you_duels": "Twoje pojedynki: {w} wygrane, {l} przegrane.",
+        "cta": "Zobacz pełną skuteczność AI",
+        "unsub": "Wypisz się z tygodniowego podsumowania",
+        "note": "To nie jest porada inwestycyjna.",
+    },
 }
 
 

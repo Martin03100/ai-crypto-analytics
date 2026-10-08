@@ -70,4 +70,49 @@
   <url><loc>https://aicryptopredictor.netlify.app/cs/predikce/near</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
   <url><loc>https://aicryptopredictor.netlify.app/cs/predikce/aptos</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
   <url><loc>https://aicryptopredictor.netlify.app/cs/predikce/uniswap</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/de/prognose</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/de/prognose/bitcoin</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/de/prognose/ethereum</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/de/prognose/solana</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/de/prognose/bnb</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/de/prognose/xrp</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/de/prognose/cardano</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/de/prognose/dogecoin</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/de/prognose/avalanche</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/de/prognose/polkadot</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/de/prognose/chainlink</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/de/prognose/toncoin</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/de/prognose/tron</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/de/prognose/litecoin</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/de/prognose/bitcoin-cash</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/de/prognose/shiba-inu</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/de/prognose/sui</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/de/prognose/pepe</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/de/prognose/near</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/de/prognose/aptos</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/de/prognose/uniswap</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/pl/prognoza</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/pl/prognoza/bitcoin</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/pl/prognoza/ethereum</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/pl/prognoza/solana</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/pl/prognoza/bnb</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/pl/prognoza/xrp</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/pl/prognoza/cardano</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/pl/prognoza/dogecoin</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/pl/prognoza/avalanche</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/pl/prognoza/polkadot</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/pl/prognoza/chainlink</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/pl/prognoza/toncoin</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/pl/prognoza/tron</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/pl/prognoza/litecoin</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/pl/prognoza/bitcoin-cash</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/pl/prognoza/shiba-inu</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/pl/prognoza/sui</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/pl/prognoza/pepe</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/pl/prognoza/near</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/pl/prognoza/aptos</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/pl/prognoza/uniswap</loc><changefreq>daily</changefreq><priority>0.7</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/calendar</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/glossary</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://aicryptopredictor.netlify.app/changelog</loc><changefreq>weekly</changefreq><priority>0.4</priority></url>
 </urlset>

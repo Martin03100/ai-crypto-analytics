@@ -3,7 +3,7 @@
 const BASE = "/api";
 const CSRF_COOKIE_NAME = "aca_csrf";
 const LANG_STORAGE_KEY = "aca_lang";
-const VALID_LANGS = ["en", "sk", "cs"];
+const VALID_LANGS = ["en", "sk", "cs", "de", "pl"];
 
 function currentLang() {
   try {
@@ -373,4 +373,34 @@ export const api = {
   historyCsvUrl: () => `${BASE}/forecast/history/export.csv`,
 
   sendChatMessage: (provider, messages) => requestJob("/chat", { body: { provider, messages, lang: currentLang() } }).then(aiResult),
+
+  tipster: (nickname) => request(`/public/tipsters/${encodeURIComponent(nickname)}`).then((r) => {
+    const o = obj(r);
+    return { ...o, duels: obj(o.duels), recent: objArr(o.recent), challenge: { ...obj(o.challenge), rounds: objArr(obj(o.challenge).rounds) } };
+  }),
+  accuracyTimeline: () => request("/public/accuracy-timeline").then((r) => {
+    const o = obj(r);
+    return { weeks: arr(o.weeks), providers: objArr(o.providers).map((p) => ({ ...p, points: objArr(p.points) })) };
+  }),
+  weeklySummary: () => request("/public/weekly-summary").then((r) => withArrays(r, ["providers"])),
+  weeklyCardUrl: (fmt) => `${BASE}/public/weekly-summary/card.png?fmt=${fmt === "story" ? "story" : "square"}`,
+  calendar: (days = 60) => request(`/public/calendar?days=${Number(days) || 60}`).then((r) => withArrays(r, ["events"])),
+  reminders: () => request("/calendar/reminders").then((r) => ({ event_ids: arr(obj(r).event_ids).filter((id) => typeof id === "string") })),
+  addReminder: (event_id) => request("/calendar/reminders", { method: "POST", body: { event_id } }),
+  removeReminder: (eventId) => request(`/calendar/reminders/${encodeURIComponent(eventId)}`, { method: "DELETE" }),
+  pushKey: () => request("/push/key").then(obj),
+  pushSubscribe: (subscription) => request("/push/subscribe", { method: "POST", body: subscription }).then(obj),
+  pushUnsubscribe: (endpoint) => request("/push/unsubscribe", { method: "POST", body: { endpoint } }),
+  pushTest: () => request("/push/test", { method: "POST" }).then(obj),
+  notifyPrefs: () => request("/account/notify-prefs").then((r) => ({ ...obj(r), prefs: obj(obj(r).prefs) })),
+  setNotifyPrefs: (prefs) => request("/account/notify-prefs", { method: "PUT", body: prefs }).then((r) => ({ prefs: obj(obj(r).prefs) })),
+  setUiMode: (simple_mode) => request("/account/ui-mode", { method: "PUT", body: { simple_mode } }).then(obj),
+  whatIf: (coin, days, amount) =>
+    request(`/tools/what-if?coin=${encodeURIComponent(coin)}&days=${Number(days)}&amount=${Number(amount)}`)
+      .then((r) => ({ ...withArrays(r, ["curve"]), strategy: obj(obj(r).strategy), hold: obj(obj(r).hold) })),
+  exportCsvUrl: (kind) => `${BASE}/account/export/${encodeURIComponent(kind)}.csv`,
+  sendFeedback: (body) => request("/feedback", { method: "POST", body: { ...body, lang: currentLang() } }),
+  adminFeedback: (status = "new") => request(`/admin/feedback?status=${encodeURIComponent(status)}`).then((r) => withArrays(r, ["items"])),
+  adminFeedbackStatus: (id, status) => request(`/admin/feedback/${encodeURIComponent(id)}`, { method: "PATCH", body: { status } }),
+  adminFeedbackDelete: (id) => request(`/admin/feedback/${encodeURIComponent(id)}`, { method: "DELETE" }),
 };

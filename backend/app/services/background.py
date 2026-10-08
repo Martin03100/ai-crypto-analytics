@@ -20,6 +20,8 @@ DIGEST_WEEKDAY, DIGEST_HOUR = 0, 8      # Monday 08:00 UTC
 BRIEFING_HOUR = 7                       # every day 07:00 UTC
 SNAPSHOT_HOUR = 0                       # portfolio values at 00:00 UTC
 STATUS_EVERY = timedelta(minutes=15)    # service checks for the 30-day status history
+FLIPS_EVERY = timedelta(hours=3)        # "the AI changed its mind" on watched coins
+REMINDERS_EVERY = timedelta(minutes=10)  # calendar reminders (sent up to an hour ahead)
 
 
 def _claim(name: str, due_after: datetime, now: datetime) -> bool:
@@ -69,6 +71,7 @@ def run_periodic_jobs(now: Optional[datetime] = None) -> list[str]:
     from app.routers.forecast import _evaluate_pending
     from app.services.alerts import check_alerts
     from app.services.challenge import settle_due, week_start
+    from app.services.flips import check_flips, send_event_reminders
     from app.services.status_check import record_sample
     from app.services.briefing import send_morning_briefings
     from app.services.digest import send_weekly_digests
@@ -97,6 +100,12 @@ def run_periodic_jobs(now: Optional[datetime] = None) -> list[str]:
     if _claim("status_history", now - STATUS_EVERY, now):
         _run("status_history", record_sample)
         ran.append("status_history")
+    if _claim("direction_flips", now - FLIPS_EVERY, now):
+        _run("direction_flips", check_flips)
+        ran.append("direction_flips")
+    if _claim("event_reminders", now - REMINDERS_EVERY, now):
+        _run("event_reminders", send_event_reminders)
+        ran.append("event_reminders")
     if _claim("weekly_challenge", week_start(now), now):
         _run("weekly_challenge", settle_due)
         ran.append("weekly_challenge")

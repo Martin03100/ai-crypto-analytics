@@ -20,6 +20,7 @@ export default defineConfig({
         // Not needed to start the app offline: optional monitoring SDK, rare font subsets, share images.
         globIgnores: ["**/vendor_sentry-*.js", "**/*-{cyrillic,greek,vietnamese}*.woff2", "**/og-image.png", "**/icon-512.png"],
         navigateFallback: "/index.html",
+        importScripts: ["/push-sw.js"],      // Web Push: show notifications and open the app on click
         navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,
         runtimeCaching: [
@@ -50,6 +51,7 @@ export default defineConfig({
     globals: false,
     // Playwright end-to-end specs in e2e/ run with `npm run test:e2e`, not with Vitest.
     include: ["src/**/*.test.{js,jsx}"],
+    setupFiles: ["src/testSetup.js"],
   },
   server: {
     port: 5173,
@@ -63,15 +65,17 @@ export default defineConfig({
   build: {
     // Fonts are never inlined as data: URLs: the production CSP allows fonts only from 'self'.
     assetsInlineLimit: (file) => (/\.(woff2?|ttf|otf)$/.test(file) ? false : undefined),
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks(id) {
-          if (!id.includes("node_modules")) return undefined;
-          if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id)) return "vendor_react";
-          if (/[\\/]node_modules[\\/](recharts|d3-[^\\/]+|victory-vendor|internmap|decimal\.js-light|eventemitter3|lodash)[\\/]/.test(id)) return "vendor_charts";
-          if (/[\\/]node_modules[\\/]lucide-react[\\/]/.test(id)) return "vendor_icons";
-          if (/[\\/]node_modules[\\/]@sentry[\\/]/.test(id)) return "vendor_sentry";
-          return undefined;
+        // Rolldown code-splitting groups (higher priority wins). React must stay in its own chunk: with the old
+        // manualChunks emulation it ended up inside the chart chunk and every page downloaded Recharts.
+        codeSplitting: {
+          groups: [
+            { name: "vendor_react", test: /[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler|react-is|use-sync-external-store)[\\/]/, priority: 40 },
+            { name: "vendor_sentry", test: /[\\/]node_modules[\\/]@sentry/, priority: 30 },
+            { name: "vendor_icons", test: /[\\/]node_modules[\\/]lucide-react[\\/]/, priority: 30 },
+            { name: "vendor_charts", test: /[\\/]node_modules[\\/](recharts|d3-[^\\/]+|victory-vendor|internmap|decimal\.js-light|eventemitter3|lodash)[\\/]/, priority: 20 },
+          ],
         },
       },
     },

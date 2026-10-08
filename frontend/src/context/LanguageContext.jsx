@@ -1,11 +1,11 @@
 /** Language context. */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { translate } from "../i18n/translations";
+import { isLanguageLoaded, loadLanguage, translate } from "../i18n/translations";
 
 const LanguageContext = createContext(null);
 const STORAGE_KEY = "aca_lang";
-const VALID = ["sk", "cs", "en"];
+const VALID = ["sk", "cs", "de", "pl", "en"];
 const DEFAULT_LANG = "en";
 
 function readStored() {
@@ -16,13 +16,17 @@ function writeStored(value) {
   try { localStorage.setItem(STORAGE_KEY, value); } catch { /* storage blocked: the choice lasts this session */ }
 }
 
-/** First visit: follow the browser language (Slovak and Czech users get their language right away). */
+/** First visit: follow the browser language (Slovak, Czech, German and Polish users get their language right away). */
 export function detectLang(languages = typeof navigator === "undefined" ? [] : navigator.languages || [navigator.language]) {
   for (const tag of languages) {
     const base = String(tag || "").toLowerCase().split("-")[0];
     if (VALID.includes(base)) return base;
   }
   return DEFAULT_LANG;
+}
+
+export function initialLang() {
+  return loadLang();
 }
 
 function loadLang() {
@@ -41,7 +45,8 @@ export function LanguageProvider({ children }) {
   const setLang = useCallback((next) => {
     if (!VALID.includes(next)) return;
     writeStored(next);
-    setLangState(next);
+    if (isLanguageLoaded(next)) setLangState(next);
+    else loadLanguage(next).then(() => setLangState(next));
   }, []);
 
   const t = useCallback((key, params) => translate(key, lang, params), [lang]);

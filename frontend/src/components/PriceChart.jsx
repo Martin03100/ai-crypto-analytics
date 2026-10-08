@@ -15,6 +15,7 @@ import { SkeletonChart } from "./Skeleton";
 import { useCurrency } from "../context/CurrencyContext";
 import { useLanguage } from "../context/LanguageContext";
 import { localeForLang } from "../i18n/locale";
+import Term from "./Term";
 
 const COINS = [
   { id: "bitcoin", symbol: "BTC" }, { id: "ethereum", symbol: "ETH" }, { id: "solana", symbol: "SOL" },
@@ -140,7 +141,7 @@ export default function PriceChart() {
           </ResponsiveContainer>
           {showRsi && (
             <div className="indicator-panel" role="img" aria-label={t("chart.rsiLabel")}>
-              <span className="indicator-title">RSI (14)</span>
+              <span className="indicator-title"><Term id="rsi">RSI (14)</Term></span>
               <ResponsiveContainer width="100%" height={110}>
                 <ComposedChart data={chartData} margin={{ top: 4, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid stroke="rgba(128,128,128,0.12)" vertical={false} />
@@ -156,7 +157,7 @@ export default function PriceChart() {
           )}
           {showMacd && (
             <div className="indicator-panel" role="img" aria-label={t("chart.macdLabel")}>
-              <span className="indicator-title">MACD (12, 26, 9)</span>
+              <span className="indicator-title"><Term id="macd">MACD (12, 26, 9)</Term></span>
               <ResponsiveContainer width="100%" height={120}>
                 <ComposedChart data={chartData} margin={{ top: 4, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid stroke="rgba(128,128,128,0.12)" vertical={false} />

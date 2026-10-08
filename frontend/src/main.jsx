@@ -20,7 +20,10 @@ import { captureReferralCode } from "./utils/referral";
 import "@fontsource-variable/inter";
 import "@fontsource/jetbrains-mono/400.css";
 import "./styles/app.css";
+import "./styles/extras.css";
 import { initPwa } from "./pwa";
+import { initialLang } from "./context/LanguageContext";
+import { loadLanguage } from "./i18n/translations";
 
 startLabelAssociation();
 initMonitoring();
@@ -29,7 +32,8 @@ rememberUtmSource();
 captureReferralCode();
 initAnalytics();
 
-ReactDOM.createRoot(document.getElementById("root")).render(
+// The saved language is loaded before the first paint, so the app never flashes in English.
+loadLanguage(initialLang()).finally(() => ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <ErrorBoundary>
       <BrowserRouter>
@@ -53,4 +57,4 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       </BrowserRouter>
     </ErrorBoundary>
   </React.StrictMode>
-);
+));

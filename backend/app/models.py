@@ -55,6 +55,10 @@ class User(Base):
     briefing_opt_in: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=None)
     telegram_chat_id: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, default=None)
     telegram_link_code: Mapped[Optional[str]] = mapped_column(String(16), unique=True, index=True, nullable=True, default=None)
+    # Beginner view: one sentence and a traffic light instead of the full analysis. None = not chosen yet.
+    simple_mode: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=None)
+    # JSON {"alerts": bool, "flips": bool, "results": bool, "events": bool}; missing keys mean on.
+    notify_prefs_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
 
     reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
@@ -341,3 +345,61 @@ class ChallengeEntry(Base):
     price: Mapped[float] = mapped_column(Float, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     week_user: Mapped[str] = mapped_column(String(32), unique=True, index=True, nullable=False)   # one guess per week
+
+
+class CoinSignalState(Base):
+    """Last direction of the free model's 24h outlook per coin, to spot when "the AI changed its mind"."""
+
+    __tablename__ = "coin_signal_states"
+
+    coin: Mapped[str] = mapped_column(String(16), primary_key=True)
+    direction: Mapped[str] = mapped_column(String(8), nullable=False)          # up | down | flat
+    last_trend: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)  # last non-flat direction
+    change_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    flipped_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class EventReminder(Base):
+    """A calendar event the user marked; a notification goes out shortly before it starts."""
+
+    __tablename__ = "event_reminders"
+    __table_args__ = (UniqueConstraint("user_id", "event_id", name="uq_event_reminder_user_event"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    event_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    event_at: Mapped[datetime] = mapped_column(DateTime, index=True, nullable=False)
+    title_key: Mapped[str] = mapped_column(String(32), nullable=False)
+    coin: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+
+class PushSubscription(Base):
+    """A browser that accepted Web Push notifications for a user."""
+
+    __tablename__ = "push_subscriptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    endpoint: Mapped[str] = mapped_column(String(1024), unique=True, nullable=False)
+    p256dh: Mapped[str] = mapped_column(String(255), nullable=False)
+    auth: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    last_ok_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class Feedback(Base):
+    """Bug reports and ideas sent from the app; the admin reads them in the admin panel."""
+
+    __tablename__ = "feedback"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True, nullable=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)               # bug | idea | other
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    page: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    lang: Mapped[Optional[str]] = mapped_column(String(4), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="new")   # new | done
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, index=True)

@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { Gauge, Lightbulb } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
+import { useSimpleMode } from "../hooks/useSimpleMode";
 
 const SEEN_KEY = "aca_onboarding_seen_v1";
 
@@ -16,6 +18,7 @@ const STEP_TARGETS = [
   { selector: 'a[href="/forecast"]', titleKey: "onboarding.step2Title", textKey: "onboarding.step2Text", needsSidebar: true },
   { selector: 'a[href="/portfolio"]', titleKey: "onboarding.step3Title", textKey: "onboarding.step3Text", needsSidebar: true },
   { selector: "#tour-feargreed-card", titleKey: "onboarding.step4Title", textKey: "onboarding.step4Text" },
+  { selector: ".palette-trigger", titleKey: "onboarding.stepSearchTitle", textKey: "onboarding.stepSearchText", needsSidebar: true },
   { selector: 'a[href="/settings"]', titleKey: "onboarding.step5Title", textKey: "onboarding.step5Text", needsSidebar: true },
 ];
 
@@ -46,6 +49,8 @@ export default function OnboardingTour({ onNeedSidebar }) {
   const { t } = useLanguage();
   const { user } = useAuth();
   const userKey = user?.id ?? user?.username;
+  const { chosen, setSimple } = useSimpleMode();
+  const [choosing, setChoosing] = useState(false);
   const [active, setActive] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [rect, setRect] = useState(null);
@@ -58,14 +63,32 @@ export default function OnboardingTour({ onNeedSidebar }) {
   }, [onNeedSidebar, userKey]);
 
   useEffect(() => {
-    if (location.pathname !== "/dashboard") return;
-    if (!userKey || hasSeenOnboarding(userKey)) return;
+    if (location.pathname !== "/dashboard" || !userKey) return;
+    if (hasSeenOnboarding(userKey)) return;     // existing users switch the view on the dashboard or in Settings
     const timer = setTimeout(() => {
+      if (!chosen) {
+        setChoosing(true);   // first: beginner or full view, then the tour
+        return;
+      }
       setStepIndex(0);
       setActive(true);
     }, 700);
     return () => clearTimeout(timer);
-  }, [location.pathname, userKey]);
+  }, [location.pathname, userKey, chosen]);
+
+  const choose = useCallback((simpleView) => {
+    setChoosing(false);
+    setSimple(simpleView);
+    setStepIndex(0);
+    setActive(true);
+  }, [setSimple]);
+
+  useEffect(() => {
+    if (!choosing) return;
+    const onKey = (e) => { if (e.key === "Escape") choose(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [choosing, choose]);
 
   const measure = useCallback(() => {
     const step = STEP_TARGETS[stepIndex];
@@ -115,6 +138,30 @@ export default function OnboardingTour({ onNeedSidebar }) {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [active, finish]);
+
+  if (choosing) {
+    return (
+      <div className="confirm-overlay" role="presentation">
+        <div className="confirm-modal mode-choice" role="dialog" aria-modal="true" aria-labelledby="mode-choice-title">
+          <h3 className="confirm-title" id="mode-choice-title">{t("viewMode.askTitle")}</h3>
+          <p className="text-sub" style={{ marginTop: 0 }}>{t("viewMode.askLead")}</p>
+          <div className="mode-options">
+            <button type="button" className="mode-option" onClick={() => choose(true)} autoFocus>
+              <Lightbulb size={20} aria-hidden="true" />
+              <strong>{t("viewMode.beginner")}</strong>
+              <span className="text-sub">{t("viewMode.beginnerText")}</span>
+            </button>
+            <button type="button" className="mode-option" onClick={() => choose(false)}>
+              <Gauge size={20} aria-hidden="true" />
+              <strong>{t("viewMode.advanced")}</strong>
+              <span className="text-sub">{t("viewMode.advancedText")}</span>
+            </button>
+          </div>
+          <p className="text-sub" style={{ marginBottom: 0 }}>{t("viewMode.later")}</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!active) return null;
 

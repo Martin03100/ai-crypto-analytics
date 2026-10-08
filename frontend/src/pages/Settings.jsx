@@ -1,12 +1,15 @@
 /** Settings page. */
 
-import { AtSign, Compass, Download, Info, Key, Languages, LogOut, Moon, ShieldCheck, Sun, Trash2, Wallet2 } from "lucide-react";
+import { AtSign, Compass, Info, Key, Languages, LogOut, Moon, ShieldCheck, Sun, Trash2, Wallet2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Card } from "../components/Card";
 import DemoDataCard from "../components/DemoDataCard";
 import InstallAppCard from "../components/InstallAppCard";
+import DataExport from "../components/DataExport";
 import MembershipCard from "../components/MembershipCard";
+import NotificationSettings from "../components/NotificationSettings";
+import ViewModeCard from "../components/ViewModeCard";
 import { resetOnboarding } from "../components/OnboardingTour";
 import PasswordInput from "../components/PasswordInput";
 import TwoFactorSettings from "../components/TwoFactorSettings";
@@ -188,6 +191,10 @@ export default function Settings() {
           </button>
         </Card>
 
+        <ViewModeCard />
+
+        <NotificationSettings />
+
         <MembershipCard />
 
         <InstallAppCard />
@@ -196,7 +203,7 @@ export default function Settings() {
 
         <Card title={t("settings.about")} icon={Info}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13 }}>
-            <div><strong>{t("settings.version")}:</strong> 2.3.0</div>
+            <div><strong>{t("settings.version")}:</strong> 2.4.0</div>
             <div><strong>{t("settings.techStack")}:</strong> React (Vite), FastAPI, SQLAlchemy, Recharts, CoinGecko API</div>
             <div><strong>{t("settings.support")}:</strong> <a href="mailto:aicryptoanalytics7@gmail.com" className="key-link">aicryptoanalytics7@gmail.com</a></div>
             <div style={{ display: "flex", gap: 14, marginTop: 6, flexWrap: "wrap" }}>
@@ -216,10 +223,7 @@ export default function Settings() {
           </div>
         </Card>
 
-        <Card title={t("settings.dataTitle")} icon={Download}>
-          <p className="text-sub" style={{ marginTop: 0 }}>{t("settings.dataText")}</p>
-          <a className="btn btn-ghost btn-sm" href={api.exportDataUrl()} download><Download size={14} /> {t("settings.dataButton")}</a>
-        </Card>
+        <DataExport />
 
         <Card title={t("settings.deleteAccountTitle")} icon={Trash2} className="danger-zone">
           <p className="text-sub" style={{ marginBottom: 10 }}>{t("settings.deleteAccountDesc")}</p>

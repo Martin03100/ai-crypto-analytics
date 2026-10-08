@@ -54,11 +54,25 @@ statistical model and real market data. Bachelor's thesis project (Software Deve
 - **Honest accuracy:** confidence calibration (claimed vs. real hit rate), accuracy by market situation (rising,
   falling, sideways) and a comparison of every forecast with a naive "price stays the same" guess.
 - **Sharing:** forecasts as Story (9:16) and post (1:1) images, invite link as a QR code.
-- **SEO coin pages:** 20 coins in English, Slovak and Czech (`/prediction/bitcoin`, `/sk/predikcia/bitcoin`,
-  `/cs/predikce/bitcoin`); a Netlify edge function adds the title, canonical, hreflang, JSON-LD and a text snippet.
+- **SEO coin pages:** 20 coins in five languages (`/prediction/bitcoin`, `/sk/predikcia/bitcoin`,
+  `/cs/predikce/bitcoin`, `/de/prognose/bitcoin`, `/pl/prognoza/bitcoin`); a Netlify edge function adds the title, canonical, hreflang, JSON-LD and a text snippet.
 - **Status page** with 30 days of availability history, a "server is waking up" banner on slow responses and a
   one-click **database backup** (gzipped JSON) in the admin panel.
-- Transactional emails in **English, Slovak and Czech**, following the user's app language.
+- **Beginner view:** one plain sentence and a traffic light per coin (and per forecast) instead of charts; new users
+  choose beginner or full view on the first visit, and can switch on the dashboard or in Settings.
+- **Browser notifications (Web Push):** alerts, "the AI changed its mind" (the free model's 24h outlook flips on a
+  watched coin), results and calendar reminders. VAPID keys are created automatically and stored encrypted; the
+  server only sends to real browser push services.
+- **Event calendar** (`/calendar`): Fed decisions, US inflation and jobs reports (official dates), monthly and quarterly
+  option expiries, large token unlocks (DefiLlama) and the estimated Bitcoin halving, with reminders.
+- **"What if" calculator, market heatmap, quick view** (`/quick`, also a home-screen shortcut) and live prices.
+- **Public tipster profiles** (`/tipster/<nickname>`), **accuracy over time**, a weekly **AI vs reality** recap with
+  Story / post images.
+- **Command palette** (Ctrl+K), **glossary** (`/glossary`) with explanations next to terms, **what's new**
+  (`/changelog`), **CSV export** of forecasts, evaluations, alerts and challenge tips, and in-app **feedback** that
+  the admin reads in the admin panel.
+- **Five languages:** English, Slovak, Czech, German and Polish (app, emails, notifications and coin pages).
+- Transactional emails in **English, Slovak, Czech, German and Polish**, following the user's app language.
 - **Demo mode** for presentations: one click fills the whole app with clearly labelled test data ("Gemini test", "Claude test", ...)
   on synthetic prices - forecasts, evaluated accuracy, leaderboard, tips and portfolio analyses, visible only to the user who loaded it.
 

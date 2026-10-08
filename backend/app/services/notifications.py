@@ -8,8 +8,10 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models import Notification
+from app.services import push
 
-KINDS = {"forecast_evaluated", "duel_settled", "referral_reward", "premium_started", "price_alert", "challenge_won"}
+KINDS = {"forecast_evaluated", "duel_settled", "referral_reward", "premium_started", "price_alert", "challenge_won",
+         "direction_flip", "event_reminder"}
 KEEP_PER_USER = 50
 
 
@@ -18,6 +20,7 @@ def notify(db: Session, user_id: int, kind: str, **data) -> None:
     if kind not in KINDS:
         raise ValueError(f"Unknown notification kind: {kind}")
     db.add(Notification(user_id=user_id, kind=kind, data_json=json.dumps(data, ensure_ascii=False)))
+    push.queue(db, user_id, kind, data)
 
 
 def as_dict(row: Notification) -> dict:

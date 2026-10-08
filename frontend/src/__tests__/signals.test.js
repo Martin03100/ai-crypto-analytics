@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { translate } from "../i18n/translations";
+import { beforeAll, describe, expect, it } from "vitest";
+import { loadLanguage, translate } from "../i18n/translations";
 import { groupSignals, signalBalance, signalLabel } from "../utils/signals";
 
 const t = (key, params) => translate(key, "en", params);
@@ -9,6 +9,8 @@ const items = [
   { group: "derivatives", key: "long_short", display: "0.70", tone: "bullish", source: "okx" },
   { group: "unknown", key: "x", display: "1", tone: "neutral", source: "?" },
 ];
+
+beforeAll(async () => { await Promise.all(["sk", "cs", "de", "pl"].map(loadLanguage)); });
 
 describe("market signals", () => {
   it("groups in a fixed order and drops unknown groups", () => {

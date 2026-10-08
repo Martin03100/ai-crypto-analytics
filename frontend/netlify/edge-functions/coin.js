@@ -30,6 +30,20 @@ const TEXT = {
     indexDesc: "Denní výhled ceny Bitcoinu, Etherea, Solany a dalších 17 mincí včetně naměřené přesnosti každého modelu.",
     price: "Cena", outlook: "Výhled 24 h", disclaimer: "Nejedná se o investiční poradenství.",
   },
+  de: {
+    title: (n, c) => `${n} (${c}) Kursprognose — KI-Prognose & Trefferquote`,
+    desc: (n) => `Der heutige Kursausblick für ${n} von einem statistischen Modell und 5 KI-Modellen, mit Live-Signalen und einer öffentlichen Bilanz, wie genau frühere Prognosen waren.`,
+    indexTitle: "Krypto-Kursprognosen — 20 Coins, KI-Prognosen an der Realität geprüft",
+    indexDesc: "Täglicher Kursausblick für Bitcoin, Ethereum, Solana und 17 weitere Coins, mit der gemessenen Trefferquote jedes Modells.",
+    price: "Kurs", outlook: "Ausblick 24 Std.", disclaimer: "Keine Anlageberatung.",
+  },
+  pl: {
+    title: (n, c) => `Prognoza ceny ${n} (${c}) — prognoza AI i skuteczność`,
+    desc: (n) => `Dzisiejsza prognoza ceny ${n} z modelu statystycznego i 5 modeli AI, z sygnałami na żywo i publicznym zapisem skuteczności wcześniejszych prognoz.`,
+    indexTitle: "Prognozy cen kryptowalut — 20 monet, prognozy AI sprawdzone z rzeczywistością",
+    indexDesc: "Codzienna prognoza ceny Bitcoina, Etheru, Solany i 17 innych monet wraz ze zmierzoną skutecznością każdego modelu.",
+    price: "Cena", outlook: "Prognoza 24 h", disclaimer: "To nie jest porada inwestycyjna.",
+  },
 };
 
 const esc = (v) => String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -57,7 +71,7 @@ export function pageFor(pathname) {
 export function alternates(page) {
   return Object.entries(SEO_LANGS).map(([lang, base]) => {
     const href = `${SITE}${base}${page.coin ? `/${page.coin.slug}` : ""}`;
-    return { hreflang: lang === "cs" ? "cs" : lang, href };
+    return { hreflang: lang, href };
   });
 }
 
@@ -137,4 +151,7 @@ export default async function handler(request, context) {
   return new Response(injectCoinMeta(await response.text(), page, data), { status: response.status, headers });
 }
 
-export const config = { path: ["/prediction", "/prediction/*", "/sk/predikcia", "/sk/predikcia/*", "/cs/predikce", "/cs/predikce/*"] };
+export const config = {
+  path: ["/prediction", "/prediction/*", "/sk/predikcia", "/sk/predikcia/*", "/cs/predikce", "/cs/predikce/*",
+    "/de/prognose", "/de/prognose/*", "/pl/prognoza", "/pl/prognoza/*"],
+};

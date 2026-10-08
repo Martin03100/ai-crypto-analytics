@@ -33,6 +33,14 @@ _T = {
            "row": "{coin}: {price} → {target} ({change}), 80% rozsah {low} – {high}",
            "cta": "Otevřít dashboard", "note": "Statistický model na reálných tržních datech. Nejde o investiční poradenství.",
            "off": "Přehled vypneš v Nastavení.", "signals": "Tržní signály"},
+    "de": {"subject": "Dein morgendlicher Krypto-Überblick", "title": "Guten Morgen! Die nächsten 24 Stunden für deine Coins",
+           "row": "{coin}: {price} → {target} ({change}), 80-%-Spanne {low} – {high}",
+           "cta": "Dashboard öffnen", "note": "Statistisches Modell auf echten Marktdaten. Keine Anlageberatung.",
+           "off": "Den Überblick kannst du in den Einstellungen abschalten.", "signals": "Marktsignale"},
+    "pl": {"subject": "Twój poranny przegląd krypto", "title": "Dzień dobry! Najbliższe 24 godziny dla twoich monet",
+           "row": "{coin}: {price} → {target} ({change}), zakres 80% {low} – {high}",
+           "cta": "Otwórz dashboard", "note": "Model statystyczny na prawdziwych danych rynkowych. To nie jest porada inwestycyjna.",
+           "off": "Przegląd wyłączysz w Ustawieniach.", "signals": "Sygnały rynkowe"},
 }
 
 

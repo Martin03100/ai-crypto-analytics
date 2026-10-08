@@ -96,7 +96,7 @@ def register(payload: RegisterRequest, response: Response, request: Request, bac
     _set_auth_cookie(response, user)
     return TokenResponse(username=user.username, user_id=user.id, email=user.email,
                           email_verified=user.email_verified, totp_enabled=bool(user.totp_enabled),
-                          premium=is_premium(user), admin=is_admin(user))
+                          premium=is_premium(user), admin=is_admin(user), simple_mode=user.simple_mode)
 
 
 @router.post("/login", response_model=TokenResponse, dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_LOGIN))])
@@ -153,7 +153,7 @@ def login(payload: LoginRequest, response: Response, request: Request, backgroun
     _set_auth_cookie(response, user)
     return TokenResponse(username=user.username, user_id=user.id, email=user.email,
                           email_verified=user.email_verified, totp_enabled=bool(user.totp_enabled),
-                          premium=is_premium(user), admin=is_admin(user))
+                          premium=is_premium(user), admin=is_admin(user), simple_mode=user.simple_mode)
 
 
 @router.post("/logout")
@@ -166,7 +166,7 @@ def logout(response: Response) -> dict:
 def me(user: User = Depends(get_current_user)) -> TokenResponse:
     return TokenResponse(access_token="", username=user.username, user_id=user.id, email=user.email,
                          email_verified=user.email_verified, totp_enabled=bool(user.totp_enabled),
-                         premium=is_premium(user), admin=is_admin(user))
+                         premium=is_premium(user), admin=is_admin(user), simple_mode=user.simple_mode)
 
 
 @router.post("/forgot-password", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_LOGIN))])

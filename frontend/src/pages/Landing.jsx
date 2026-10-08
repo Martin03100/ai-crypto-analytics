@@ -1,6 +1,6 @@
 /** Landing page. */
 
-import { ArrowRight, BarChart3, BellRing, Brain, Check, Crown, Database, Radar, ShieldCheck, Trophy, Users } from "lucide-react";
+import { ArrowRight, BarChart3, BellRing, Brain, Calculator, CalendarDays, Lightbulb, Check, Crown, Database, Radar, ShieldCheck, Trophy, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { api } from "../api";
@@ -21,6 +21,9 @@ const FEATURES = [
   { icon: Users, title: "landing.f4Title", text: "landing.f4Text" },
   { icon: Radar, title: "landing.f5Title", text: "landing.f5Text" },
   { icon: BellRing, title: "landing.f6Title", text: "landing.f6Text" },
+  { icon: Lightbulb, title: "landing.f7Title", text: "landing.f7Text" },
+  { icon: CalendarDays, title: "landing.f8Title", text: "landing.f8Text" },
+  { icon: Calculator, title: "landing.f9Title", text: "landing.f9Text" },
 ];
 // The stats strip appears only once enough forecasts were checked to mean something (the full record stays public).
 const MIN_PUBLIC_SAMPLE = 50;
@@ -82,6 +85,9 @@ export default function Landing() {
             <p className="text-sub">{t(text)}</p>
             {title === "landing.f3Title" && (
               <Link to="/track-record" className="key-link landing-feature-link">{t("track.landingLink")} <ArrowRight size={13} /></Link>
+            )}
+            {title === "landing.f8Title" && (
+              <Link to="/calendar" className="key-link landing-feature-link">{t("calendar.openFull")} <ArrowRight size={13} /></Link>
             )}
           </div>
         ))}

@@ -29,10 +29,16 @@ _SUBJECT = {
            "rsi": "RSI {coin} je {value}", "fear_greed": "Index Fear & Greed je {value}"},
     "cs": {"price": "{coin} je {dir} {target}", "move": "{coin} se za 24 hodin pohnul o {value}",
            "rsi": "RSI {coin} je {value}", "fear_greed": "Index Fear & Greed je {value}"},
+    "de": {"price": "{coin} liegt {dir} {target}", "move": "{coin} hat sich in 24 Stunden um {value} bewegt",
+           "rsi": "RSI von {coin} liegt bei {value}", "fear_greed": "Der Fear & Greed Index liegt bei {value}"},
+    "pl": {"price": "{coin} jest {dir} {target}", "move": "{coin} zmienił się w ciągu 24 godzin o {value}",
+           "rsi": "RSI {coin} wynosi {value}", "fear_greed": "Indeks Fear & Greed wynosi {value}"},
 }
 _WORDS = {"en": ("above", "below", "Alert", "Open AI Crypto Analytics"),
           "sk": ("nad", "pod", "Alarm", "Otvoriť AI Crypto Analytics"),
-          "cs": ("nad", "pod", "Alarm", "Otevřít AI Crypto Analytics")}
+          "cs": ("nad", "pod", "Alarm", "Otevřít AI Crypto Analytics"),
+          "de": ("über", "unter", "Alarm", "AI Crypto Analytics öffnen"),
+          "pl": ("powyżej", "poniżej", "Alert", "Otwórz AI Crypto Analytics")}
 
 
 def fmt_price(value: float) -> str:

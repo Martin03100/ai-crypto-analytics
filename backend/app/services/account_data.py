@@ -9,7 +9,7 @@ from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.models import (
-    AuditEvent, ChallengeEntry, CommunityVote, ForecastEvaluation, ForecastHistory, ForecastSchedule, Notification, PortfolioHistory,
+    AuditEvent, ChallengeEntry, EventReminder, Feedback, PushSubscription, CommunityVote, ForecastEvaluation, ForecastHistory, ForecastSchedule, Notification, PortfolioHistory,
     PortfolioPosition, PortfolioSnapshot, PriceAlert, PriceTip, User,
 )
 
@@ -69,7 +69,8 @@ def export_user_data(db: Session, user: User) -> dict:
                     "referral_code": user.referral_code, "watchlist": user.watchlist_json,
                     "invited_by_another_user": user.referred_by_id is not None,
                     "telegram_connected": bool(user.telegram_chat_id),
-                    "payment_customer_at_stripe": bool(user.stripe_customer_id)},
+                    "payment_customer_at_stripe": bool(user.stripe_customer_id),
+                    "beginner_view": user.simple_mode, "notification_settings": user.notify_prefs_json},
         "connected_ai_providers": [k.provider for k in user.api_keys],
         "forecasts": _rows(db, ForecastHistory, user.id, ("id", "crypto_symbol", "timeframe", "model_used", "created_at", "forecast_json")),
         "forecast_evaluations": _rows(db, ForecastEvaluation, user.id, ("forecast_id", "provider", "coin", "timeframe", "accuracy_pct",
@@ -82,6 +83,9 @@ def export_user_data(db: Session, user: User) -> dict:
         "portfolio_positions": _rows(db, PortfolioPosition, user.id, ("coin", "amount", "avg_buy_price", "created_at")),
         "portfolio_history": _rows(db, PortfolioSnapshot, user.id, ("day", "value_usd", "cost_usd")),
         "weekly_challenge_guesses": _rows(db, ChallengeEntry, user.id, ("week", "price", "created_at")),
+        "calendar_reminders": _rows(db, EventReminder, user.id, ("event_id", "event_at", "sent_at", "created_at")),
+        "browser_notification_devices": _rows(db, PushSubscription, user.id, ("created_at", "last_ok_at")),
+        "feedback_sent": _rows(db, Feedback, user.id, ("kind", "message", "page", "created_at")),
         "community_votes": _rows(db, CommunityVote, user.id, ("sentiment_vote", "voted_at")),
         "notifications": _rows(db, Notification, user.id, ("kind", "data_json", "created_at", "read_at")),
         "account_activity": _rows(db, AuditEvent, user.id, ("action", "ip", "user_agent", "details", "created_at")),

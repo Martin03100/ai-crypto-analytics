@@ -8,7 +8,9 @@ import { Card } from "../components/Card";
 import InfoTip from "../components/InfoTip";
 import LoadError from "../components/LoadError";
 import OnchainCard from "../components/OnchainCard";
+import MarketHeatmap from "../components/MarketHeatmap";
 import MarketScanner from "../components/MarketScanner";
+import WhatIfCalculator from "../components/WhatIfCalculator";
 import MarketSignals from "../components/MarketSignals";
 import PriceChart from "../components/PriceChart";
 import { SkeletonLines } from "../components/Skeleton";
@@ -147,11 +149,15 @@ export default function Market() {
         </div>
       </div>
 
+      <MarketHeatmap style={{ marginBottom: 16 }} />
+
       <div style={{ marginBottom: 16 }}>
         <PriceChart />
       </div>
 
       <MarketScanner />
+
+      <WhatIfCalculator style={{ marginBottom: 16 }} />
 
       <MarketSignals style={{ marginBottom: 16 }} />
 

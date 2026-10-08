@@ -1,7 +1,9 @@
 /** Translation tests. */
 
-import { describe, expect, it } from "vitest";
-import { DEFAULT_LANG, translate } from "../i18n/translations";
+import { beforeAll, describe, expect, it } from "vitest";
+import { DEFAULT_LANG, loadLanguage, translate } from "../i18n/translations";
+
+beforeAll(async () => { await Promise.all(["sk", "cs", "de", "pl"].map(loadLanguage)); });
 
 describe("translate()", () => {
   it("returns the correct string for each supported language", () => {

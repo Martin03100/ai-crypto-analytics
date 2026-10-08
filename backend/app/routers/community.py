@@ -88,7 +88,7 @@ def set_nickname(payload: NicknameIn, user: User = Depends(get_current_user), db
 class PreferencesIn(BaseModel):
     digest_opt_in: bool | None = None
     briefing_opt_in: bool | None = None
-    lang: str | None = Field(default=None, pattern=r"^(en|sk|cs)$")
+    lang: str | None = Field(default=None, pattern=r"^(en|sk|cs|de|pl)$")
 
 
 @router.put("/api/account/preferences")

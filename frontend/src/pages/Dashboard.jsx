@@ -1,18 +1,21 @@
 /** Dashboard page. */
 
-import { ArrowRight, CalendarClock, Gauge, RefreshCw, Sparkles, Wallet } from "lucide-react";
+import { ArrowRight, CalendarClock, Gauge, Lightbulb, RefreshCw, Sparkles, Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { ConfidenceBadge, RiskBadge } from "../components/Badge";
 import { Card } from "../components/Card";
 import DailyDigest from "../components/DailyDigest";
-import InfoTip from "../components/InfoTip";
+import Term from "../components/Term";
 import { SkeletonLines } from "../components/Skeleton";
 import ChallengeCard from "../components/ChallengeCard";
 import MarketSignals from "../components/MarketSignals";
 import PriceAlerts from "../components/PriceAlerts";
+import SimpleOverview from "../components/SimpleOverview";
+import UpcomingEvents from "../components/UpcomingEvents";
 import Watchlist from "../components/Watchlist";
+import { useSimpleMode } from "../hooks/useSimpleMode";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../context/ToastContext";
@@ -42,6 +45,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { t, lang } = useLanguage();
   const { push } = useToast();
+  const { simple, setSimple } = useSimpleMode();
   usePageTitle("dashboard.pageTitle");
   const [fg, setFg] = useState(null);
   const [refreshingFg, setRefreshingFg] = useState(false);
@@ -98,18 +102,26 @@ export default function Dashboard() {
           <p className="eyebrow">{today}</p>
           <h1 className="page-title">{t(greetingKey)}, {user?.username}</h1>
         </div>
-        <Link to="/forecast" className="btn btn-primary"><Sparkles size={15} /> {t("dashboard.quickForecastLabel")}</Link>
+        <div className="topbar-actions">
+          <button type="button" className={`btn btn-ghost btn-sm mode-pill ${simple ? "on" : ""}`} aria-pressed={simple}
+                  onClick={() => setSimple(!simple)} title={t("viewMode.title")}>
+            <Lightbulb size={14} aria-hidden="true" /> {t("viewMode.simple")}
+          </button>
+          <Link to="/forecast" className="btn btn-primary"><Sparkles size={15} /> {t("dashboard.quickForecastLabel")}</Link>
+        </div>
       </div>
 
-      <DailyDigest />
+      {simple ? <SimpleOverview /> : <DailyDigest />}
 
       <Watchlist />
 
       <PriceAlerts />
 
+      <UpcomingEvents style={{ marginTop: 16 }} />
+
       <ChallengeCard style={{ marginTop: 16 }} />
 
-      <MarketSignals compact style={{ marginTop: 16 }} />
+      {!simple && <MarketSignals compact style={{ marginTop: 16 }} />}
 
       {loading ? (
         <div className="grid grid-2" style={{ marginTop: 16 }}><Card><SkeletonLines count={4} /></Card><Card><SkeletonLines count={4} /></Card></div>
@@ -146,7 +158,7 @@ export default function Dashboard() {
           {fg ? (
             <Card id="tour-feargreed-card">
               <div className="card-head">
-                <h2 className="card-title" style={{ margin: 0 }}><Gauge size={14} /> {t("dashboard.fearGreedTitle")} <InfoTip text={t("help.fearGreed")} /></h2>
+                <h2 className="card-title" style={{ margin: 0 }}><Gauge size={14} /> <Term id="fearGreed">{t("dashboard.fearGreedTitle")}</Term></h2>
                 <button className="btn btn-ghost btn-sm btn-icon" onClick={handleRefreshFg} disabled={refreshingFg}
                         aria-label={t("dashboard.fearGreedRefresh")} title={t("dashboard.fearGreedRefresh")}>
                   <RefreshCw size={13} className={refreshingFg ? "spin" : ""} />
@@ -175,7 +187,7 @@ export default function Dashboard() {
             </Card>
           )}
 
-          <Card title={t("schedule.dashboardTitle")} icon={CalendarClock}>
+          {!simple && <Card title={t("schedule.dashboardTitle")} icon={CalendarClock}>
             {nextSchedule ? (
               <>
                 <div className="kv-head">
@@ -190,7 +202,7 @@ export default function Dashboard() {
             ) : (
               <EmptyCta icon={CalendarClock} text={t("schedule.dashboardEmpty")} to="/forecast?tab=schedule" action={t("schedule.create")} />
             )}
-          </Card>
+          </Card>}
 
           <Card title={t("dashboard.lastPortfolioTitle")} icon={Wallet}>
             {lastPortfolio ? (

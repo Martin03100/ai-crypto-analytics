@@ -10,6 +10,7 @@ import { formatPrice } from "../utils/formatPrice";
 import { Card } from "./Card";
 import InfoTip from "./InfoTip";
 import { SkeletonLines } from "./Skeleton";
+import Term from "./Term";
 
 const SORTS = { expected: (r) => -Math.abs(r.expected_24h_pct ?? 0), up: (r) => -(r.expected_24h_pct ?? -99),
   down: (r) => r.expected_24h_pct ?? 99, rsi: (r) => -(r.rsi ?? -1) };
@@ -53,7 +54,7 @@ export default function MarketScanner() {
           <table className="lb-table scanner-table">
             <thead>
               <tr><th>{t("scanner.colCoin")}</th><th>{t("scanner.colPrice")}</th><th>24h</th><th>7d</th>
-                <th>{t("scanner.colExpected")}</th><th>RSI</th><th>{t("scanner.colSignal")}</th></tr>
+                <th>{t("scanner.colExpected")}</th><th><Term id="rsi">RSI</Term></th><th>{t("scanner.colSignal")}</th></tr>
             </thead>
             <tbody>
               {rows.map((r) => (

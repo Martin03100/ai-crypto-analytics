@@ -1,9 +1,10 @@
 /** Admin panel: overview, users, waitlist and app settings. Visible only to admins (ADMIN_USERNAMES + 2FA). */
 
-import { Ban, CreditCard, Crown, Database, Download, LayoutGrid, Search, Settings2, ShieldAlert, Users } from "lucide-react";
+import { Ban, CreditCard, Crown, Database, Download, LayoutGrid, MessageSquare, Search, Settings2, ShieldAlert, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { api } from "../api";
+import AdminFeedback from "../components/AdminFeedback";
 import AdminPayments from "../components/AdminPayments";
 import { Card } from "../components/Card";
 import LoadError from "../components/LoadError";
@@ -15,7 +16,7 @@ import { useToast } from "../context/ToastContext";
 import { localeForLang } from "../i18n/locale";
 import { usePageTitle } from "../hooks/usePageTitle";
 
-const TABS = [["overview", LayoutGrid], ["users", Users], ["waitlist", Download], ["payments", CreditCard], ["settings", Settings2]];
+const TABS = [["overview", LayoutGrid], ["users", Users], ["feedback", MessageSquare], ["waitlist", Download], ["payments", CreditCard], ["settings", Settings2]];
 const SWITCHES = ["signups_enabled", "chat_enabled", "compare_enabled", "backtest_enabled", "tipsters_enabled",
   "waitlist_enabled", "digest_enabled", "referrals_enabled"];
 const NUMBERS = ["free_schedules", "premium_schedules", "free_alerts", "premium_alerts", "premium_trial_days", "referral_reward_days",
@@ -275,6 +276,7 @@ export default function Admin() {
           </div>
           {tab === "overview" && <Overview />}
           {tab === "users" && <UsersTab />}
+          {tab === "feedback" && <AdminFeedback />}
           {tab === "waitlist" && <WaitlistTab />}
           {tab === "payments" && <AdminPayments />}
           {tab === "settings" && <SettingsTab />}

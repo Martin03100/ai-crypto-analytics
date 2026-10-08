@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { useLanguage } from "../context/LanguageContext";
 
 const ITEMS = [["D", "shortcuts.dashboard"], ["F", "shortcuts.forecast"], ["P", "shortcuts.portfolio"],
-  ["M", "shortcuts.market"], ["A", "shortcuts.account"], ["S", "shortcuts.settings"], ["?", "shortcuts.help"]];
+  ["M", "shortcuts.market"], ["A", "shortcuts.account"], ["S", "shortcuts.settings"], ["Ctrl K", "shortcuts.search"], ["?", "shortcuts.help"]];
 
 export default function ShortcutsHelp({ onClose }) {
   const { t } = useLanguage();

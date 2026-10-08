@@ -21,7 +21,7 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     email: str = Field(min_length=3, max_length=255)
     captcha_token: Optional[str] = Field(default=None, max_length=4096)
-    lang: Optional[str] = Field(default=None, pattern=r"^(en|sk|cs)$")
+    lang: Optional[str] = Field(default=None, pattern=r"^(en|sk|cs|de|pl)$")
     referral_code: Optional[str] = Field(default=None, max_length=16, pattern=r"^[A-Za-z0-9]*$")
 
 
@@ -42,6 +42,7 @@ class TokenResponse(BaseModel):
     totp_enabled: bool = False
     premium: bool = False
     admin: bool = False
+    simple_mode: Optional[bool] = None
 
 
 class ApiKeyIn(BaseModel):
@@ -281,7 +282,7 @@ class ScheduleCreate(BaseModel):
     hour: int = Field(ge=0, le=23)
     minute: int = Field(default=0, ge=0, le=59)
     timezone: str = Field(default="UTC", min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_+\-/]+$")
-    lang: Literal["en", "sk", "cs"] = "en"
+    lang: Literal["en", "sk", "cs", "de", "pl"] = "en"
 
 
 class ScheduleUpdate(BaseModel):

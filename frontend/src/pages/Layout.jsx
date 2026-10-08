@@ -1,15 +1,18 @@
 /** App layout. */
 
-import { Menu, MoreHorizontal, RefreshCw, WifiOff } from "lucide-react";
+import { Menu, MoreHorizontal, RefreshCw, Search, WifiOff } from "lucide-react";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import AnnouncementBar from "../components/AnnouncementBar";
 import ChatWidget from "../components/ChatWidget";
+import CommandPalette from "../components/CommandPalette";
+import { openPalette } from "../utils/viewHelpers";
 import ErrorBoundary from "../components/ErrorBoundary";
 import NotificationBell from "../components/NotificationBell";
 import OnboardingTour from "../components/OnboardingTour";
 import Sidebar, { BrandMark } from "../components/Sidebar";
 import ShortcutsHelp from "../components/ShortcutsHelp";
+import { SkeletonLines } from "../components/Skeleton";
 import VerifyEmailGate from "../components/VerifyEmailGate";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { useNavLinks } from "../hooks/useNavLinks";
@@ -22,8 +25,13 @@ import { PWA_UPDATE_EVENT, updateApp } from "../pwa";
 function ContentLoader() {
   const { t } = useLanguage();
   return (
-    <div style={{ padding: "60px 0", textAlign: "center", color: "var(--text-tertiary)", fontSize: 13 }}>
-      {t("app.loading")}
+    <div className="page-skeleton" role="status" aria-label={t("app.loading")}>
+      <div className="skeleton" style={{ height: 28, width: "40%", marginBottom: 18 }} />
+      <div className="card"><SkeletonLines count={3} /></div>
+      <div className="grid grid-2" style={{ marginTop: 16 }}>
+        <div className="card"><SkeletonLines count={4} /></div>
+        <div className="card"><SkeletonLines count={4} /></div>
+      </div>
     </div>
   );
 }
@@ -103,9 +111,14 @@ export default function Layout() {
       <main className="main">
         <div className="mobile-topbar">
           <div className="brand"><BrandMark /><div className="brand-name">AI Crypto Analytics</div></div>
-          <button className="mobile-menu-btn" onClick={() => setMenuOpen(true)} aria-label={t("common.openMenu")}>
-            <Menu size={17} />
-          </button>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button className="mobile-menu-btn" onClick={openPalette} aria-label={t("palette.trigger")}>
+              <Search size={17} />
+            </button>
+            <button className="mobile-menu-btn" onClick={() => setMenuOpen(true)} aria-label={t("common.openMenu")}>
+              <Menu size={17} />
+            </button>
+          </div>
         </div>
         <OfflineBanner />
         <AnnouncementBar />
@@ -123,6 +136,7 @@ export default function Layout() {
       {chat_enabled && <ChatWidget />}
       <OnboardingTour onNeedSidebar={setMenuOpen} />
       {showShortcuts && <ShortcutsHelp onClose={closeShortcuts} />}
+      <CommandPalette />
     </div>
   );
 }

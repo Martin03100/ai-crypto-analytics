@@ -9,7 +9,7 @@ export const SEO_COINS = [
   ["UNI", "uniswap", "Uniswap"],
 ].map(([coin, slug, name]) => ({ coin, slug, name }));
 
-export const SEO_LANGS = { en: "/prediction", sk: "/sk/predikcia", cs: "/cs/predikce" };
+export const SEO_LANGS = { en: "/prediction", sk: "/sk/predikcia", cs: "/cs/predikce", de: "/de/prognose", pl: "/pl/prognoza" };
 
 export function coinBySlug(slug) {
   return SEO_COINS.find((c) => c.slug === String(slug || "").toLowerCase()) || null;
@@ -22,5 +22,7 @@ export function coinPath(lang, slug) {
 export function langFromPath(pathname) {
   if (pathname.startsWith("/sk/")) return "sk";
   if (pathname.startsWith("/cs/")) return "cs";
+  if (pathname.startsWith("/de/")) return "de";
+  if (pathname.startsWith("/pl/")) return "pl";
   return "en";
 }

@@ -22,6 +22,8 @@ import { useCurrency } from "../context/CurrencyContext";
 import { SkeletonChart, SkeletonLines } from "../components/Skeleton";
 import ProviderSelect from "../components/ProviderSelect";
 import SchedulePanel from "../components/SchedulePanel";
+import SimpleVerdict from "../components/SimpleVerdict";
+import { useSimpleMode } from "../hooks/useSimpleMode";
 import { useToast } from "../context/ToastContext";
 import { useProviders } from "../context/ProvidersContext";
 import { useConfirm } from "../context/ConfirmContext";
@@ -207,6 +209,7 @@ export default function Forecast() {
   const { currency } = useCurrency();
   const { compare_enabled, backtest_enabled } = useAppConfig();
   const { mode: premiumMode, loaded: configLoaded } = usePremium();
+  const { simple } = useSimpleMode();
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState(() => (TABS.includes(searchParams.get("tab")) ? searchParams.get("tab") : "new"));
   const urlTab = searchParams.get("tab");
@@ -227,6 +230,10 @@ export default function Forecast() {
   const canGenerate = providers.some((p) => p.connected);
   const [provider, setProvider] = useState(null);
   const [coin, setCoin] = useState(() => (COINS.includes(searchParams.get("coin")) ? searchParams.get("coin") : "BTC"));
+  const urlCoin = searchParams.get("coin");
+  useEffect(() => {
+    if (COINS.includes(urlCoin)) setCoin(urlCoin);
+  }, [urlCoin]);
   const [horizon, setHorizon] = useState("1T");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -364,11 +371,11 @@ export default function Forecast() {
         <button className={`tab ${tab === "new" ? "active" : ""}`} onClick={() => setTab("new")}>{t("forecast.tabNew")}</button>
         <button className={`tab ${tab === "history" ? "active" : ""}`} onClick={() => setTab("history")}>{t("forecast.tabHistory")}</button>
         <button className={`tab ${tab === "schedule" ? "active" : ""}`} onClick={() => setTab("schedule")}>{t("forecast.tabSchedule")}</button>
-        <button className={`tab ${tab === "leaderboard" ? "active" : ""}`} onClick={() => setTab("leaderboard")}>{t("forecast.tabLeaderboard")}</button>
-        {compare_enabled && <button className={`tab ${tab === "compare" ? "active" : ""}`} onClick={() => setTab("compare")}>{t("forecast.tabCompare")}</button>}
-        {backtest_enabled && <button className={`tab ${tab === "backtest" ? "active" : ""}`} onClick={() => setTab("backtest")}>{t("forecast.tabBacktest")}</button>}
-        {premiumMode && <button className={`tab ${tab === "simulator" ? "active" : ""}`} onClick={() => setTab("simulator")}><Crown size={13} style={{ marginRight: 5 }} />{t("sim.tab")}</button>}
-        {premiumMode && <button className={`tab ${tab === "mystats" ? "active" : ""}`} onClick={() => setTab("mystats")}><Crown size={13} style={{ marginRight: 5 }} />{t("mystats.tab")}</button>}
+        {!simple && <button className={`tab ${tab === "leaderboard" ? "active" : ""}`} onClick={() => setTab("leaderboard")}>{t("forecast.tabLeaderboard")}</button>}
+        {!simple && compare_enabled && <button className={`tab ${tab === "compare" ? "active" : ""}`} onClick={() => setTab("compare")}>{t("forecast.tabCompare")}</button>}
+        {!simple && backtest_enabled && <button className={`tab ${tab === "backtest" ? "active" : ""}`} onClick={() => setTab("backtest")}>{t("forecast.tabBacktest")}</button>}
+        {!simple && premiumMode && <button className={`tab ${tab === "simulator" ? "active" : ""}`} onClick={() => setTab("simulator")}><Crown size={13} style={{ marginRight: 5 }} />{t("sim.tab")}</button>}
+        {!simple && premiumMode && <button className={`tab ${tab === "mystats" ? "active" : ""}`} onClick={() => setTab("mystats")}><Crown size={13} style={{ marginRight: 5 }} />{t("mystats.tab")}</button>}
       </div>
 
       {tab === "new" && (
@@ -417,6 +424,8 @@ export default function Forecast() {
 
           {!loading && result?.data && (
             <div style={{ marginTop: 20 }}>
+              {simple && <SimpleVerdict data={result.data} coin={result.coin} horizon={result.horizon}
+                                        model={providers.find((p) => p.provider === result.provider)?.label || result.provider} />}
               <Card title={`${t("forecast.chartTitlePrefix")}: ${result.coin}`} icon={Sparkles} glow="cyan">
                 {result.is_mock && <div style={{ marginBottom: 12 }}><MockBadge /></div>}
                 {result.fallbackFrom && <div style={{ marginBottom: 12 }}><FallbackBadge /></div>}

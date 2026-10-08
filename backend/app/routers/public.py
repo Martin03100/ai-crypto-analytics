@@ -23,7 +23,7 @@ from app.models import ForecastEvaluation, ForecastHistory, PriceTip, User, Wait
 from app.rate_limit import rate_limit_by_ip
 from app.routers.forecast import _MIN_SAMPLE, _tip_summary, provider_stats
 from app.routers.community import premium_info
-from app.services import accuracy, cards, challenge, coin_page, status_check
+from app.services import accuracy, app_settings, cards, challenge, coin_page, status_check
 from app.utils.ttl_cache import TTLCache
 from app.services.app_settings import public_settings, require_feature
 from app.services.digest import check_unsubscribe_token
@@ -114,7 +114,7 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 class WaitlistRequest(BaseModel):
     email: str = Field(min_length=6, max_length=255)
-    lang: str = Field(default="en", pattern=r"^(en|sk|cs)$")
+    lang: str = Field(default="en", pattern=r"^(en|sk|cs|de|pl)$")
     source: Optional[str] = Field(default=None, max_length=32, pattern=r"^[A-Za-z0-9_.-]*$")
 
 
@@ -224,7 +224,7 @@ def tipsters(period: Literal["week", "all"] = Query(default="week"), db: Session
     return {
         "period": period, "week_start": since.isoformat() + "Z",
         "leaders": [{"nickname": u.nickname, "duels": n, "wins": int(w or 0), "win_pct": round((w or 0) / n * 100),
-                     "premium": is_premium(u), "badge": ambassador_badge(invited_signups(db, u.id)),
+                     "premium": is_premium(u) and app_settings.premium_mode(), "badge": ambassador_badge(invited_signups(db, u.id)),
                      "challenge_wins": challenge.wins(db, u.id)}
                     for u, n, w in rows],
         "humans_vs_ai": {"wins": outcomes.get("win", 0), "losses": outcomes.get("loss", 0), "ties": outcomes.get("tie", 0)},

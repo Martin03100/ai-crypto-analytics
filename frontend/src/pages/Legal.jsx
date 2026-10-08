@@ -37,7 +37,7 @@ function Operator({ t }) {
   );
 }
 
-const PRIVACY_SECTIONS = ["dataCollected", "purposes", "cookies", "analytics", "alertsData", "premiumData", "waitlist",
+const PRIVACY_SECTIONS = ["dataCollected", "purposes", "cookies", "analytics", "alertsData", "pushData", "feedbackData", "premiumData", "waitlist",
   "payments", "thirdParty", "retention", "rights", "contact"];
 const TERMS_SECTIONS = ["notAdvice", "eligibility", "account", "premium", "referrals", "withdrawal", "acceptableUse",
   "liability", "law", "changes"];

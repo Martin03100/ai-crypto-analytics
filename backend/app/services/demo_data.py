@@ -148,6 +148,24 @@ def _reasoning(lang: str, label: str, coin: str, horizon: str, spot: float, chan
                     f"během horizontu ({horizon}) při denní volatilitě {vol} %.",
             "tail": f"S 80% pravděpodobností skončí cena mezi ${lo} a ${hi}. Jde o vygenerovaná demo data ze syntetických cen, ne o radu.",
         },
+        "de": {
+            "up": f"Testanalyse von {label}: {coin} notiert bei etwa ${s}. Das Modell erwartet bis zum Ende des Horizonts "
+                  f"({horizon}) einen Anstieg um {chg} %, gestützt durch positives Momentum und eine tägliche Volatilität von {vol} %.",
+            "down": f"Testanalyse von {label}: {coin} notiert bei etwa ${s}. Das Modell erwartet bis zum Ende des Horizonts "
+                    f"({horizon}) einen Rückgang um {chg} %, da das Momentum nachlässt; die tägliche Volatilität liegt bei {vol} %.",
+            "flat": f"Testanalyse von {label}: {coin} notiert bei etwa ${s}. Das Modell erwartet über den Horizont ({horizon}) "
+                    f"eine Seitwärtsbewegung ({chg} %) bei einer täglichen Volatilität von {vol} %.",
+            "tail": f"Mit 80 % Wahrscheinlichkeit endet der Preis zwischen ${lo} und ${hi}. Generierte Demodaten aus synthetischen Preisen, keine Beratung.",
+        },
+        "pl": {
+            "up": f"Analiza testowa modelu {label}: {coin} jest notowany w okolicach ${s}. Model oczekuje wzrostu o {chg}% do końca "
+                  f"horyzontu ({horizon}) dzięki pozytywnemu momentum i dziennej zmienności {vol}%.",
+            "down": f"Analiza testowa modelu {label}: {coin} jest notowany w okolicach ${s}. Model oczekuje spadku o {chg}% do końca "
+                    f"horyzontu ({horizon}) przy słabnącym momentum; dzienna zmienność wynosi {vol}%.",
+            "flat": f"Analiza testowa modelu {label}: {coin} jest notowany w okolicach ${s}. Model oczekuje ruchu bocznego ({chg}%) "
+                    f"w horyzoncie ({horizon}) przy dziennej zmienności {vol}%.",
+            "tail": f"Z 80% prawdopodobieństwem cena zakończy się między ${lo} a ${hi}. To wygenerowane dane demo z syntetycznych cen, nie porada.",
+        },
     }[lang]
     return f"{texts[tone]} {texts['tail']}"
 
@@ -265,6 +283,14 @@ _REASONS = {
            "SELL": "{coin} tvoří {share} % portfolia a je přehřátý: zvaž snížení pozice.",
            "SELL_SMALL": "{coin} je malá pozice ({share} %) se slábnoucím momentem: zvaž její uzavření.",
            "HOLD": "{coin} ({share} % portfolia) konsoliduje: držení pozice je rozumné."},
+    "de": {"BUY": "{coin} macht nur {share} % des Portfolios aus und zeigt konstruktives Momentum: Raum zum Nachkaufen.",
+           "SELL": "{coin} macht {share} % des Portfolios aus und ist heißgelaufen: überleg dir, die Position zu reduzieren.",
+           "SELL_SMALL": "{coin} ist eine kleine Position ({share} %) mit nachlassendem Momentum: überleg dir, sie zu schließen.",
+           "HOLD": "{coin} ({share} % des Portfolios) konsolidiert: die Position zu halten ist sinnvoll."},
+    "pl": {"BUY": "{coin} stanowi tylko {share}% portfela i ma konstruktywne momentum: jest miejsce na dokupienie.",
+           "SELL": "{coin} stanowi {share}% portfela i jest przegrzany: rozważ zmniejszenie pozycji.",
+           "SELL_SMALL": "{coin} to mała pozycja ({share}%) ze słabnącym momentum: rozważ jej zamknięcie.",
+           "HOLD": "{coin} ({share}% portfela) konsoliduje się: trzymanie pozycji jest rozsądne."},
 }
 _ANALYSIS = {
     "en": "Test analysis by {label}: the portfolio has {n} positions with total value of about ${total}. The largest position, "
@@ -273,8 +299,13 @@ _ANALYSIS = {
           "{top}, tvorí {top_share} % hodnoty{concentration}. Sektorovej expozícii dominuje {sector}. Vygenerované demo dáta, nie rada.",
     "cs": "Testovací analýza modelu {label}: portfolio má {n} pozic s celkovou hodnotou přibližně ${total}. Největší pozice, "
           "{top}, tvoří {top_share} % hodnoty{concentration}. Sektorové expozici dominuje {sector}. Vygenerovaná demo data, ne rada.",
+    "de": "Testanalyse von {label}: Das Portfolio hat {n} Positionen mit einem Gesamtwert von etwa ${total}. Die größte Position, "
+          "{top}, macht {top_share} % des Werts aus{concentration}. Beim Sektor-Engagement führt {sector}. Generierte Demodaten, keine Beratung.",
+    "pl": "Analiza testowa modelu {label}: portfel ma {n} pozycji o łącznej wartości około ${total}. Największa pozycja, "
+          "{top}, stanowi {top_share}% wartości{concentration}. W ekspozycji sektorowej dominuje {sector}. Wygenerowane dane demo, nie porada.",
 }
-_CONCENTRATION = {"en": " - a high concentration", "sk": " - vysoká koncentrácia", "cs": " - vysoká koncentrace"}
+_CONCENTRATION = {"en": " - a high concentration", "sk": " - vysoká koncentrácia", "cs": " - vysoká koncentrace",
+                  "de": " - eine hohe Konzentration", "pl": " - wysoka koncentracja"}
 _CHECKLIST = {
     "en": ["Check concentration in your largest position ({top_share}%, recommended below 40%).",
            "Consider adding exposure to sectors you hold little of.",
@@ -288,6 +319,14 @@ _CHECKLIST = {
            "Zvaž přidání sektorů, kterých máš málo.",
            "Nastav stop-loss u nejvolatilnějších pozic.",
            "Portfolio přehodnocuj každé 2-4 týdny."],
+    "de": ["Prüfe die Konzentration in deiner größten Position ({top_share} %, empfohlen unter 40 %).",
+           "Überleg dir, Sektoren aufzunehmen, von denen du wenig hältst.",
+           "Setz Stop-Loss-Marken für die volatilsten Positionen.",
+           "Überprüfe das Portfolio alle 2-4 Wochen."],
+    "pl": ["Sprawdź koncentrację w największej pozycji ({top_share}%, zalecane poniżej 40%).",
+           "Rozważ dodanie sektorów, których masz mało.",
+           "Ustaw stop-loss dla najbardziej zmiennych pozycji.",
+           "Przeglądaj portfel co 2-4 tygodnie."],
 }
 PORTFOLIO_DAYS_AGO = (1, 3, 5, 8, 12, 17, 23, 30)
 

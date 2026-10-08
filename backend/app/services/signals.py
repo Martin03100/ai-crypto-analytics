@@ -44,29 +44,48 @@ CRYPTO_WORDS = re.compile(r"crypto|bitcoin|ether|digital asset|token|stablecoin|
 
 # Short names for e-mails and Telegram (the web app has its own translations).
 LABELS = {
-    "funding": ("Funding", "Funding", "Funding"), "open_interest": ("Open interest", "Open interest", "Open interest"),
-    "long_short": ("Long/short ratio", "Pomer long/short", "Poměr long/short"),
-    "liquidations": ("Liquidations", "Likvidácie", "Likvidace"), "put_call": ("Options put/call", "Opcie put/call", "Opce put/call"),
-    "dvol": ("Implied volatility", "Implikovaná volatilita", "Implikovaná volatilita"),
-    "stablecoins": ("Stablecoin supply", "Zásoba stablecoinov", "Zásoba stablecoinů"),
-    "coinbase_premium": ("Coinbase premium", "Coinbase prémia", "Coinbase prémie"),
-    "btc_dominance": ("BTC dominance", "Dominancia BTC", "Dominance BTC"),
-    "total_cap": ("Crypto market cap", "Kapitalizácia trhu", "Kapitalizace trhu"),
-    "btc_fees": ("BTC fees", "Poplatky BTC", "Poplatky BTC"), "hashrate": ("Hashrate", "Hashrate", "Hashrate"),
-    "vix": ("VIX", "VIX", "VIX"), "nasdaq": ("Nasdaq", "Nasdaq", "Nasdaq"), "sp500": ("S&P 500", "S&P 500", "S&P 500"),
-    "dollar": ("US dollar", "Americký dolár", "Americký dolar"), "us10y": ("US 10y yield", "Výnos 10r dlhopisu USA", "Výnos 10l dluhopisu USA"),
-    "oil": ("Oil", "Ropa", "Ropa"), "fed_rate": ("Fed rate", "Sadzba Fedu", "Sazba Fedu"),
-    "inflation": ("US inflation", "Inflácia USA", "Inflace USA"), "gold": ("Gold", "Zlato", "Zlato"),
-    "event": ("Calendar", "Kalendár", "Kalendář"), "regulator_news": ("Regulators", "Regulátori", "Regulátoři"),
-    "polymarket": ("Polymarket", "Polymarket", "Polymarket"),
+    "funding": ("Funding", "Funding", "Funding", "Funding", "Funding"),
+    "open_interest": ("Open interest", "Open interest", "Open interest", "Open Interest", "Open interest"),
+    "long_short": ("Long/short ratio", "Pomer long/short", "Poměr long/short", "Long/Short-Verhältnis", "Stosunek long/short"),
+    "liquidations": ("Liquidations", "Likvidácie", "Likvidace", "Liquidationen", "Likwidacje"),
+    "put_call": ("Options put/call", "Opcie put/call", "Opce put/call", "Optionen Put/Call", "Opcje put/call"),
+    "dvol": ("Implied volatility", "Implikovaná volatilita", "Implikovaná volatilita", "Implizite Volatilität",
+             "Zmienność implikowana"),
+    "stablecoins": ("Stablecoin supply", "Zásoba stablecoinov", "Zásoba stablecoinů", "Stablecoin-Angebot",
+                    "Podaż stablecoinów"),
+    "coinbase_premium": ("Coinbase premium", "Coinbase prémia", "Coinbase prémie", "Coinbase-Prämie", "Premia Coinbase"),
+    "btc_dominance": ("BTC dominance", "Dominancia BTC", "Dominance BTC", "BTC-Dominanz", "Dominacja BTC"),
+    "total_cap": ("Crypto market cap", "Kapitalizácia trhu", "Kapitalizace trhu", "Krypto-Marktkapitalisierung",
+                  "Kapitalizacja rynku"),
+    "btc_fees": ("BTC fees", "Poplatky BTC", "Poplatky BTC", "BTC-Gebühren", "Opłaty BTC"),
+    "hashrate": ("Hashrate", "Hashrate", "Hashrate", "Hashrate", "Hashrate"),
+    "vix": ("VIX", "VIX", "VIX", "VIX", "VIX"), "nasdaq": ("Nasdaq", "Nasdaq", "Nasdaq", "Nasdaq", "Nasdaq"),
+    "sp500": ("S&P 500", "S&P 500", "S&P 500", "S&P 500", "S&P 500"),
+    "dollar": ("US dollar", "Americký dolár", "Americký dolar", "US-Dollar", "Dolar amerykański"),
+    "us10y": ("US 10y yield", "Výnos 10r dlhopisu USA", "Výnos 10l dluhopisu USA", "Rendite 10-j. US-Anleihe",
+              "Rentowność 10-l. obligacji USA"),
+    "oil": ("Oil", "Ropa", "Ropa", "Öl", "Ropa"), "fed_rate": ("Fed rate", "Sadzba Fedu", "Sazba Fedu", "Fed-Zins", "Stopa Fed"),
+    "inflation": ("US inflation", "Inflácia USA", "Inflace USA", "US-Inflation", "Inflacja w USA"),
+    "gold": ("Gold", "Zlato", "Zlato", "Gold", "Złoto"),
+    "event": ("Calendar", "Kalendár", "Kalendář", "Kalender", "Kalendarz"),
+    "regulator_news": ("Regulators", "Regulátori", "Regulátoři", "Regulierer", "Regulatorzy"),
+    "polymarket": ("Polymarket", "Polymarket", "Polymarket", "Polymarket", "Polymarket"),
 }
+_LABEL_INDEX = {"en": 0, "sk": 1, "cs": 2, "de": 3, "pl": 4}
+
+
+def _label(key: str, idx: int) -> str:
+    names = LABELS.get(key)
+    if not names:
+        return key
+    return names[idx] if idx < len(names) else names[0]
 
 
 def headline(items: List[Dict[str, Any]], lang: str, limit: int = 4) -> List[str]:
     """The strongest non-neutral signals as short lines, e.g. "Funding: +0.0450% / 8h ▼"."""
-    idx = {"en": 0, "sk": 1, "cs": 2}.get(lang, 0)
+    idx = _LABEL_INDEX.get(lang, 0)
     picked = [s for s in items if s["tone"] != "neutral"][:limit]
-    return [f"{LABELS.get(s['key'], (s['key'],) * 3)[idx]}: {s['display']} {'▲' if s['tone'] == 'bullish' else '▼'}" for s in picked]
+    return [f"{_label(s['key'], idx)}: {s['display']} {'▲' if s['tone'] == 'bullish' else '▼'}" for s in picked]
 
 
 def signal(group: str, key: str, value: Optional[float], display: str, tone: str, source: str, note: str,

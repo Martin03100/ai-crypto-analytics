@@ -5,18 +5,20 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.models import (
-    ApiKey, AuditEvent, ChallengeEntry, CommunityVote, EmailVerificationCode, ForecastEvaluation, ForecastHistory, ForecastSchedule,
+    ApiKey, AuditEvent, ChallengeEntry, EventReminder, Feedback, PushSubscription, CommunityVote, EmailVerificationCode, ForecastEvaluation, ForecastHistory, ForecastSchedule,
     Notification, PasswordResetToken, PortfolioHistory, PortfolioPosition, PortfolioSnapshot, PriceAlert, PriceTip, User,
 )
 
 _USER_TABLES = (ApiKey, ForecastHistory, PortfolioHistory, CommunityVote, PasswordResetToken, ForecastEvaluation,
                 PriceTip, EmailVerificationCode, AuditEvent, ForecastSchedule, Notification, PriceAlert,
-                PortfolioPosition, PortfolioSnapshot, ChallengeEntry)
+                PortfolioPosition, PortfolioSnapshot, ChallengeEntry, EventReminder, PushSubscription)
 
 
 def delete_user_data(db: Session, user: User) -> None:
     for model in _USER_TABLES:
         db.query(model).filter(model.user_id == user.id).delete(synchronize_session=False)
+    # Feedback stays for the admin, but no longer points to the person.
+    db.query(Feedback).filter(Feedback.user_id == user.id).update({Feedback.user_id: None}, synchronize_session=False)
     db.delete(user)
 
 

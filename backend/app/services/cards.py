@@ -141,3 +141,58 @@ def forecast_card_tall(fmt: str, coin: str, horizon: str, model: str, prices: Se
     draw.text((70, h - (170 if story else 90)), "aicryptopredictor.netlify.app", font=_font(38), fill=CYAN)
     draw.text((70, h - (120 if story else 50)), "Not financial advice", font=_font(28), fill=MUTED)
     return _png(img)
+
+
+def _provider_name(name: str) -> str:
+    return "Statistical model" if name in ("quant", QUANT_LABEL) else _model_name(name)
+
+
+def weekly_card(fmt: str, summary: dict) -> bytes:
+    """Weekly "AI vs reality" recap in the 1:1 or 9:16 format, for Instagram / TikTok / X."""
+    w, h = FORMATS[fmt]
+    story = fmt == "story"
+    img = Image.new("RGB", (w, h), BG)
+    draw = ImageDraw.Draw(img)
+    top = 250 if story else 70
+    draw.rounded_rectangle((70, top, 116, top + 46), radius=11, fill=CYAN)
+    draw.text((134, top + 4), "AI Crypto Analytics", font=_font(36), fill=TEXT)
+    y = top + (140 if story else 100)
+    draw.text((70, y), "AI vs reality", font=_font(96 if story else 80), fill=TEXT)
+    draw.text((70, y + (118 if story else 96)), "This week, every forecast checked", font=_font(38), fill=MUTED)
+    y += 200 if story else 170
+    hit = summary.get("hit_pct")
+    stats = [(str(summary.get("forecasts", 0)), "forecasts"), ("—" if hit is None else f"{hit}%", "direction hit")]
+    vs = summary.get("humans_vs_ai") or {}
+    duels = vs.get("wins", 0) + vs.get("losses", 0) + vs.get("ties", 0)
+    if duels:
+        stats.append((f"{vs.get('wins', 0)}/{duels}", "humans beat AI"))
+    box_w = (w - 140 - 20 * (len(stats) - 1)) // len(stats)
+    for i, (value, label) in enumerate(stats):
+        x = 70 + i * (box_w + 20)
+        draw.rounded_rectangle((x, y, x + box_w, y + 170), radius=22, fill=CARD)
+        draw.text((x + 26, y + 24), value, font=_font(64), fill=CYAN)
+        draw.text((x + 26, y + 112), label, font=_font(28), fill=MUTED)
+    y += 230 if story else 210
+    draw.text((70, y), "Leaderboard", font=_font(44), fill=TEXT)
+    y += 70
+    rows = (summary.get("providers") or [])[:6 if story else 4]
+    if not rows:
+        draw.text((70, y), "No forecasts were evaluated this week.", font=_font(34), fill=MUTED)
+    for i, p in enumerate(rows):
+        draw.text((70, y), f"{i + 1}. {_provider_name(p['provider'])}"[:26], font=_font(36), fill=TEXT)
+        bar_x, bar_w = int(w * 0.5), int(w * 0.32)
+        draw.rounded_rectangle((bar_x, y + 8, bar_x + bar_w, y + 36), radius=10, fill=(39, 39, 46))
+        fill = int(bar_w * (p.get("hit_pct") or 0) / 100)
+        draw.rounded_rectangle((bar_x, y + 8, bar_x + max(fill, 10), y + 36), radius=10, fill=CYAN if i == 0 else (82, 82, 91))
+        draw.text((bar_x + bar_w + 18, y + 2), f"{p.get('hit_pct')}%", font=_font(30), fill=MUTED)
+        y += 66 if story else 58
+    best = summary.get("best")
+    if best:
+        y += 30
+        draw.text((70, y), f"Best call: {_provider_name(best['provider'])} on {best['coin']}"[:44], font=_font(34), fill=GREEN)
+        draw.text((70, y + 48), f"{best['accuracy_pct']}% accurate", font=_font(30), fill=MUTED)
+    if story:
+        draw.text((70, h - 300), "Think you know better? Beat the AI.", font=_font(44), fill=TEXT)
+    draw.text((70, h - (170 if story else 90)), "aicryptopredictor.netlify.app", font=_font(38), fill=CYAN)
+    draw.text((70, h - (120 if story else 50)), "Not financial advice", font=_font(28), fill=MUTED)
+    return _png(img)

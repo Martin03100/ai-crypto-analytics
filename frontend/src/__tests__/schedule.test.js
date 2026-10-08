@@ -17,7 +17,9 @@ describe("first-visit language", () => {
   it("follows the browser language when supported", () => {
     expect(detectLang(["sk-SK", "en"])).toBe("sk");
     expect(detectLang(["cs"])).toBe("cs");
-    expect(detectLang(["de-DE", "en-US"])).toBe("en");
+    expect(detectLang(["de-DE", "en-US"])).toBe("de");
+    expect(detectLang(["pl"])).toBe("pl");
+    expect(detectLang(["fr-FR", "en-US"])).toBe("en");
     expect(detectLang([])).toBe("en");
   });
 });

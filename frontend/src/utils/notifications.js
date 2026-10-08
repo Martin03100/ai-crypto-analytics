@@ -28,6 +28,10 @@ export function notificationText(n, t) {
       return t("notif.referral", { days: d.days });
     case "price_alert":
       return alertNotification(d, t);
+    case "direction_flip":
+      return t(d.direction === "up" ? "notif.flipUp" : "notif.flipDown", { coin: d.coin, change: `${d.change_pct > 0 ? "+" : ""}${d.change_pct}` });
+    case "event_reminder":
+      return t("notif.eventReminder", { event: t(`calendar.kind_${d.title_key}`, { coin: d.coin || "" }) });
     case "challenge_won":
       return t("notif.challengeWon", { coin: d.coin, price: formatPrice(d.price) });
     case "premium_started":
@@ -43,4 +47,23 @@ export function timeAgo(iso, t, now = Date.now()) {
   if (minutes < 60) return t("market.timeAgoMinutes", { count: minutes });
   if (minutes < 1440) return t("market.timeAgoHours", { count: Math.round(minutes / 60) });
   return t("market.timeAgoDays", { count: Math.round(minutes / 1440) });
+}
+
+/** Where a click on the notification leads. */
+export function notificationTarget(n) {
+  const d = n?.data || {};
+  switch (n?.kind) {
+    case "referral_reward":
+    case "premium_started":
+      return "/settings";
+    case "direction_flip":
+      return d.coin ? `/forecast?coin=${encodeURIComponent(d.coin)}` : "/forecast";
+    case "event_reminder":
+      return "/calendar";
+    case "price_alert":
+    case "challenge_won":
+      return "/dashboard";
+    default:
+      return "/forecast?tab=history";
+  }
 }

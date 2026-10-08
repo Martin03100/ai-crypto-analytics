@@ -24,13 +24,17 @@ describe("coin edge function", () => {
     expect(pageFor("/sk/predikcia/ethereum").coin.coin).toBe("ETH");
     expect(pageFor("/prediction/unknown")).toBeNull();
     expect(pageFor("/predictionx")).toBeNull();
+    expect(pageFor("/de/prognose/solana")).toMatchObject({ lang: "de" });
+    expect(pageFor("/pl/prognoza")).toMatchObject({ lang: "pl", coin: null });
   });
-  it("lists all three language alternates", () => {
+  it("lists all five language alternates", () => {
     const alts = alternates(pageFor("/cs/predikce/bitcoin"));
     expect(alts.map((a) => a.href)).toEqual([
       "https://aicryptopredictor.netlify.app/prediction/bitcoin",
       "https://aicryptopredictor.netlify.app/sk/predikcia/bitcoin",
       "https://aicryptopredictor.netlify.app/cs/predikce/bitcoin",
+      "https://aicryptopredictor.netlify.app/de/prognose/bitcoin",
+      "https://aicryptopredictor.netlify.app/pl/prognoza/bitcoin",
     ]);
   });
   it("injects title, canonical, hreflang, JSON-LD and snippet", () => {

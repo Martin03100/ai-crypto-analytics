@@ -73,7 +73,7 @@ def test_waitlist_duplicate_gives_same_answer_and_is_stored_once(client):
 def test_waitlist_rejects_invalid_input(client):
     headers = anon_csrf_headers(client)
     assert client.post("/api/public/waitlist", json={"email": "not-an-email"}, headers=headers).status_code == 400
-    assert client.post("/api/public/waitlist", json={"email": "a@b.co", "lang": "de"}, headers=headers).status_code == 422
+    assert client.post("/api/public/waitlist", json={"email": "a@b.co", "lang": "fr"}, headers=headers).status_code == 422
     assert client.post("/api/public/waitlist", json={"email": "a@b.co", "source": "<script>"},
                        headers=headers).status_code == 422
     assert _waitlist() == []

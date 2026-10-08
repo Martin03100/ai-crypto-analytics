@@ -7,7 +7,7 @@ import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../context/ToastContext";
 import { trackEvent } from "../utils/analytics";
 
-export default function ShareImages({ token, coin = "forecast" }) {
+export default function ShareImages({ token, coin = "forecast", urlFor, shareUrl, label }) {
   const { t } = useLanguage();
   const { push } = useToast();
   const [busy, setBusy] = useState(null);
@@ -15,13 +15,13 @@ export default function ShareImages({ token, coin = "forecast" }) {
   const get = async (fmt) => {
     setBusy(fmt);
     try {
-      const res = await fetch(api.shareCardUrl(token, fmt));
+      const res = await fetch(urlFor ? urlFor(fmt) : api.shareCardUrl(token, fmt));
       if (!res.ok) throw new Error(String(res.status));
       const blob = await res.blob();
       const file = new File([blob], `ai-crypto-${coin.toLowerCase()}-${fmt}.png`, { type: "image/png" });
       trackEvent("share-image", { fmt });
       if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], url: `${window.location.origin}/share/${token}` }).catch(() => {});
+        await navigator.share({ files: [file], url: shareUrl || `${window.location.origin}/share/${token}` }).catch(() => {});
       } else {
         const url = URL.createObjectURL(blob);
         const a = Object.assign(document.createElement("a"), { href: url, download: file.name });
@@ -39,7 +39,7 @@ export default function ShareImages({ token, coin = "forecast" }) {
 
   return (
     <div className="share-images">
-      <span className="text-sub">{t("shareImage.label")}</span>
+      <span className="text-sub">{label || t("shareImage.label")}</span>
       {["story", "square"].map((fmt) => (
         <button key={fmt} type="button" className="btn btn-ghost btn-sm" onClick={() => get(fmt)} disabled={busy !== null}>
           {busy === fmt ? <Loader2 size={13} className="spin" /> : <ImageIcon size={13} />} {t(`shareImage.${fmt}`)}

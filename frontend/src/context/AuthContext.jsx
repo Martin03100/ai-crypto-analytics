@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { api, isTransient, SESSION_EXPIRED_EVENT } from "../api";
 import { clearOfflineData, offlineSessionUser, rememberOfflineSession } from "../pwa";
 import { getReferralCode } from "../utils/referral";
+import { disablePush } from "../utils/pushClient";
 import { useLanguage } from "./LanguageContext";
 
 const AuthContext = createContext(null);
@@ -12,6 +13,7 @@ function toUser(res) {
   return {
     username: res.username, id: res.user_id, email: res.email,
     emailVerified: res.email_verified, totpEnabled: Boolean(res.totp_enabled), premium: Boolean(res.premium), admin: Boolean(res.admin),
+    simpleMode: typeof res.simple_mode === "boolean" ? res.simple_mode : null,
   };
 }
 
@@ -72,6 +74,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(async () => {
+    // This browser must stop receiving the signed-out account's notifications.
+    await Promise.race([disablePush().catch(() => {}), new Promise((r) => setTimeout(r, 1500))]);
     try {
       await api.logout();
     } catch {

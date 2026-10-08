@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useLanguage } from "../context/LanguageContext";
-import { notificationText, timeAgo } from "../utils/notifications";
+import { notificationTarget, notificationText, timeAgo } from "../utils/notifications";
 
 const POLL_MS = 120_000;
 
@@ -42,7 +42,7 @@ export default function NotificationBell() {
 
   const go = (n) => {
     setOpen(false);
-    navigate(n.kind === "referral_reward" || n.kind === "premium_started" ? "/settings" : "/forecast?tab=history");
+    navigate(notificationTarget(n));
   };
 
   return (

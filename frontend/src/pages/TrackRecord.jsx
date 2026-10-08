@@ -10,6 +10,8 @@ import LoadError from "../components/LoadError";
 import ShareBar from "../components/ShareBar";
 import TipsterBoard from "../components/TipsterBoard";
 import AccuracyInsights from "../components/AccuracyInsights";
+import AccuracyTimeline from "../components/AccuracyTimeline";
+import WeeklyRecap from "../components/WeeklyRecap";
 import ChallengeCard from "../components/ChallengeCard";
 import { SkeletonLines } from "../components/Skeleton";
 import { useAppConfig } from "../context/AppConfigContext";
@@ -138,6 +140,8 @@ export default function TrackRecord() {
             </p>
           )}
 
+          <WeeklyRecap style={{ marginTop: 16 }} />
+          <AccuracyTimeline />
           <AccuracyInsights />
           <ChallengeCard style={{ marginTop: 16 }} />
           {tipsters_enabled && <TipsterBoard />}

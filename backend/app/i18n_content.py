@@ -1,10 +1,10 @@
-"""Localized backend texts (EN, SK, CS)."""
+"""Localized backend texts (EN, SK, CS, DE, PL)."""
 
 from __future__ import annotations
 
 from typing import Dict, List, Tuple
 
-SUPPORTED_LANGS = ("en", "sk", "cs")
+SUPPORTED_LANGS = ("en", "sk", "cs", "de", "pl")
 DEFAULT_LANG = "en"
 
 
@@ -13,9 +13,9 @@ def normalize_lang(lang: str | None) -> str:
 
 
 UNIT_LABELS: Dict[str, Dict[str, str]] = {
-    "hodina": {"en": "hour", "sk": "hodina", "cs": "hodina"},
-    "den": {"en": "day", "sk": "deň", "cs": "den"},
-    "mesiac": {"en": "month", "sk": "mesiac", "cs": "měsíc"},
+    "hodina": {"en": "hour", "sk": "hodina", "cs": "hodina", "de": "Stunde", "pl": "godzina"},
+    "den": {"en": "day", "sk": "deň", "cs": "den", "de": "Tag", "pl": "dzień"},
+    "mesiac": {"en": "month", "sk": "mesiac", "cs": "měsíc", "de": "Monat", "pl": "miesiąc"},
 }
 
 
@@ -28,6 +28,8 @@ MISSING_API_KEY: Dict[str, str] = {
     "en": "Missing API key for the selected provider.",
     "sk": "Chýba API kľúč pre zvoleného providera.",
     "cs": "Chybí API klíč pro zvoleného providera.",
+    "de": "Für den gewählten Anbieter fehlt der API-Schlüssel.",
+    "pl": "Brakuje klucza API dla wybranego dostawcy.",
 }
 
 
@@ -36,8 +38,8 @@ def missing_api_key_message(lang: str) -> str:
 
 
 _TREND_WORDS: Dict[str, Dict[str, str]] = {
-    "up": {"en": "rising", "sk": "rastúci", "cs": "rostoucí"},
-    "down": {"en": "falling", "sk": "klesajúci", "cs": "klesající"},
+    "up": {"en": "rising", "sk": "rastúci", "cs": "rostoucí", "de": "steigenden", "pl": "wzrostowy"},
+    "down": {"en": "falling", "sk": "klesajúci", "cs": "klesající", "de": "fallenden", "pl": "spadkowy"},
 }
 
 
@@ -63,6 +65,16 @@ def mock_forecast_reasoning(coin: str, horizon: str, trend_direction: str, lang:
             f"[UKÁZKOVÁ DATA] Simulovaná predikce pro {coin} na horizont {horizon} "
             f"naznačuje {trend} trend na základě demonstračního modelu. "
             f"Připoj platný API klíč v Účtu pro reálnou AI analýzu."
+        ),
+        "de": (
+            f"[BEISPIELDATEN] Die simulierte Prognose für {coin} über {horizon} deutet auf einen "
+            f"{trend} Trend hin, basierend auf einem Demo-Modell. Hinterlege einen gültigen API-Schlüssel "
+            f"im Konto für eine echte KI-Analyse."
+        ),
+        "pl": (
+            f"[DANE PRZYKŁADOWE] Symulowana prognoza dla {coin} na horyzont {horizon} "
+            f"wskazuje na trend {trend} na podstawie modelu demonstracyjnego. "
+            f"Podłącz ważny klucz API w Koncie, aby otrzymać prawdziwą analizę AI."
         ),
     }
     return templates.get(lang, templates[DEFAULT_LANG])
@@ -95,6 +107,18 @@ def quant_reasoning(lang: str, coin: str, horizon: str, sigma_day_pct: float, ch
             f"(momentum je záměrně utlumeno - krátkodobé trendy na kryptotrhu jsou nespolehlivé). S 80% "
             f"pravděpodobností skončí cena na konci horizontu mezi ${lo} a ${hi}. Jde o referenční odhad, ne o radu."
         ),
+        "de": (
+            f"Kostenloses statistisches Modell (ohne KI): {coin} bei ${now}, Horizont {horizon}. Die typische tägliche "
+            f"Volatilität der letzten 30 Tage liegt bei {sigma_day_pct:.1f} %. Der Medianpfad bewegt sich um {change_pct:+.1f} % "
+            f"(das Momentum ist bewusst gedämpft - kurzfristige Krypto-Trends sind unzuverlässig). Mit 80 % "
+            f"Wahrscheinlichkeit liegt der Preis am Ende des Horizonts zwischen ${lo} und ${hi}. Das ist eine Richtschätzung, keine Beratung."
+        ),
+        "pl": (
+            f"Darmowy model statystyczny (bez AI): {coin} po ${now}, horyzont {horizon}. Typowa dzienna zmienność "
+            f"z ostatnich 30 dni wynosi {sigma_day_pct:.1f}%. Mediana ścieżki zmienia się o {change_pct:+.1f}% "
+            f"(momentum jest celowo wytłumione - krótkoterminowe trendy na rynku krypto są niewiarygodne). Z 80% "
+            f"prawdopodobieństwem cena na końcu horyzontu znajdzie się między ${lo} a ${hi}. To szacunek orientacyjny, nie porada."
+        ),
     }
     return templates.get(lang, templates[DEFAULT_LANG])
 
@@ -116,6 +140,16 @@ def mock_portfolio_reason(action: str, coin: str, lang: str) -> str:
             "BUY": f"[MOCK] {coin} vykazuje příznivou technickou strukturu pro dokoupení.",
             "SELL": f"[MOCK] {coin} se jeví přehřátý, zvaž částečný prodej.",
             "HOLD": f"[MOCK] {coin} je ve stabilním pásmu, doporučuje se držet.",
+        },
+        "de": {
+            "BUY": f"[MOCK] {coin} zeigt eine günstige technische Struktur zum Nachkaufen.",
+            "SELL": f"[MOCK] {coin} wirkt überhitzt, überleg dir einen Teilverkauf.",
+            "HOLD": f"[MOCK] {coin} bewegt sich in einer stabilen Spanne, Halten wird empfohlen.",
+        },
+        "pl": {
+            "BUY": f"[MOCK] {coin} ma korzystną strukturę techniczną do dokupienia.",
+            "SELL": f"[MOCK] {coin} wygląda na przegrzany, rozważ częściową sprzedaż.",
+            "HOLD": f"[MOCK] {coin} jest w stabilnym przedziale, zalecane jest trzymanie.",
         },
     }
     return templates.get(lang, templates[DEFAULT_LANG])[action]
@@ -140,6 +174,18 @@ MOCK_PORTFOLIO_ANALYSIS_TEXT: Dict[str, str] = {
         "koncentrace do jedné dominantní pozice. Připoj platný API klíč "
         "pro reálnou AI analýzu."
     ),
+    "de": (
+        "[BEISPIELDATEN] Das Portfolio könnte von einer breiteren Diversifikation "
+        "über Sektoren wie RWA, L2-Lösungen und DeFi-Protokolle profitieren. Überleg dir, "
+        "die Konzentration auf eine einzelne dominante Position zu verringern. Hinterlege einen "
+        "gültigen API-Schlüssel für eine echte KI-Analyse."
+    ),
+    "pl": (
+        "[DANE PRZYKŁADOWE] Portfel mógłby skorzystać na szerszej dywersyfikacji "
+        "w sektorach takich jak RWA, rozwiązania L2 i protokoły DeFi. Rozważ zmniejszenie "
+        "koncentracji w jednej dominującej pozycji. Podłącz ważny klucz API, "
+        "aby otrzymać prawdziwą analizę AI."
+    ),
 }
 
 MOCK_REBALANCING_CHECKLIST: Dict[str, List[str]] = {
@@ -161,6 +207,18 @@ MOCK_REBALANCING_CHECKLIST: Dict[str, List[str]] = {
         "[MOCK] Nastav si stop-loss úrovně pro volatilní pozice.",
         "[MOCK] Přehodnoť portfolio každé 2-4 týdny.",
     ],
+    "de": [
+        "[MOCK] Prüfe die Konzentration in deiner größten Position (empfohlen < 40 %).",
+        "[MOCK] Überleg dir, Engagement im DeFi-Sektor aufzubauen.",
+        "[MOCK] Setz Stop-Loss-Marken für volatile Positionen.",
+        "[MOCK] Überprüfe dein Portfolio alle 2-4 Wochen.",
+    ],
+    "pl": [
+        "[MOCK] Sprawdź koncentrację w swojej największej pozycji (zalecane < 40%).",
+        "[MOCK] Rozważ zwiększenie ekspozycji na sektor DeFi.",
+        "[MOCK] Ustaw poziomy stop-loss dla zmiennych pozycji.",
+        "[MOCK] Przeglądaj portfel co 2-4 tygodnie.",
+    ],
 }
 
 
@@ -179,6 +237,16 @@ MOCK_NEWS_TRENDS: Dict[str, List[str]] = {
         "[MOCK] Rostoucí zájem o L2 škálovací řešení.",
         "[MOCK] Regulační nejistota ovlivňuje sentiment altcoinů.",
         "[MOCK] Institucionální kapitál se přesouvá směrem k BTC/ETH.",
+    ],
+    "de": [
+        "[MOCK] Wachsendes Interesse an L2-Skalierungslösungen.",
+        "[MOCK] Regulatorische Unsicherheit belastet die Stimmung bei Altcoins.",
+        "[MOCK] Institutionelles Kapital verlagert sich in Richtung BTC/ETH.",
+    ],
+    "pl": [
+        "[MOCK] Rosnące zainteresowanie rozwiązaniami skalującymi L2.",
+        "[MOCK] Niepewność regulacyjna wpływa na sentyment wobec altcoinów.",
+        "[MOCK] Kapitał instytucjonalny przesuwa się w stronę BTC/ETH.",
     ],
 }
 
@@ -201,6 +269,16 @@ def mock_digest_summary(fg_value: int, fg_classification: str, lang: str) -> str
             f"Trh se momentálně pohybuje v demonstračním režimu — připoj platný API "
             f"klíč v Účet & API klíče pro reálný AI ranní přehled."
         ),
+        "de": (
+            f"[BEISPIELDATEN] Der Fear & Greed Index steht heute bei {fg_value} ({fg_classification}). "
+            f"Der Markt läuft gerade im Demo-Modus — hinterlege einen gültigen API-Schlüssel unter "
+            f"Konto & API-Schlüssel für einen echten KI-Morgenüberblick."
+        ),
+        "pl": (
+            f"[DANE PRZYKŁADOWE] Fear & Greed Index wynosi dziś {fg_value} ({fg_classification}). "
+            f"Rynek działa obecnie w trybie demonstracyjnym — podłącz ważny klucz API "
+            f"w sekcji Konto i klucze API, aby otrzymać prawdziwy poranny przegląd AI."
+        ),
     }
     return templates.get(lang, templates[DEFAULT_LANG])
 
@@ -220,6 +298,16 @@ MOCK_DIGEST_KEY_POINTS: Dict[str, List[str]] = {
         "[MOCK] Sleduj vývoj Fear & Greed Indexu během dne.",
         "[MOCK] Zkontroluj nejnovější titulky v sekci Tržní Sentiment.",
         "[MOCK] Ověř si stav svého portfolia v Portfolio Advisor.",
+    ],
+    "de": [
+        "[MOCK] Behalte den Fear & Greed Index im Laufe des Tages im Blick.",
+        "[MOCK] Sieh dir die neuesten Schlagzeilen im Bereich Marktstimmung an.",
+        "[MOCK] Prüfe den Stand deines Portfolios im Portfolio Advisor.",
+    ],
+    "pl": [
+        "[MOCK] Śledź Fear & Greed Index w ciągu dnia.",
+        "[MOCK] Sprawdź najnowsze nagłówki w sekcji Sentyment rynku.",
+        "[MOCK] Sprawdź stan swojego portfela w Portfolio Advisor.",
     ],
 }
 
@@ -242,6 +330,16 @@ def mock_chat_reply(last_user_question: str, lang: str) -> str:
             "[UKÁZKOVÁ DATA] Nemám připojený API klíč pro zvoleného providera, takže "
             f"odpovídám demonstračně. Připoj platný klíč v sekci Účet & API klíče "
             f'pro skutečnou AI odpověď na otázku: "{snippet}"'
+        ),
+        "de": (
+            "[BEISPIELDATEN] Für den gewählten Anbieter ist kein API-Schlüssel hinterlegt, "
+            f"daher ist das eine Demo-Antwort. Hinterlege einen gültigen Schlüssel unter Konto & API-Schlüssel "
+            f'für eine echte KI-Antwort auf: "{snippet}"'
+        ),
+        "pl": (
+            "[DANE PRZYKŁADOWE] Nie mam podłączonego klucza API dla wybranego dostawcy, "
+            f"więc to odpowiedź demonstracyjna. Podłącz ważny klucz w sekcji Konto i klucze API, "
+            f'aby otrzymać prawdziwą odpowiedź AI na pytanie: "{snippet}"'
         ),
     }
     return templates.get(lang, templates[DEFAULT_LANG])
@@ -267,6 +365,10 @@ MARKET_EVENT_LABELS: Dict[str, Dict[str, Tuple[str, str]]] = {
            "cpi": ("Zverejnenie dát o inflácii v USA (CPI)", "Makro")},
     "cs": {"fomc": ("Rozhodnutí FOMC o úrokových sazbách (Fed)", "Makro"),
            "cpi": ("Zveřejnění dat o inflaci v USA (CPI)", "Makro")},
+    "de": {"fomc": ("FOMC-Zinsentscheid (Fed)", "Makro"),
+           "cpi": ("Veröffentlichung der US-Inflationsdaten (CPI)", "Makro")},
+    "pl": {"fomc": ("Decyzja FOMC w sprawie stóp procentowych (Fed)", "Makro"),
+           "cpi": ("Publikacja danych o inflacji w USA (CPI)", "Makro")},
 }
 
 

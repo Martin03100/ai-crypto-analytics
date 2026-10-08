@@ -41,6 +41,17 @@
   ],
   "shortcuts": [
     {
+      "name": "Quick view",
+      "short_name": "Quick view",
+      "url": "/quick",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
       "name": "New forecast",
       "short_name": "Forecast",
       "url": "/forecast",
@@ -52,9 +63,9 @@
       ]
     },
     {
-      "name": "Scheduled forecasts",
-      "short_name": "Schedule",
-      "url": "/forecast?tab=schedule",
+      "name": "Event calendar",
+      "short_name": "Calendar",
+      "url": "/calendar",
       "icons": [
         {
           "src": "/icon-192.png",

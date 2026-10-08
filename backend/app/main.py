@@ -15,7 +15,7 @@ from app.csrf import CSRFMiddleware
 from app.database import SessionLocal, init_db
 from app.logging_config import configure_logging
 from app.monitoring import capture_exception, init_monitoring
-from app.routers import account, admin, alerts, auth, chat, community, forecast, jobs, market, portfolio, public, schedules, tools, tracker
+from app.routers import account, admin, alerts, auth, chat, community, extras, forecast, jobs, market, portfolio, public, schedules, tools, tracker
 from app.request_guard import RequestGuardMiddleware
 from app.security_headers import SecurityHeadersMiddleware
 from app.services import keep_awake
@@ -82,6 +82,8 @@ app.include_router(admin.router)
 app.include_router(alerts.router)
 app.include_router(tools.router)
 app.include_router(tracker.router)
+app.include_router(extras.router)
+app.include_router(extras.admin_router)
 
 
 @app.get("/api/health")

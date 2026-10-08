@@ -24,6 +24,9 @@ from fastapi.testclient import TestClient  # noqa: E402
 from app.database import Base, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.rate_limit import _hits as _rate_limit_hits  # noqa: E402
+from app.services import push as _push  # noqa: E402
+
+_push.INLINE = True   # deliver Web Push in the committing thread, so tests see the result
 
 
 @pytest.fixture(autouse=True)

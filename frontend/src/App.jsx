@@ -7,6 +7,7 @@ import { useAuth } from "./context/AuthContext";
 import { useLanguage } from "./context/LanguageContext";
 import Layout from "./pages/Layout";
 import WakeBanner from "./components/WakeBanner";
+import { SEO_LANGS } from "./utils/seoCoins";
 
 import Auth from "./pages/Auth";
 import { PrivacyPolicy, TermsOfService } from "./pages/Legal";
@@ -25,6 +26,11 @@ const Links = lazy(() => import("./pages/Links"));
 const Premium = lazy(() => import("./pages/Premium"));
 const Unsubscribe = lazy(() => import("./pages/Unsubscribe"));
 const CoinPage = lazy(() => import("./pages/CoinPage"));
+const Calendar = lazy(() => import("./pages/Calendar"));
+const Glossary = lazy(() => import("./pages/Glossary"));
+const Changelog = lazy(() => import("./pages/Changelog"));
+const TipsterProfile = lazy(() => import("./pages/TipsterProfile"));
+const QuickView = lazy(() => import("./pages/QuickView"));
 const CoinIndex = lazy(() => import("./pages/CoinPage").then((m) => ({ default: m.CoinIndex })));
 
 function FullScreenLoader() {
@@ -62,7 +68,11 @@ export default function App() {
         <Route path="/links" element={<Suspense fallback={<FullScreenLoader />}><Links /></Suspense>} />
         <Route path="/premium" element={<Suspense fallback={<FullScreenLoader />}><Premium /></Suspense>} />
         <Route path="/unsubscribe" element={<Suspense fallback={<FullScreenLoader />}><Unsubscribe /></Suspense>} />
-        {["/prediction", "/sk/predikcia", "/cs/predikce"].map((base) => [
+        <Route path="/calendar" element={<Suspense fallback={<FullScreenLoader />}><Calendar /></Suspense>} />
+        <Route path="/glossary" element={<Suspense fallback={<FullScreenLoader />}><Glossary /></Suspense>} />
+        <Route path="/changelog" element={<Suspense fallback={<FullScreenLoader />}><Changelog /></Suspense>} />
+        <Route path="/tipster/:nickname" element={<Suspense fallback={<FullScreenLoader />}><TipsterProfile /></Suspense>} />
+        {Object.values(SEO_LANGS).map((base) => [
           <Route key={base} path={base} element={<Suspense fallback={<FullScreenLoader />}><CoinIndex /></Suspense>} />,
           <Route key={`${base}/slug`} path={`${base}/:slug`} element={<Suspense fallback={<FullScreenLoader />}><CoinPage /></Suspense>} />,
         ])}
@@ -83,6 +93,7 @@ export default function App() {
           <Route path="account" element={<Account />} />
           <Route path="settings" element={<Settings />} />
           <Route path="admin" element={<Admin />} />
+          <Route path="quick" element={<QuickView />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -1,15 +1,16 @@
 /** Watchlist: the coins the user follows, with live price and 24h change. */
 
 import { Check, Pencil, Star } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useCurrency } from "../context/CurrencyContext";
 import { useLanguage } from "../context/LanguageContext";
 import { useToast } from "../context/ToastContext";
 import { COIN_IDS } from "../utils/coins";
+import { tickDirection } from "../utils/viewHelpers";
 
-const REFRESH_MS = 60_000;
+const REFRESH_MS = 30_000;   // prices are cached on the server, so this costs no extra upstream calls
 
 export default function Watchlist() {
   const { t } = useLanguage();
@@ -19,6 +20,8 @@ export default function Watchlist() {
   const [available, setAvailable] = useState([]);
   const [max, setMax] = useState(12);
   const [prices, setPrices] = useState({});
+  const [ticks, setTicks] = useState({});
+  const lastPrices = useRef({});
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -31,7 +34,14 @@ export default function Watchlist() {
   const loadPrices = useCallback(() => {
     const ids = (coins || []).map((c) => COIN_IDS[c]).filter(Boolean);
     if (ids.length === 0) return;
-    api.livePrices(ids, vsCurrency).then((r) => setPrices(r.prices)).catch(() => {});
+    api.livePrices(ids, vsCurrency).then((r) => {
+      const prev = lastPrices.current;
+      const moved = {};
+      for (const id of ids) moved[id] = tickDirection(prev[id]?.[vsCurrency], r.prices[id]?.[vsCurrency]);
+      lastPrices.current = r.prices;
+      setTicks(moved);
+      setPrices(r.prices);
+    }).catch(() => {});
   }, [coins, vsCurrency]);
 
   useEffect(() => {
@@ -59,7 +69,7 @@ export default function Watchlist() {
   return (
     <section className="card watchlist" aria-labelledby="watchlist-title">
       <div className="card-head">
-        <h2 id="watchlist-title" className="card-title" style={{ margin: 0 }}><Star size={14} /> {t("watchlist.title")}</h2>
+        <h2 id="watchlist-title" className="card-title" style={{ margin: 0 }}><Star size={14} /> {t("watchlist.title")} <span className="live-dot" role="img" title={t("watchlist.live")} aria-label={t("watchlist.live")} /></h2>
         <button className="btn btn-ghost btn-sm" onClick={() => setEditing((v) => !v)} aria-pressed={editing}>
           {editing ? <><Check size={13} /> {t("common.done")}</> : <><Pencil size={13} /> {t("watchlist.edit")}</>}
         </button>
@@ -93,7 +103,7 @@ export default function Watchlist() {
             return (
               <Link key={symbol} to={`/forecast?coin=${symbol}`} className="watch-tile" title={t("watchlist.forecastFor", { coin: symbol })}>
                 <span className="watch-symbol">{symbol}</span>
-                <span className="watch-price num">{price != null ? formatAmount(price) : "—"}</span>
+                <span key={`${price}`} className={`watch-price num ${ticks[COIN_IDS[symbol]] ? `tick-${ticks[COIN_IDS[symbol]]}` : ""}`}>{price != null ? formatAmount(price) : "—"}</span>
                 <span className={`watch-change num ${dir}`}>
                   {change != null ? `${change > 0 ? "+" : ""}${change.toFixed(2)} %` : " "}
                 </span>

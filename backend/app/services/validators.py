@@ -323,6 +323,8 @@ _LANGUAGE_NAMES = {
     "sk": "slovenčina (spisovná, s diakritikou)",
     "cz": "čeština (spisovná, s diakritikou)",
     "cs": "čeština (spisovná, s diakritikou)",
+    "de": "deutsch (Hochdeutsch, mit korrekten Umlauten)",
+    "pl": "polski (z polskimi znakami diakrytycznymi)",
 }
 
 
