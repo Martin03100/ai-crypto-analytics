@@ -1,10 +1,10 @@
 /* Web Push handlers, loaded into the Workbox service worker with importScripts. */
 
 self.addEventListener("push", (event) => {
-  let data = {};
+  let data;
   try {
     data = event.data ? event.data.json() : {};
-  } catch (e) {
+  } catch {
     data = { title: "AI Crypto Analytics", body: event.data ? event.data.text() : "" };
   }
   const url = typeof data.url === "string" && data.url.startsWith("/") ? data.url : "/dashboard";
