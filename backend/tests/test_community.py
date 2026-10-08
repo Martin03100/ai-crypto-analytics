@@ -285,27 +285,28 @@ def test_periodic_jobs_run_once_per_slot(client, monkeypatch):
     monkeypatch.setattr(alerts, "check_alerts", lambda db: calls.append("alerts"))
     monkeypatch.setattr(briefing, "send_morning_briefings", lambda db: calls.append("briefing"))
     monkeypatch.setattr(digest, "send_weekly_digests", lambda db: calls.append("digest"))
+    monkeypatch.setattr(background, "_warm_in_background", lambda: calls.append("warm"))
     monday = datetime(2026, 10, 12, 8, 30)
     assert background.run_periodic_jobs(monday) == ["evaluate_forecasts", "price_alerts", "morning_briefing",
                                                  "portfolio_snapshots", "status_history", "direction_flips",
-                                                 "event_reminders", "weekly_challenge", "weekly_digest"]
+                                                 "event_reminders", "weekly_challenge", "weekly_digest", "warm_signals"]
     assert background.run_periodic_jobs(monday + timedelta(minutes=4)) == []
     assert background.run_periodic_jobs(monday + timedelta(minutes=11)) == ["evaluate_forecasts", "price_alerts",
-                                                                            "event_reminders"]
+                                                                            "event_reminders", "warm_signals"]
     wednesday = datetime(2026, 10, 14, 9, 0)
     assert background.run_periodic_jobs(wednesday) == ["evaluate_forecasts", "price_alerts", "morning_briefing",
                                                        "portfolio_snapshots", "status_history", "direction_flips",
-                                                       "event_reminders"]
+                                                       "event_reminders", "warm_signals"]
     assert background.run_periodic_jobs(datetime(2026, 10, 14, 15, 0)) == ["evaluate_forecasts", "price_alerts",
                                                                            "status_history", "direction_flips",
-                                                                           "event_reminders"]
+                                                                           "event_reminders", "warm_signals"]
     assert calls.count("digest") == 1 and calls.count("briefing") == 2 and calls.count("snap") == 2
-    assert calls.count("challenge") == 1 and calls.count("status") == 3
+    assert calls.count("challenge") == 1 and calls.count("status") == 3 and calls.count("warm") == 4
     db = SessionLocal()
     try:
         assert {r.name for r in db.query(JobRun).all()} == {"evaluate_forecasts", "price_alerts", "morning_briefing",
                                                   "portfolio_snapshots", "status_history", "weekly_challenge",
-                                                  "weekly_digest", "direction_flips", "event_reminders"}
+                                                  "weekly_digest", "direction_flips", "event_reminders", "warm_signals"}
     finally:
         db.close()
 

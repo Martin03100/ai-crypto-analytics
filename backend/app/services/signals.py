@@ -26,13 +26,18 @@ from app.utils.ttl_cache import TTLCache
 logger = logging.getLogger("aca.signals")
 
 _UA = {"User-Agent": "ai-crypto-analytics/2.4 (market research; contact aicryptoanalytics7@gmail.com)"}
-_TIMEOUT = 8
+_TIMEOUT = 5
+# A source that timed out or refused the connection is skipped for a while, so one blocked or hanging API
+# (e.g. a service unreachable from the server's region) cannot slow down every page that shows signals.
+_HOST_BACKOFF_SECONDS = 600
+_down_until: Dict[str, float] = {}
 _fast = TTLCache(ttl_seconds=300)        # derivatives, prices
 _medium = TTLCache(ttl_seconds=900)      # options, stablecoins, network, regulators
 _slow = TTLCache(ttl_seconds=6 * 3600)   # daily macro series
 _bundle = TTLCache(ttl_seconds=300)
 _locks: Dict[str, Any] = {}
 _locks_guard = threading.Lock()
+_refreshing: set = set()
 
 GROUPS = ("derivatives", "options", "flows", "market", "network", "macro", "events", "regulation", "predictions")
 OPTION_COINS = ("BTC", "ETH")
@@ -104,15 +109,27 @@ def _headers(url: str) -> Dict[str, str]:
     return _UA
 
 
-def _get(url: str, cache: TTLCache, params: Optional[dict] = None, as_text: bool = False) -> Any:
+def _host(url: str) -> str:
+    return url.split("/")[2] if "://" in url else url
+
+
+def _get(url: str, cache: TTLCache, params: Optional[dict] = None, as_text: bool = False,
+         timeout: float = _TIMEOUT) -> Any:
     key = url + json.dumps(params or {}, sort_keys=True)
     hit = cache.get(key)
     if hit is not None:
         return hit
+    host = _host(url)
+    if _down_until.get(host, 0) > time.monotonic():
+        return cache.get(key, allow_stale=True)
     try:
-        res = requests.get(url, params=params, headers=_headers(url), timeout=_TIMEOUT)
+        res = requests.get(url, params=params, headers=_headers(url), timeout=timeout)
         res.raise_for_status()
         data = res.text if as_text else res.json()
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+        _down_until[host] = time.monotonic() + _HOST_BACKOFF_SECONDS
+        logger.info("Signal source %s unreachable (%s), skipped for %d s", host, type(exc).__name__, _HOST_BACKOFF_SECONDS)
+        return cache.get(key, allow_stale=True)
     except Exception as exc:  # noqa: BLE001 - any failure just skips the source
         logger.info("Signal source %s unavailable: %s", url.split("?")[0], type(exc).__name__)
         return cache.get(key, allow_stale=True)
@@ -489,7 +506,8 @@ def regulation() -> List[Dict[str, Any]]:
 
 def prediction_markets(symbol: str) -> List[Dict[str, Any]]:
     data = _get("https://gamma-api.polymarket.com/markets", _medium,
-                {"limit": 100, "active": "true", "closed": "false", "order": "volume24hr", "ascending": "false"})
+                {"limit": 100, "active": "true", "closed": "false", "order": "volume24hr", "ascending": "false"},
+                timeout=3)
     if not isinstance(data, list):
         return []
     names = {"BTC": "bitcoin", "ETH": "ethereum", "SOL": "solana", "XRP": "xrp", "DOGE": "doge"}
@@ -516,12 +534,23 @@ def prediction_markets(symbol: str) -> List[Dict[str, Any]]:
 
 # ---------- bundle ----------
 
-def collect(symbol: str = "BTC", timeout: float = 12.0) -> Dict[str, Any]:
-    """All signals for a coin (derivatives and options are coin-specific; the rest is market-wide)."""
+def collect(symbol: str = "BTC", timeout: float = 6.0) -> Dict[str, Any]:
+    """All signals for a coin (derivatives and options are coin-specific; the rest is market-wide).
+
+    An expired bundle is returned at once and refreshed in the background (stale-while-revalidate), so only the
+    very first request after a restart waits for the sources."""
     symbol = (symbol or "BTC").upper()
     cached = _bundle.get(symbol)
     if cached is not None:
         return cached
+    stale = _bundle.get(symbol, allow_stale=True)
+    if stale is not None:
+        _refresh_in_background(symbol, timeout)
+        return stale
+    return _collect_locked(symbol, timeout)
+
+
+def _collect_locked(symbol: str, timeout: float) -> Dict[str, Any]:
     with _locks_guard:
         lock = _locks.setdefault(symbol, threading.Lock())
     with lock:                          # concurrent requests for one coin share a single fetch
@@ -529,6 +558,36 @@ def collect(symbol: str = "BTC", timeout: float = 12.0) -> Dict[str, Any]:
         if cached is not None:
             return cached
         return _collect(symbol, timeout)
+
+
+def _refresh_in_background(symbol: str, timeout: float) -> None:
+    with _locks_guard:
+        if symbol in _refreshing:
+            return
+        _refreshing.add(symbol)
+
+    def run() -> None:
+        try:
+            _collect_locked(symbol, timeout)
+        except Exception:  # noqa: BLE001 - the stale bundle stays in use
+            logger.exception("Signal refresh failed")
+        finally:
+            with _locks_guard:
+                _refreshing.discard(symbol)
+
+    threading.Thread(target=run, name=f"signals-{symbol}", daemon=True).start()
+
+
+def warm(symbols) -> int:
+    """Refresh the bundles of these coins now (background job), so visitors never wait for the sources."""
+    done = 0
+    for symbol in symbols:
+        try:
+            _collect_locked(symbol.upper(), 6.0)
+            done += 1
+        except Exception:  # noqa: BLE001
+            logger.exception("Signal warm-up failed for %s", symbol)
+    return done
 
 
 def latest(symbol: str = "BTC") -> Optional[Dict[str, Any]]:

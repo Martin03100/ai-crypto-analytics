@@ -265,7 +265,8 @@ def _forecast_numbers(raw: str):
 def export_rows(db: Session, user: User, kind: str):
     if kind == "forecasts":
         yield ["id", "created_at", "coin", "horizon", "model", "start_price", "predicted_final_price", "shared"]
-        for f in db.query(ForecastHistory).filter(ForecastHistory.user_id == user.id).order_by(ForecastHistory.created_at):
+        for f in (db.query(ForecastHistory).filter(ForecastHistory.user_id == user.id, ForecastHistory.hidden_at.is_(None))
+                  .order_by(ForecastHistory.created_at)):
             start, final = _forecast_numbers(f.forecast_json)
             yield [f.id, f.created_at, f.crypto_symbol, f.timeframe, f.model_used, start, final, bool(f.share_token)]
     elif kind == "evaluations":

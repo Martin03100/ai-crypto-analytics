@@ -2,17 +2,24 @@
 
 from __future__ import annotations
 
+import logging
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Optional
 
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.config import DEFAULT_COIN_IDS, QUANT_LABEL
+from app.database import SessionLocal
 from app.models import ForecastEvaluation
 from app.services import insights, market_data, quant_engine, signals
 from app.utils.ttl_cache import TTLCache
 
+logger = logging.getLogger("aca.coin_page")
 _cache = TTLCache(ttl_seconds=600)
+_guard = threading.Lock()
+_rebuilding: set = set()
 
 
 def _outlook(coin: str, horizon: str) -> Optional[Dict[str, Any]]:
@@ -37,19 +44,54 @@ def _accuracy(db: Session, coin: str) -> list:
 
 
 def build(db: Session, coin: str) -> Optional[Dict[str, Any]]:
+    """The coin page data. An expired page is served at once and rebuilt in the background, so search engines and
+    visitors from social networks never wait for the market APIs (only the first visit after a restart does)."""
     coin = coin.upper()
     if coin not in DEFAULT_COIN_IDS:
         return None
     cached = _cache.get(coin)
     if cached is not None:
         return cached
+    stale = _cache.get(coin, allow_stale=True)
+    if stale is not None:
+        _rebuild_in_background(coin)
+        return stale
+    return _build(db, coin)
+
+
+def _rebuild_in_background(coin: str) -> None:
+    with _guard:
+        if coin in _rebuilding:
+            return
+        _rebuilding.add(coin)
+
+    def run() -> None:
+        db = SessionLocal()
+        try:
+            _build(db, coin)
+        except Exception:  # noqa: BLE001 - the stale page stays in use
+            logger.exception("Coin page rebuild failed for %s", coin)
+        finally:
+            db.close()
+            with _guard:
+                _rebuilding.discard(coin)
+
+    threading.Thread(target=run, name=f"coin-page-{coin}", daemon=True).start()
+
+
+def _build(db: Session, coin: str) -> Dict[str, Any]:
     coin_id = DEFAULT_COIN_IDS[coin]
-    ok, markets, _err = market_data.get_coin_markets([coin_id])
+    # The market APIs are independent: ask them at the same time instead of one after another.
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        markets_f = pool.submit(market_data.get_coin_markets, [coin_id])
+        history_f = pool.submit(market_data.get_market_history, coin_id, 30)
+        bundle_f = pool.submit(signals.collect, coin)
+        ok, markets, _err = markets_f.result()
+        ok_h, history, _err = history_f.result()
+        bundle = bundle_f.result()
     m = (markets or {}).get(coin_id, {}) if ok else {}
-    ok_h, history, _err = market_data.get_market_history(coin_id, 30)
     rsi = insights.daily_rsi(history.get("prices", [])) if ok_h else None
-    day, week = _outlook(coin, "24h"), _outlook(coin, "1T")
-    bundle = signals.collect(coin)
+    day, week = _outlook(coin, "24h"), _outlook(coin, "1T")     # reuse the price history fetched above (cached)
     items = [{k: v for k, v in s.items() if k != "note"} for s in bundle["items"] if s["tone"] != "neutral"][:8]
     page = {
         "coin": coin, "name": m.get("name") or coin, "price": m.get("current_price"), "market_cap": m.get("market_cap"),

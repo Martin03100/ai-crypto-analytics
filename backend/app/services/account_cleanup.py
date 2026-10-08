@@ -9,14 +9,22 @@ from app.models import (
     Notification, PasswordResetToken, PortfolioHistory, PortfolioPosition, PortfolioSnapshot, PriceAlert, PriceTip, User,
 )
 
-_USER_TABLES = (ApiKey, ForecastHistory, PortfolioHistory, CommunityVote, PasswordResetToken, ForecastEvaluation,
+_USER_TABLES = (ApiKey, ForecastHistory, PortfolioHistory, CommunityVote, PasswordResetToken,
                 PriceTip, EmailVerificationCode, AuditEvent, ForecastSchedule, Notification, PriceAlert,
                 PortfolioPosition, PortfolioSnapshot, ChallengeEntry, EventReminder, PushSubscription)
+
+ANONYMOUS_USER_ID = 0
 
 
 def delete_user_data(db: Session, user: User) -> None:
     for model in _USER_TABLES:
         db.query(model).filter(model.user_id == user.id).delete(synchronize_session=False)
+    # Scored forecasts stay in the public track record without any link to the person (otherwise deleting an
+    # account would delete its wrong forecasts from the statistics); demo results are generated data and go.
+    db.query(ForecastEvaluation).filter(ForecastEvaluation.user_id == user.id, ForecastEvaluation.is_demo.is_(True)) \
+        .delete(synchronize_session=False)
+    db.query(ForecastEvaluation).filter(ForecastEvaluation.user_id == user.id) \
+        .update({ForecastEvaluation.user_id: ANONYMOUS_USER_ID}, synchronize_session=False)
     # Feedback stays for the admin, but no longer points to the person.
     db.query(Feedback).filter(Feedback.user_id == user.id).update({Feedback.user_id: None}, synchronize_session=False)
     db.delete(user)
@@ -27,7 +35,9 @@ def is_abandoned_signup(db: Session, user: User) -> bool:
 
     An account that changed its email (and is waiting to confirm the new one) or has any history is never
     released, otherwise anyone could delete it by registering with that address."""
-    if user.email_verified is not False:
+    from app.services.roles import is_admin
+
+    if user.email_verified is not False or is_admin(user):
         return False
     if user.premium_until or user.stripe_customer_id:
         return False

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from datetime import datetime, timedelta, timezone
 from typing import Callable, Optional
 
@@ -22,6 +23,7 @@ SNAPSHOT_HOUR = 0                       # portfolio values at 00:00 UTC
 STATUS_EVERY = timedelta(minutes=15)    # service checks for the 30-day status history
 FLIPS_EVERY = timedelta(hours=3)        # "the AI changed its mind" on watched coins
 REMINDERS_EVERY = timedelta(minutes=10)  # calendar reminders (sent up to an hour ahead)
+WARM_SIGNALS_EVERY = timedelta(minutes=10)  # market signals of all coins, ready before anyone asks
 
 
 def _claim(name: str, due_after: datetime, now: datetime) -> bool:
@@ -113,4 +115,15 @@ def run_periodic_jobs(now: Optional[datetime] = None) -> list[str]:
     if now - slot < timedelta(days=1) and _claim("weekly_digest", slot, now):
         _run("weekly_digest", send_weekly_digests)
         ran.append("weekly_digest")
+    if _claim("warm_signals", now - WARM_SIGNALS_EVERY, now):
+        _warm_in_background()
+        ran.append("warm_signals")
     return ran
+
+
+def _warm_in_background() -> None:
+    """Refresh every coin's market signals in their own thread: slow sources must not hold up the other jobs."""
+    from app.config import DEFAULT_COIN_IDS
+    from app.services import signals
+
+    threading.Thread(target=signals.warm, args=(list(DEFAULT_COIN_IDS),), name="warm-signals", daemon=True).start()

@@ -39,6 +39,8 @@ class User(Base):
     totp_enabled: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=None)
     # Time step of the last accepted sign-in code; a code is accepted only once.
     totp_last_step: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=None)
+    # JSON list of SHA-256 hashes of the unused 2FA recovery codes (each works once if the phone is lost).
+    totp_recovery_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
     # JSON list of coin symbols the user follows on the dashboard; None = the default set.
     watchlist_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
     # Public name on the tipster leaderboard; None = the user does not appear there.
@@ -91,6 +93,11 @@ class ForecastHistory(Base):
     # Background evaluation bookkeeping: failed attempts and when the last one ran (for back-off / giving up).
     eval_attempts: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=None)
     eval_last_try_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, default=None)
+    # Server signature of the generated forecast: one generated forecast can be saved (and scored) only once.
+    signature: Mapped[Optional[str]] = mapped_column(String(64), unique=True, index=True, nullable=True, default=None)
+    # Set when the user deletes a forecast that is not scored yet: it leaves their history but is still scored for
+    # the public track record (so wrong forecasts cannot be deleted away), then removed.
+    hidden_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, default=None)
 
     user: Mapped["User"] = relationship(back_populates="forecasts")
 
@@ -149,6 +156,9 @@ class ForecastEvaluation(Base):
     evaluated_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     # Evaluations of generated demo forecasts; visible only to the user who loaded the demo data.
     is_demo: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=None)
+    # Copied from the forecast, so the public record keeps working after the forecast itself is deleted.
+    confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=None)
+    start_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=None)
 
 
 class PriceTip(Base):

@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from app.config import DEFAULT_COIN_IDS, TIME_HORIZONS
 from app.i18n_content import quant_reasoning, unit_label
 from app.services import market_data
+from app.services.stats import normal_cdf
 
 Z_80 = 1.2815515655446004
 _EWMA_LAMBDA = 0.97
@@ -104,6 +105,15 @@ def project_path(series: List[Tuple[float, float]], sigma_h: float, step_hours: 
     return prices, lows, highs
 
 
+def direction_confidence(spot: float, final: float, sigma_h: float, hours: float) -> float:
+    """Probability (%) that the price ends on the predicted side of today's price, from the model's own
+    distribution: 50 % = a coin flip. The damped drift keeps it modest (at most about 64 %), which is honest."""
+    sigma_t = math.sqrt((sigma_h ** 2) * hours + _JUMP_VARIANCE_FLOOR)
+    if spot <= 0 or final <= 0 or sigma_t <= 0:
+        return 50.0
+    return round(normal_cdf(abs(math.log(final / spot)) / sigma_t) * 100, 1)
+
+
 def build_quant_forecast(coin: str, horizon: str, lang: str = "en") -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
     coin = (coin or "").upper()
     coin_id = DEFAULT_COIN_IDS.get(coin)
@@ -130,8 +140,7 @@ def build_quant_forecast(coin: str, horizon: str, lang: str = "en") -> Tuple[boo
     labels = [f"{unit} {i}" for i in range(1, points + 1)]
 
     sigma_day_pct = sigma_h * math.sqrt(24) * 100
-    rel_width = (highs[-1] - lows[-1]) / prices[-1]
-    confidence = round(max(15.0, min(92.0, 92.0 - rel_width * 90.0)), 1)
+    confidence = direction_confidence(spot, prices[-1], sigma_h, step * points)
     risk = "Low" if sigma_day_pct < 2.0 else "Medium" if sigma_day_pct < 4.5 else "High"
     change_pct = (prices[-1] / spot - 1) * 100
 

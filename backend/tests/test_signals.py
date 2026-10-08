@@ -14,7 +14,7 @@ NOW_MS = time.time() * 1000
 
 def fake_get(responses):
     """responses: {url_fragment: payload}; anything else is unavailable (None)."""
-    def _get(url, cache, params=None, as_text=False):
+    def _get(url, cache, params=None, as_text=False, timeout=None):
         for fragment, payload in responses.items():
             if fragment in url:
                 return payload(params) if callable(payload) else payload

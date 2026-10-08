@@ -77,16 +77,16 @@ def get_admin_user(user: User = Depends(get_current_user)) -> User:
     return user
 
 
-def save_limit_reached(db: Session, model, user_id: int) -> bool:
+def save_limit_reached(db: Session, model, user_id: int, *conditions) -> bool:
     from app import config
 
-    return db.query(model).filter(model.user_id == user_id).count() >= config.MAX_SAVED_ITEMS_PER_USER
+    return db.query(model).filter(model.user_id == user_id, *conditions).count() >= config.MAX_SAVED_ITEMS_PER_USER
 
 
-def ensure_below_save_limit(db: Session, model, user_id: int) -> None:
+def ensure_below_save_limit(db: Session, model, user_id: int, *conditions) -> None:
     from app.config import MAX_SAVED_ITEMS_PER_USER
 
-    if save_limit_reached(db, model, user_id):
+    if save_limit_reached(db, model, user_id, *conditions):
         raise HTTPException(status_code=400, detail=f"Dosiahol si limit {MAX_SAVED_ITEMS_PER_USER} uložených "
                                                     "záznamov. Zmaž staršie a skús to znova.")
 

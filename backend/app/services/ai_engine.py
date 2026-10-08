@@ -669,7 +669,7 @@ def compute_forecast_accuracy(coin: str, timeframe: str, predicted_prices: List[
     scored = score_forecast(predicted_prices, actual_prices, chart[0][1])
     if scored is None:
         return {**base, "status": "unavailable", "accuracy_pct": None, "actual_prices": actual_prices}
-    return {**base, "status": "completed", "actual_prices": actual_prices, **scored}
+    return {**base, "status": "completed", "actual_prices": actual_prices, "start_price": chart[0][1], **scored}
 
 
 def score_forecast(predicted_prices: List[float], actual_prices: List[float],

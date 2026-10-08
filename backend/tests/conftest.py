@@ -111,3 +111,14 @@ def _no_live_signals(monkeypatch, request):
     from app.services import signals
     monkeypatch.setattr(signals, "collect", lambda *a, **k: {"coin": "BTC", "items": [], "sources": [], "lines": [],
                                                             "updated_at": "", "score": {"bullish": 0, "bearish": 0, "neutral": 0}})
+
+
+@pytest.fixture(autouse=True)
+def _relaxed_save_window(monkeypatch, request):
+    """Many tests save a forecast "made" days ago to test scoring; the real 15-minute save window is tested on its
+    own (marker: strict_save_window)."""
+    if request.node.get_closest_marker("strict_save_window"):
+        return
+    from datetime import timedelta
+    from app.routers import forecast
+    monkeypatch.setattr(forecast, "SAVE_WINDOW", timedelta(days=3650))

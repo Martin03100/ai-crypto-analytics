@@ -20,11 +20,12 @@ function Table({ title, rows, label }) {
         <table className="lb-table">
           <thead>
             <tr><th>{label}</th><th>{t("leaderboard.colEvaluated")}</th><th>{t("leaderboard.colDirection")}</th>
-              <th>{t("leaderboard.colAccuracy")}</th><th>{t("leaderboard.colBeatsBaseline")}</th></tr>
+              <th>{t("leaderboard.colError")}</th><th>{t("leaderboard.colBeatsBaseline")}</th></tr>
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.key}><td>{r.key}</td><td>{r.evaluated}</td><td>{pct(r.direction_hit_pct)}</td><td>{pct(r.avg_accuracy_pct)}</td><td>{pct(r.beats_baseline_pct)}</td></tr>
+              <tr key={r.key}><td>{r.key}</td><td>{r.evaluated}</td><td>{pct(r.direction_hit_pct)}</td>
+                <td>{pct(r.avg_accuracy_pct == null ? null : Math.round((100 - r.avg_accuracy_pct) * 10) / 10)}</td><td>{pct(r.beats_baseline_pct)}</td></tr>
             ))}
           </tbody>
         </table>

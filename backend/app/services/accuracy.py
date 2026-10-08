@@ -15,10 +15,16 @@ MAX_ROWS = 20000
 
 
 def _rows(db: Session) -> List[tuple]:
+    # Outer join: an evaluation keeps counting after its forecast was deleted (it carries its own confidence and
+    # start price); older evaluations without them still read the values from the forecast.
     return (db.query(ForecastEvaluation, ForecastHistory.forecast_json)
-            .join(ForecastHistory, ForecastHistory.id == ForecastEvaluation.forecast_id)
+            .outerjoin(ForecastHistory, ForecastHistory.id == ForecastEvaluation.forecast_id)
             .filter(ForecastEvaluation.is_demo.isnot(True))
             .order_by(ForecastEvaluation.id.desc()).limit(MAX_ROWS).all())
+
+
+def _number(value) -> Optional[float]:
+    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
 
 def _parse(raw: str) -> Dict[str, Any]:
@@ -62,10 +68,10 @@ def by_regime(rows) -> List[Dict[str, Any]]:
 def insights(db: Session) -> Dict[str, Any]:
     cal, reg = [], []
     for ev, raw in _rows(db):
-        data = _parse(raw)
-        conf = data.get("confidence_score")
-        if isinstance(conf, (int, float)) and not isinstance(conf, bool) and 0 <= conf <= 100:
-            cal.append((ev, float(conf)))
-        start = data.get("aktualna_cena")
-        reg.append((ev, regime(start if isinstance(start, (int, float)) else None, ev.actual_final_price), None))
+        data = _parse(raw) if raw else {}
+        conf = ev.confidence if ev.confidence is not None else _number(data.get("confidence_score"))
+        if conf is not None and 0 <= conf <= 100:
+            cal.append((ev, conf))
+        start = ev.start_price if ev.start_price is not None else _number(data.get("aktualna_cena"))
+        reg.append((ev, regime(start, ev.actual_final_price), None))
     return {"calibration": calibration(cal), "regimes": by_regime(reg), "flat_band_pct": FLAT_BAND_PCT}

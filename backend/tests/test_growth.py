@@ -30,7 +30,7 @@ def test_track_record_is_public_and_empty_at_start(client):
     assert res.status_code == 200
     body = res.json()
     assert body["providers"] == [] and body["recent"] == []
-    assert body["totals"] == {"evaluated": 0, "direction_hit_pct": None, "beats_baseline_pct": None}
+    assert body["totals"] == {"evaluated": 0, "direction_hit_pct": None, "direction_ci": None, "beats_baseline_pct": None}
 
 
 def test_track_record_aggregates_real_forecasts_and_hides_demo_and_users(client):
@@ -45,7 +45,8 @@ def test_track_record_aggregates_real_forecasts_and_hides_demo_and_users(client)
     gemini = next(p for p in body["providers"] if p["provider"] == "Gemini")
     assert gemini["evaluated"] == 3 and gemini["direction_hit_pct"] == 66.7 and gemini["low_sample"] is True
     assert len(body["recent"]) == 4
-    assert set(body["recent"][0]) == {"coin", "horizon", "provider", "direction_correct", "accuracy_pct", "evaluated_at"}
+    assert set(body["recent"][0]) == {"coin", "horizon", "provider", "direction_correct", "accuracy_pct", "error_pct",
+                                      "evaluated_at"}
     assert "user" not in str(body).lower()
 
 

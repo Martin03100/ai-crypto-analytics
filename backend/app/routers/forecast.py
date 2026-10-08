@@ -32,6 +32,7 @@ from app.services.notifications import notify
 from app.services.backtest import BACKTEST_SETUP, run_backtest
 from app.services.demo_data import DEMO_LABEL_LIKE, demo_accuracy, is_demo_label
 from app.services.ai_engine import compute_forecast_accuracy, estimate_forecast_cost, get_coin_forecast
+from app.services.stats import RELIABLE_SAMPLE, wilson_interval
 
 router = APIRouter(prefix="/api/forecast", tags=["forecast"])
 
@@ -92,12 +93,34 @@ def estimate_forecast_cost_endpoint(payload: ForecastRequest, user: User = Depen
     return CostEstimateOut(is_mock=False, **result)
 
 
-@router.post("/save", response_model=ForecastHistoryOut, status_code=201)
+# A generated forecast must be saved soon after it was made: otherwise one could wait until the horizon has passed
+# and save only the forecasts that turned out right, which would bias the public track record.
+SAVE_WINDOW = timedelta(minutes=15)
+_DUPLICATE_SAVE = "Táto predikcia už je uložená."
+
+
+def _parse_iso(raw: object) -> Optional[datetime]:
+    if not isinstance(raw, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _visible(user_id: int):
+    """The user's own forecasts, without the ones they deleted that still wait for scoring."""
+    return (ForecastHistory.user_id == user_id) & ForecastHistory.hidden_at.is_(None)
+
+
+@router.post("/save", response_model=ForecastHistoryOut, status_code=201, dependencies=[Depends(rate_limit_by_user(30, 60))])
 def save_forecast(payload: SaveForecastRequest, user: User = Depends(get_current_user),
                    db: Session = Depends(get_db)) -> ForecastHistoryOut:
     label = provider_label(payload.provider)
     if label is None:
         raise HTTPException(status_code=400, detail="Neznamy AI provider.")
+    signature = None
     if payload.is_mock:
         model_label = "mock"
     else:
@@ -107,14 +130,24 @@ def save_forecast(payload: SaveForecastRequest, user: User = Depends(get_current
                 or not verify_forecast_signature(data.get("podpis"), user.id, payload.provider, payload.coin,
                                                  payload.horizon, prices, created, content=data)):
             raise HTTPException(status_code=400, detail="Predikciu sa nepodarilo overiť. Vygeneruj ju znova a ulož ju bez úprav.")
+        created_at, now = _parse_iso(created), datetime.now(timezone.utc)
+        if created_at is None or created_at > now + timedelta(minutes=2) or now - created_at > SAVE_WINDOW:
+            raise HTTPException(status_code=400, detail="Predikcia je staršia ako 15 minút, už sa nedá uložiť. Vygeneruj novú.")
+        signature = data["podpis"]
+        if db.query(ForecastHistory.id).filter(ForecastHistory.signature == signature).first() is not None:
+            raise HTTPException(status_code=409, detail=_DUPLICATE_SAVE)
         model_label = label
-    ensure_below_save_limit(db, ForecastHistory, user.id)
+    ensure_below_save_limit(db, ForecastHistory, user.id, ForecastHistory.hidden_at.is_(None))
     entry = ForecastHistory(
         user_id=user.id, crypto_symbol=payload.coin.upper(), timeframe=payload.horizon,
-        model_used=model_label, forecast_json=json.dumps(payload.forecast_data, ensure_ascii=False),
+        model_used=model_label, forecast_json=json.dumps(payload.forecast_data, ensure_ascii=False), signature=signature,
     )
     db.add(entry)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:          # the same forecast saved twice at the same moment
+        db.rollback()
+        raise HTTPException(status_code=409, detail=_DUPLICATE_SAVE) from None
     db.refresh(entry)
     return ForecastHistoryOut(
         id=entry.id, crypto_symbol=entry.crypto_symbol, timeframe=entry.timeframe,
@@ -122,20 +155,34 @@ def save_forecast(payload: SaveForecastRequest, user: User = Depends(get_current
     )
 
 
+def remove_forecasts(db: Session, rows: List[ForecastHistory]) -> None:
+    """Delete forecasts from the user's history without changing the public track record.
+
+    Sample and demo forecasts are deleted outright. A scored forecast is deleted, but its result (and a settled duel)
+    stays in the anonymous statistics. A forecast that is not scored yet is only hidden: it is still scored when its
+    horizon ends (so a forecast going wrong cannot be deleted away) and removed right after that."""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    for row in rows:
+        if row.model_used == "mock" or is_demo_label(row.model_used):
+            db.query(ForecastEvaluation).filter(ForecastEvaluation.forecast_id == row.id).delete(synchronize_session=False)
+            db.query(PriceTip).filter(PriceTip.forecast_id == row.id).delete(synchronize_session=False)
+            db.delete(row)
+        elif db.query(ForecastEvaluation.id).filter(ForecastEvaluation.forecast_id == row.id).first() is not None:
+            db.query(PriceTip).filter(PriceTip.forecast_id == row.id, PriceTip.outcome.is_(None)).delete(synchronize_session=False)
+            db.delete(row)
+        else:
+            row.hidden_at, row.share_token = now, None
+
+
 @router.delete("/history/{entry_id}")
 def delete_forecast(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
-    row = db.query(ForecastHistory).filter(ForecastHistory.id == entry_id, ForecastHistory.user_id == user.id).first()
-    if row is None:
-        raise HTTPException(status_code=404, detail="Uložená analýza nebola nájdená.")
-    db.query(ForecastEvaluation).filter(ForecastEvaluation.forecast_id == row.id).delete(synchronize_session=False)
-    db.query(PriceTip).filter(PriceTip.forecast_id == row.id).delete(synchronize_session=False)
-    db.delete(row)
+    remove_forecasts(db, [_own_forecast(db, user, entry_id)])
     db.commit()
     return {"success": True}
 
 
 def _own_forecast(db: Session, user: User, entry_id: int) -> ForecastHistory:
-    row = db.query(ForecastHistory).filter(ForecastHistory.id == entry_id, ForecastHistory.user_id == user.id).first()
+    row = db.query(ForecastHistory).filter(ForecastHistory.id == entry_id, _visible(user.id)).first()
     if row is None:
         raise HTTPException(status_code=404, detail="Uložená analýza nebola nájdená.")
     return row
@@ -171,9 +218,7 @@ def unshare_forecast(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], request
             dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
 def get_forecast_accuracy(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], user: User = Depends(get_current_user),
                            db: Session = Depends(get_db)) -> ForecastAccuracyOut:
-    row = db.query(ForecastHistory).filter(ForecastHistory.id == entry_id, ForecastHistory.user_id == user.id).first()
-    if row is None:
-        raise HTTPException(status_code=404, detail="Uložená analýza nebola nájdená.")
+    row = _own_forecast(db, user, entry_id)
     try:
         forecast_data = json.loads(row.forecast_json)
     except json.JSONDecodeError:
@@ -195,7 +240,7 @@ def get_forecast_accuracy(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], us
     _settle_tip(db, tip, result)
     _commit_ignoring_duplicates(db)
     can_tip = (tip is None and bool(predicted_prices)
-               and datetime.now(timezone.utc) - _created_at(row, forecast_data) <= _TIP_WINDOW)
+               and datetime.now(timezone.utc) - _created_at(row, forecast_data) <= tip_window(row.timeframe))
     return ForecastAccuracyOut(
         **result, can_tip=can_tip, tip_price=tip.tip_price if tip else None,
         tip_outcome=tip.outcome if tip else None, ai_final_price=predicted_prices[-1] if predicted_prices else None,
@@ -224,8 +269,7 @@ def export_history_csv(user: User = Depends(get_current_user), db: Session = Dep
     import csv
     import io
 
-    rows = (db.query(ForecastHistory).filter(ForecastHistory.user_id == user.id)
-            .order_by(ForecastHistory.created_at.desc()).all())
+    rows = db.query(ForecastHistory).filter(_visible(user.id)).order_by(ForecastHistory.created_at.desc()).all()
     evaluations = {e.forecast_id: e for e in db.query(ForecastEvaluation).filter(ForecastEvaluation.user_id == user.id)}
     out = io.StringIO()
     writer = csv.writer(out)
@@ -257,7 +301,7 @@ def get_history(symbol: Optional[str] = Query(default=None, max_length=16),
                 days_back: Optional[int] = Query(default=None, ge=1, le=3650),
                  page: int = Query(default=1, ge=1, le=100_000), page_size: int = Query(default=20, ge=1, le=100),
                  user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> PaginatedForecastHistory:
-    query = db.query(ForecastHistory).filter(ForecastHistory.user_id == user.id)
+    query = db.query(ForecastHistory).filter(_visible(user.id))
     if days_back is not None:
         query = query.filter(ForecastHistory.created_at >= datetime.now(timezone.utc) - timedelta(days=days_back))
     if symbol:
@@ -288,6 +332,14 @@ def get_history(symbol: Optional[str] = Query(default=None, max_length=16),
 
 
 _TIP_WINDOW = timedelta(hours=2)
+_TIP_WINDOW_SHARE = 0.1
+
+
+def tip_window(timeframe: str) -> timedelta:
+    """How long after a forecast a user may still tip its final price: 2 hours, but at most a tenth of the horizon
+    (a 4-hour forecast: 24 minutes), so the human never sees much more of the move than the AI did."""
+    hours = HORIZON_HOURS.get(timeframe, 7 * 24)
+    return min(_TIP_WINDOW, timedelta(hours=hours * _TIP_WINDOW_SHARE))
 
 
 def _created_at(row: ForecastHistory, forecast_data: dict) -> datetime:
@@ -308,14 +360,25 @@ def _record_evaluation(db: Session, row: ForecastHistory, result: dict) -> None:
         return
     if db.query(ForecastEvaluation).filter(ForecastEvaluation.forecast_id == row.id).first():
         return
+    try:
+        data = json.loads(row.forecast_json)
+    except json.JSONDecodeError:
+        data = {}
+    data = data if isinstance(data, dict) else {}
+
+    def number(value):
+        return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
     db.add(ForecastEvaluation(
         forecast_id=row.id, user_id=row.user_id, provider=row.model_used, coin=row.crypto_symbol,
         timeframe=row.timeframe, accuracy_pct=result["accuracy_pct"],
         baseline_accuracy_pct=result.get("baseline_accuracy_pct"),
         direction_correct=bool(result.get("direction_correct")), actual_final_price=result["actual_prices"][-1],
         is_demo=True if is_demo_label(row.model_used) else None,
+        confidence=number(data.get("confidence_score")),
+        start_price=number(data.get("aktualna_cena")) or number(result.get("start_price")),
     ))
-    if not is_demo_label(row.model_used):
+    if not is_demo_label(row.model_used) and row.hidden_at is None:
         notify(db, row.user_id, "forecast_evaluated", forecast_id=row.id, coin=row.crypto_symbol, horizon=row.timeframe,
                provider=row.model_used, direction_correct=bool(result.get("direction_correct")),
                accuracy_pct=result["accuracy_pct"])
@@ -360,6 +423,9 @@ def _mark_attempt(row: ForecastHistory, now: datetime, give_up: bool = False) ->
 
 def _evaluate_pending(db: Session, limit: int = 5, deadline_seconds: float = 8.0) -> None:
     now = datetime.now(timezone.utc)
+    # Deleted forecasts that can never be scored are not needed any more.
+    db.query(ForecastHistory).filter(ForecastHistory.hidden_at.isnot(None),
+                                     ForecastHistory.eval_attempts >= _EVAL_MAX_ATTEMPTS).delete(synchronize_session=False)
     candidates = (
         db.query(ForecastHistory)
         .filter(ForecastHistory.model_used != "mock", ForecastHistory.id.not_in(select(ForecastEvaluation.forecast_id)),
@@ -401,6 +467,8 @@ def _evaluate_pending(db: Session, limit: int = 5, deadline_seconds: float = 8.0
                 continue
             _record_evaluation(db, row, result)
             _settle_tip(db, db.query(PriceTip).filter(PriceTip.forecast_id == row.id).first(), result)
+            if row.hidden_at is not None:   # deleted by the user: the result is kept, the forecast itself goes now
+                db.delete(row)
         _commit_ignoring_duplicates(db)
     finally:
         pool.shutdown(wait=False)
@@ -409,9 +477,7 @@ def _evaluate_pending(db: Session, limit: int = 5, deadline_seconds: float = 8.0
 @router.post("/history/{entry_id}/tip", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_AI_ENDPOINT))])
 def submit_tip(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], payload: TipRequest, user: User = Depends(get_current_user),
                db: Session = Depends(get_db)) -> dict:
-    row = db.query(ForecastHistory).filter(ForecastHistory.id == entry_id, ForecastHistory.user_id == user.id).first()
-    if row is None:
-        raise HTTPException(status_code=404, detail="Uložená analýza nebola nájdená.")
+    row = _own_forecast(db, user, entry_id)
     try:
         forecast_data = json.loads(row.forecast_json)
     except json.JSONDecodeError:
@@ -421,8 +487,8 @@ def submit_tip(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], payload: TipR
     predicted = _numeric_prices(forecast_data.get("ceny"))
     if row.model_used == "mock" or not predicted:
         raise HTTPException(status_code=400, detail="Na ukážkové dáta sa tipovať nedá.")
-    if datetime.now(timezone.utc) - _created_at(row, forecast_data) > _TIP_WINDOW:
-        raise HTTPException(status_code=400, detail="Tipovať sa dá len do 2 hodín od vytvorenia predikcie.")
+    if datetime.now(timezone.utc) - _created_at(row, forecast_data) > tip_window(row.timeframe):
+        raise HTTPException(status_code=400, detail="Čas na tip pre túto predikciu už uplynul.")
     if db.query(PriceTip).filter(PriceTip.forecast_id == row.id).first():
         raise HTTPException(status_code=400, detail="Na túto predikciu si už tipoval.")
     try:
@@ -457,8 +523,10 @@ def provider_stats(db: Session, visibility) -> list[dict]:
     )
     providers = [
         {"provider": name, "evaluated": n, "direction_hit_pct": round((hits or 0) / n * 100, 1),
-         "avg_accuracy_pct": round(acc or 0.0, 1), "beats_baseline_pct": round((beats or 0) / n * 100, 1),
-         "low_sample": n < _MIN_SAMPLE}
+         "direction_ci": wilson_interval(hits or 0, n),
+         "avg_accuracy_pct": round(acc or 0.0, 1), "avg_error_pct": round(100 - (acc or 0.0), 1),
+         "beats_baseline_pct": round((beats or 0) / n * 100, 1),
+         "low_sample": n < _MIN_SAMPLE, "reliable": n >= RELIABLE_SAMPLE}
         for name, n, hits, acc, beats in rows
     ]
     providers.sort(key=lambda p: (not p["low_sample"], p["direction_hit_pct"], p["beats_baseline_pct"],
@@ -484,20 +552,16 @@ def leaderboard(user: User = Depends(get_current_user), db: Session = Depends(ge
 
     pending = db.query(PriceTip).filter(PriceTip.user_id == user.id, PriceTip.outcome.is_(None)).count()
     return {
-        "providers": providers, "min_sample": _MIN_SAMPLE,
+        "providers": providers, "min_sample": _MIN_SAMPLE, "reliable_sample": RELIABLE_SAMPLE,
         "challenge": {"you": {**_tip_summary(db, user.id), "pending": pending}, "everyone": _tip_summary(db)},
     }
-
 
 
 @router.post("/history/bulk-delete")
 def bulk_delete_forecasts(payload: BulkDeleteRequest, user: User = Depends(get_current_user),
                           db: Session = Depends(get_db)) -> dict:
-    ids = [row.id for row in db.query(ForecastHistory.id).filter(
-        ForecastHistory.user_id == user.id, ForecastHistory.id.in_(payload.ids)).all()]
-    if ids:
-        db.query(ForecastEvaluation).filter(ForecastEvaluation.forecast_id.in_(ids)).delete(synchronize_session=False)
-        db.query(PriceTip).filter(PriceTip.forecast_id.in_(ids)).delete(synchronize_session=False)
-        db.query(ForecastHistory).filter(ForecastHistory.id.in_(ids)).delete(synchronize_session=False)
+    rows = db.query(ForecastHistory).filter(_visible(user.id), ForecastHistory.id.in_(payload.ids)).all()
+    if rows:
+        remove_forecasts(db, rows)
         db.commit()
-    return {"success": True, "deleted": len(ids)}
+    return {"success": True, "deleted": len(rows)}

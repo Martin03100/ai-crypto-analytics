@@ -220,3 +220,12 @@
   .bell-panel { right: -90px; }
 }
 .upcoming-list .text-sub { margin-left: auto; }
+
+/* ---------- honest accuracy: confidence ranges and the few-data note ---------- */
+.track-stat-hint { font-size: 11.5px; color: var(--text-tertiary); }
+.lb-ci { display: block; font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+.track-note {
+  display: flex; gap: 8px; align-items: flex-start; margin: 12px 0 0; padding: 10px 12px; font-size: 13px; line-height: 1.55;
+  color: var(--text-secondary); background: var(--bg-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+}
+.track-note svg { flex: none; margin-top: 3px; color: var(--cyan-fg); }

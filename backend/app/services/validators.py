@@ -277,7 +277,8 @@ def build_forecast_prompt(coin: str, horizon: str, points: int, market_context: 
         f'"casove_body": [/* {points} textovych popiskov casu */], '
         f'"odovodnenie": "/* strucne slovne zdovodnenie predikcie, vratane '
         f'spomenutia relevantneho makro/geopoliticke/sentiment kontextu a aktualneho trendu */", '
-        f'"confidence_score": /* cislo 0-100, ako vela si isty predikciou */, '
+        f'"confidence_score": /* cislo 50-100: pravdepodobnost v %, ze cena na konci horizontu skonci na tej strane '
+        f'aktualnej ceny, ktoru predikujes (rast alebo pokles); 50 = hod mincou, nad 70 len pri naozaj silnych datach */, '
         f'"risk_level": "/* presne jedno z: Low, Medium, High */"}}'
     )
 
@@ -289,12 +290,12 @@ def build_portfolio_prompt(holdings: List[Dict[str, Any]], market_context: str |
         f"vypocitane): {market_context}. " if market_context else ""
     )
     return (
-        f"Si profesionalny krypto investicny poradca, ktory hodnoti kazdu poziciu striktne na zaklade jej "
-        f"vlastnych rizik a fundamentov - nie automaticky ako BUY. Analyzuj portfolio: "
-        f"{holdings_text}. {context_block}Zameraj sa na rizika, diverzifikaciu a sektorove "
+        f"Si analytik rizik kryptomenovych portfolii (nie financny poradca - nepoznas financnu situaciu ani ciele "
+        f"pouzivatela). Kazdu poziciu hodnot striktne na zaklade jej vlastnych rizik a dat - nie automaticky ako BUY. "
+        f"Analyzuj portfolio: {holdings_text}. {context_block}Zameraj sa na rizika, diverzifikaciu a sektorove "
         f"zlozenie (DeFi, L1/L2, AI, Memes, Other). {GLOBAL_CONTEXT_INSTRUCTION} "
-        f"DOLEZITE: pouzivaj SELL a HOLD rovnako casto ako BUY, ked si to riziko/koncentracia/volatilita danej "
-        f"pozicie realisticky vyzaduje - odporucanie BUY pre kazdu poziciu by bolo nezodpovedne a nerealisticke. "
+        f"DOLEZITE: akciu (BUY/SELL/HOLD) vyber len podla dat danej pozicie (riziko, koncentracia, volatilita, trend); "
+        f"ak data nedavaju jasny dovod, zvol HOLD. Odporucanie BUY pre kazdu poziciu by bolo nezodpovedne. "
         f"Odpovedz VYHRADNE ako "
         f"platny JSON bez markdown obalu, bez sprievodneho textu, presne v tomto tvare:\n"
         f'{{"odporucania": [{{"minca": str, "akcia": "BUY|SELL|HOLD", "dovod": str}}, ...], '

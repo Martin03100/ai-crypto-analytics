@@ -28,6 +28,7 @@ from app.utils.ttl_cache import TTLCache
 from app.services.app_settings import public_settings, require_feature
 from app.services.digest import check_unsubscribe_token
 from app.services.premium import ambassador_badge, invited_signups, is_premium
+from app.services.stats import RELIABLE_SAMPLE, wilson_interval
 from app.services.status_check import collect_status
 
 router = APIRouter(prefix="/api/public", tags=["public"])
@@ -94,15 +95,18 @@ def _track_record(db: Session) -> dict:
     return {
         "providers": provider_stats(db, real),
         "min_sample": _MIN_SAMPLE,
+        "reliable_sample": RELIABLE_SAMPLE,
         "totals": {
             "evaluated": total or 0,
             "direction_hit_pct": round((hits or 0) / total * 100, 1) if total else None,
+            "direction_ci": wilson_interval(hits or 0, total or 0),
             "beats_baseline_pct": round((beats or 0) / total * 100, 1) if total else None,
         },
         # Only what the forecast was about and how it turned out; never who made it.
         "recent": [
             {"coin": e.coin, "horizon": e.timeframe, "provider": e.provider, "direction_correct": e.direction_correct,
-             "accuracy_pct": round(e.accuracy_pct, 1), "evaluated_at": _iso(e.evaluated_at)}
+             "accuracy_pct": round(e.accuracy_pct, 1), "error_pct": round(100 - e.accuracy_pct, 1),
+             "evaluated_at": _iso(e.evaluated_at)}
             for e in recent
         ],
         "challenge": _tip_summary(db),

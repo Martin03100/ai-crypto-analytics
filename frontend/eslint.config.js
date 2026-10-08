@@ -34,7 +34,7 @@ export default [
     rules: { "react-refresh/only-export-components": "off" },
   },
   {
-    files: ["**/__tests__/**", "e2e/**", "*.config.js"],
+    files: ["**/__tests__/**", "e2e/**", "*.config.js", "src/testSetup.js"],
     languageOptions: { globals: { ...globals.node } },
   },
 ];
