@@ -1,6 +1,7 @@
 # Build
 [build]
-  command = "npm install --dangerously-allow-all-scripts && npm run build"
+  # npm ci installs exactly the lockfile; no install scripts are needed any more (Vite 8 ships prebuilt binaries).
+  command = "npm ci && npm run build"
   publish = "dist"
 
 # Security headers

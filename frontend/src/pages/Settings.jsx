@@ -22,9 +22,16 @@ import { useTheme } from "../context/ThemeContext";
 import { useToast } from "../context/ToastContext";
 import { api } from "../api";
 import { usePageTitle } from "../hooks/usePageTitle";
+import { useAppConfig } from "../context/AppConfigContext";
+
+// Quick links to the parts of this long page.
+const SECTIONS = [["prefs", "settings.navPrefs"], ["security", "settings.navSecurity"], ["view", "settings.navView"],
+  ["notifications", "settings.navNotifications"], ["profile", "settings.navProfile"], ["app", "settings.navApp"],
+  ["data", "settings.navData"]];
 
 export default function Settings() {
   const { t, lang, setLang } = useLanguage();
+  const { demo_for_all } = useAppConfig();
   usePageTitle("settings.title");
   const { theme, setTheme } = useTheme();
   const { currency, setCurrency } = useCurrency();
@@ -116,8 +123,17 @@ export default function Settings() {
         </div>
       </div>
 
+      <nav className="settings-nav" aria-label={t("settings.navLabel")}>
+        {SECTIONS.map(([id, key]) => (
+          <a key={id} href={`#set-${id}`} className="settings-nav-link"
+            onClick={(e) => { e.preventDefault(); document.getElementById(`set-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>
+            {t(key)}
+          </a>
+        ))}
+      </nav>
+
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div className="settings-prefs">
+        <div className="settings-prefs settings-anchor" id="set-prefs">
           <Card title={t("settings.language")} icon={Languages}>
             <p className="text-sub" style={{ marginTop: 0 }}>{t("settings.languageDesc")}</p>
             <div className="tabs">
@@ -152,7 +168,7 @@ export default function Settings() {
           </Card>
         </div>
 
-        <Card title={t("settings.security")} icon={ShieldCheck}>
+        <Card title={t("settings.security")} icon={ShieldCheck} id="set-security" className="settings-anchor">
           <p className="text-sub" style={{ marginTop: 0 }}>{t("settings.sessionInfo")}</p>
 
           <form onSubmit={handleSaveEmail} style={{ marginTop: 14 }}>
@@ -201,39 +217,42 @@ export default function Settings() {
           </button>
         </Card>
 
-        <ViewModeCard />
+        <section id="set-view" className="settings-anchor"><ViewModeCard /></section>
 
-        <NotificationSettings />
+        <section id="set-notifications" className="settings-anchor"><NotificationSettings /></section>
 
-        <MembershipCard />
+        <section id="set-profile" className="settings-anchor"><MembershipCard /></section>
 
-        <InstallAppCard />
+        <section id="set-app" className="settings-anchor settings-stack">
+          <InstallAppCard />
 
-        <DemoDataCard />
+          {/* A presentation tool: shown to admins (and to everyone outside production, where the tests use it). */}
+          {(user?.admin || demo_for_all) && <DemoDataCard />}
 
-        <Card title={t("settings.about")} icon={Info}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13 }}>
-            <div><strong>{t("settings.version")}:</strong> 2.4.0</div>
-            <div><strong>{t("settings.techStack")}:</strong> React (Vite), FastAPI, SQLAlchemy, Recharts, CoinGecko API</div>
-            <div><strong>{t("settings.support")}:</strong> <a href="mailto:aicryptoanalytics7@gmail.com" className="key-link">aicryptoanalytics7@gmail.com</a></div>
-            <div style={{ display: "flex", gap: 14, marginTop: 6, flexWrap: "wrap" }}>
-              <Link to="/about" className="key-link">{t("about.title")}</Link>
-              <Link to="/status" className="key-link">{t("status.title")}</Link>
-              <Link to="/privacy" className="key-link">{t("privacy.title")}</Link>
-              <Link to="/terms" className="key-link">{t("terms.title")}</Link>
+          <Card title={t("settings.about")} icon={Info}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13 }}>
+              <div><strong>{t("settings.version")}:</strong> {__APP_VERSION__}</div>
+              <div><strong>{t("settings.techStack")}:</strong> React (Vite), FastAPI, SQLAlchemy, Recharts, CoinGecko API</div>
+              <div><strong>{t("settings.support")}:</strong> <a href="mailto:aicryptoanalytics7@gmail.com" className="key-link">aicryptoanalytics7@gmail.com</a></div>
+              <div style={{ display: "flex", gap: 14, marginTop: 6, flexWrap: "wrap" }}>
+                <Link to="/about" className="key-link">{t("about.title")}</Link>
+                <Link to="/status" className="key-link">{t("status.title")}</Link>
+                <Link to="/privacy" className="key-link">{t("privacy.title")}</Link>
+                <Link to="/terms" className="key-link">{t("terms.title")}</Link>
+              </div>
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ marginTop: 10, alignSelf: "flex-start" }}
+                onClick={() => { resetOnboarding(user?.id ?? user?.username); navigate("/dashboard"); }}
+              >
+                <Compass size={14} /> {t("settings.restartTour")}
+              </button>
+              <p className="text-sub" style={{ marginTop: 8 }}>{t("shortcuts.hint")}</p>
             </div>
-            <button
-              className="btn btn-ghost btn-sm"
-              style={{ marginTop: 10, alignSelf: "flex-start" }}
-              onClick={() => { resetOnboarding(user?.id ?? user?.username); navigate("/dashboard"); }}
-            >
-              <Compass size={14} /> {t("settings.restartTour")}
-            </button>
-            <p className="text-sub" style={{ marginTop: 8 }}>{t("shortcuts.hint")}</p>
-          </div>
-        </Card>
+          </Card>
+        </section>
 
-        <DataExport />
+        <section id="set-data" className="settings-anchor"><DataExport /></section>
 
         <Card title={t("settings.deleteAccountTitle")} icon={Trash2} className="danger-zone">
           <p className="text-sub" style={{ marginBottom: 10 }}>{t("settings.deleteAccountDesc")}</p>

@@ -137,6 +137,8 @@ def events(lang: str = "en") -> dict:
 def add_vote(payload: VoteRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     if payload.sentiment_vote not in VALID_VOTES:
         return {"success": False, "message": "Neplatna hodnota hlasu."}
+    # Only the latest vote of each user counts, so a new vote replaces the old one (the table stays one row per user).
+    db.query(CommunityVote).filter(CommunityVote.user_id == user.id).delete(synchronize_session=False)
     db.add(CommunityVote(user_id=user.id, sentiment_vote=payload.sentiment_vote))
     db.commit()
     return {"success": True}

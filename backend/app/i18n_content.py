@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Dict, List, Tuple
 
 SUPPORTED_LANGS = ("en", "sk", "cs", "de", "pl")
@@ -80,44 +81,85 @@ def mock_forecast_reasoning(coin: str, horizon: str, trend_direction: str, lang:
     return templates.get(lang, templates[DEFAULT_LANG])
 
 
+HORIZON_NAMES: Dict[str, Dict[str, str]] = {
+    "en": {"4h": "4 hours", "24h": "24 hours", "1T": "1 week", "1M": "1 month", "1R": "1 year"},
+    "sk": {"4h": "4 hodiny", "24h": "24 hodín", "1T": "1 týždeň", "1M": "1 mesiac", "1R": "1 rok"},
+    "cs": {"4h": "4 hodiny", "24h": "24 hodin", "1T": "1 týden", "1M": "1 měsíc", "1R": "1 rok"},
+    "de": {"4h": "4 Stunden", "24h": "24 Stunden", "1T": "1 Woche", "1M": "1 Monat", "1R": "1 Jahr"},
+    "pl": {"4h": "4 godziny", "24h": "24 godziny", "1T": "1 tydzień", "1M": "1 miesiąc", "1R": "1 rok"},
+}
+
+
+def horizon_name(horizon: str, lang: str) -> str:
+    return HORIZON_NAMES[normalize_lang(lang)].get(horizon, horizon)
+
+
+_NBSP = "\u00a0"     # keeps "81 761,42 $" on one line
+
+
+def _localize_number(text: str, lang: str) -> str:
+    """English digits "81,761.42" in the reader's style: 81 761,42 (sk, cs, pl) or 81.761,42 (de)."""
+    if lang == "en":
+        return text
+    thousands = "." if lang == "de" else _NBSP
+    return text.replace(",", "|").replace(".", ",").replace("|", thousands)
+
+
 def _fmt_price(value: float) -> str:
-    return f"{value:,.2f}" if value >= 1 else f"{value:.6g}"
+    """English-style price digits; small coins (PEPE, SHIB) get three significant digits, never 1.05e-05."""
+    if value >= 1:
+        return f"{value:,.2f}"
+    decimals = min(12, max(2, 2 - math.floor(math.log10(value)))) if value > 0 else 2
+    return f"{value:.{decimals}f}"
+
+
+def fmt_money(value: float, lang: str) -> str:
+    lang = normalize_lang(lang)
+    digits = _localize_number(_fmt_price(value), lang)
+    return f"${digits}" if lang == "en" else f"{digits}{_NBSP}$"
+
+
+def fmt_pct(value: float, lang: str, signed: bool = False) -> str:
+    lang = normalize_lang(lang)
+    digits = _localize_number(f"{value:+.1f}" if signed else f"{value:.1f}", lang)
+    return f"{digits}%" if lang in ("en", "pl") else f"{digits}{_NBSP}%"
 
 
 def quant_reasoning(lang: str, coin: str, horizon: str, sigma_day_pct: float, change_pct: float,
                     low: float, high: float, spot: float) -> str:
     lang = normalize_lang(lang)
-    lo, hi, now = _fmt_price(low), _fmt_price(high), _fmt_price(spot)
+    lo, hi, now = fmt_money(low, lang), fmt_money(high, lang), fmt_money(spot, lang)
+    vol, move, h = fmt_pct(sigma_day_pct, lang), fmt_pct(change_pct, lang, signed=True), horizon_name(horizon, lang)
     templates = {
         "en": (
-            f"Free statistical model (no AI): {coin} at ${now}, horizon {horizon}. Typical daily volatility over "
-            f"the last 30 days is {sigma_day_pct:.1f}%. The median path moves {change_pct:+.1f}% (momentum is "
+            f"Free statistical model (no AI): {coin} at {now}, horizon {h}. Typical daily volatility over "
+            f"the last 30 days is {vol}. The median path moves {move} (momentum is "
             f"deliberately damped - short-term crypto trends are unreliable). With 80% probability the price at "
-            f"the end of the horizon lands between ${lo} and ${hi}. This is a reference estimate, not advice."
+            f"the end of the horizon lands between {lo} and {hi}. This is a reference estimate, not advice."
         ),
         "sk": (
-            f"Bezplatný štatistický model (bez AI): {coin} za ${now}, horizont {horizon}. Typická denná volatilita "
-            f"za posledných 30 dní je {sigma_day_pct:.1f} %. Stredná trajektória sa pohybuje o {change_pct:+.1f} % "
+            f"Bezplatný štatistický model (bez AI): {coin} za {now}, horizont {h}. Typická denná volatilita "
+            f"za posledných 30 dní je {vol}. Stredná trajektória sa pohybuje o {move} "
             f"(momentum je zámerne utlmené - krátkodobé trendy na kryptotrhu sú nespoľahlivé). S 80 % "
-            f"pravdepodobnosťou skončí cena na konci horizontu medzi ${lo} a ${hi}. Ide o referenčný odhad, nie o radu."
+            f"pravdepodobnosťou skončí cena na konci horizontu medzi {lo} a {hi}. Ide o referenčný odhad, nie o radu."
         ),
         "cs": (
-            f"Bezplatný statistický model (bez AI): {coin} za ${now}, horizont {horizon}. Typická denní volatilita "
-            f"za posledních 30 dní je {sigma_day_pct:.1f} %. Střední trajektorie se pohybuje o {change_pct:+.1f} % "
+            f"Bezplatný statistický model (bez AI): {coin} za {now}, horizont {h}. Typická denní volatilita "
+            f"za posledních 30 dní je {vol}. Střední trajektorie se pohybuje o {move} "
             f"(momentum je záměrně utlumeno - krátkodobé trendy na kryptotrhu jsou nespolehlivé). S 80% "
-            f"pravděpodobností skončí cena na konci horizontu mezi ${lo} a ${hi}. Jde o referenční odhad, ne o radu."
+            f"pravděpodobností skončí cena na konci horizontu mezi {lo} a {hi}. Jde o referenční odhad, ne o radu."
         ),
         "de": (
-            f"Kostenloses statistisches Modell (ohne KI): {coin} bei ${now}, Horizont {horizon}. Die typische tägliche "
-            f"Volatilität der letzten 30 Tage liegt bei {sigma_day_pct:.1f} %. Der Medianpfad bewegt sich um {change_pct:+.1f} % "
+            f"Kostenloses statistisches Modell (ohne KI): {coin} bei {now}, Horizont {h}. Die typische tägliche "
+            f"Volatilität der letzten 30 Tage liegt bei {vol}. Der Medianpfad bewegt sich um {move} "
             f"(das Momentum ist bewusst gedämpft - kurzfristige Krypto-Trends sind unzuverlässig). Mit 80 % "
-            f"Wahrscheinlichkeit liegt der Preis am Ende des Horizonts zwischen ${lo} und ${hi}. Das ist eine Richtschätzung, keine Beratung."
+            f"Wahrscheinlichkeit liegt der Preis am Ende des Horizonts zwischen {lo} und {hi}. Das ist eine Richtschätzung, keine Beratung."
         ),
         "pl": (
-            f"Darmowy model statystyczny (bez AI): {coin} po ${now}, horyzont {horizon}. Typowa dzienna zmienność "
-            f"z ostatnich 30 dni wynosi {sigma_day_pct:.1f}%. Mediana ścieżki zmienia się o {change_pct:+.1f}% "
+            f"Darmowy model statystyczny (bez AI): {coin} po {now}, horyzont {h}. Typowa dzienna zmienność "
+            f"z ostatnich 30 dni wynosi {vol}. Mediana ścieżki zmienia się o {move} "
             f"(momentum jest celowo wytłumione - krótkoterminowe trendy na rynku krypto są niewiarygodne). Z 80% "
-            f"prawdopodobieństwem cena na końcu horyzontu znajdzie się między ${lo} a ${hi}. To szacunek orientacyjny, nie porada."
+            f"prawdopodobieństwem cena na końcu horyzontu znajdzie się między {lo} a {hi}. To szacunek orientacyjny, nie porada."
         ),
     }
     return templates.get(lang, templates[DEFAULT_LANG])

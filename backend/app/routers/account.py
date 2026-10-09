@@ -25,7 +25,7 @@ from app.security import (
     totp_uri, verify_password,
 )
 from app.services import audit, jobs
-from app.services.demo_data import create_demo_data, remove_demo_data
+from app.services.demo_data import create_demo_data, demo_for_all, remove_demo_data
 from app.services.totp import (
     OK, RECOVERY, RECOVERY_CODE_COUNT, consume_totp_code, new_recovery_codes, recovery_codes_left, verify_second_factor,
 )
@@ -290,6 +290,8 @@ def account_activity(limit: int = Query(default=50, ge=1, le=200), user: User = 
 @router.post("/demo-data", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
 def load_demo_data(request: Request, lang: str = Query(default="en", max_length=5),
                    user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
+    if not (demo_for_all() or is_admin(user)):
+        raise HTTPException(status_code=403, detail="Prístup len pre administrátora.")
     created = create_demo_data(db, user.id, lang)
     audit.record(db, user.id, "demo_data_loaded", request,
                  f"{created['forecasts']} forecasts, {created['portfolios']} portfolios")

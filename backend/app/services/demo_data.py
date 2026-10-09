@@ -41,6 +41,12 @@ def is_demo_label(model_used: Optional[str]) -> bool:
     return bool(model_used) and str(model_used).endswith(DEMO_LABEL_SUFFIX)
 
 
+def demo_for_all() -> bool:
+    """Demo data is a presentation tool: in production only admins may load it; in development and tests anyone."""
+    from app import config
+    return config.APP_ENV != "production"
+
+
 @dataclass(frozen=True)
 class DemoModel:
     key: str

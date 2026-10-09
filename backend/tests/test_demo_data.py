@@ -268,3 +268,13 @@ def test_demo_tips_are_a_close_contest_not_a_walkover(registered):
     you = client.get("/api/forecast/leaderboard").json()["challenge"]["you"]
     assert you["total"] == body["tips"] and you["wins"] >= 1 and you["losses"] >= 1
     assert 0.2 <= you["wins"] / you["total"] <= 0.8
+
+
+def test_demo_data_is_admin_only_in_production(registered, monkeypatch):
+    from app import config
+    client, username, _ = registered
+    monkeypatch.setattr(config, "APP_ENV", "production")
+    assert client.get("/api/public/config").json()["demo_for_all"] is False
+    assert client.post("/api/account/demo-data", headers=csrf_headers(client)).status_code == 403
+    monkeypatch.setattr(config, "ADMIN_USERNAMES", frozenset({username.lower()}))
+    assert client.post("/api/account/demo-data", headers=csrf_headers(client)).status_code == 200

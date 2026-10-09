@@ -28,6 +28,7 @@ from app.utils.ttl_cache import TTLCache
 from app.services.app_settings import public_settings, require_feature
 from app.services.digest import check_unsubscribe_token
 from app.services.premium import ambassador_badge, invited_signups, is_premium
+from app.services.demo_data import demo_for_all
 from app.services.stats import RELIABLE_SAMPLE, wilson_interval
 from app.services.status_check import collect_status
 
@@ -243,7 +244,7 @@ def premium() -> dict:
 @router.get("/config")
 def public_config() -> dict:
     """Feature switches and the announcement banner the admin controls, plus the Premium offer."""
-    return {**public_settings(), "premium": premium_info()}
+    return {**public_settings(), "premium": premium_info(), "demo_for_all": demo_for_all()}
 
 
 class UnsubscribeRequest(BaseModel):

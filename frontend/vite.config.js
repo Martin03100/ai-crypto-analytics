@@ -1,14 +1,19 @@
 /** Vite configuration. */
 
+import { readFileSync } from "node:fs";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
+
+// One source of truth for the version shown in Settings: package.json.
+const { version: APP_VERSION } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf-8"));
 
 // Read-only API responses the app may show while offline (the last copy seen online).
 // Anything with secrets or side effects (API keys, activity log, exports, all writes) is never cached.
 const OFFLINE_API = /^\/api\/(account\/watchlist|schedules|forecast\/(history(?!\/export)|leaderboard)|portfolio\/history|market\/(fear-greed|headlines|prices|chart|events|onchain|vote\/percentages))(\/|\?|$)/;
 
 export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(APP_VERSION) },
   plugins: [
     react(),
     VitePWA({
