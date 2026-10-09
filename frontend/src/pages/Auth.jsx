@@ -2,7 +2,7 @@
 
 import { AlertTriangle, Brain, CheckCircle2, LineChart, Loader2, PlayCircle, ShieldCheck, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { api } from "../api";
 import CandlestickArt from "../components/CandlestickArt";
 import PasswordInput from "../components/PasswordInput";
@@ -68,7 +68,6 @@ export default function Auth() {
   const { signups_enabled } = useAppConfig();
   const { t, lang } = useLanguage();
   usePageTitle("auth.pageTitle");
-  const navigate = useNavigate();
 
   function clientValidate() {
     if (!username || !password) return t("auth.validationUsernameRequired");
@@ -102,7 +101,6 @@ export default function Auth() {
             setCaptchaKey((k) => k + 1);
           }
         }
-        navigate("/forecast");
       } else {
         try {
           await register(username, password, email, captchaToken);
@@ -110,7 +108,6 @@ export default function Auth() {
           setCaptchaToken("");
           setCaptchaKey((k) => k + 1);
         }
-        navigate("/dashboard");    // new users first choose the beginner or full view there
       }
     } catch (err) {
       if (err?.code === "totp_required" || /6-miestny k[oó]d z overovacej aplik/i.test(err?.message || "")) setNeedTotp(true);

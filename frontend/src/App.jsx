@@ -7,6 +7,7 @@ import { useAuth } from "./context/AuthContext";
 import { useLanguage } from "./context/LanguageContext";
 import Layout from "./pages/Layout";
 import WakeBanner from "./components/WakeBanner";
+import { hasSeenOnboarding } from "./components/OnboardingTour";
 import { SEO_LANGS } from "./utils/seoCoins";
 
 import Auth from "./pages/Auth";
@@ -46,8 +47,18 @@ function RequireAuth({ children }) {
   const { user, checking } = useAuth();
   const location = useLocation();
   if (checking) return <FullScreenLoader />;
-  if (!user) return location.pathname === "/" ? <Landing /> : <Navigate to="/auth" replace />;
+  if (!user) return location.pathname === "/" ? <Landing /> : <Navigate to="/auth" replace state={{ from: location.pathname + location.search }} />;
   return children;
+}
+
+/** After signing in or up: back to the page that asked for it, otherwise the dashboard on the first visit (view choice
+ *  and the tour start there) or the forecast page. */
+function AfterAuth({ user }) {
+  const location = useLocation();
+  const from = location.state?.from;
+  const back = typeof from === "string" && from.startsWith("/") && !from.startsWith("//") && from !== "/auth" ? from : null;
+  const next = back || (hasSeenOnboarding(user.id ?? user.username) ? "/forecast" : "/dashboard");
+  return <Navigate to={next} replace />;
 }
 
 export default function App() {
@@ -59,7 +70,7 @@ export default function App() {
     <>
       <WakeBanner />
       <Routes>
-        <Route path="/auth" element={user ? <Navigate to="/forecast" replace /> : <Auth />} />
+        <Route path="/auth" element={user ? <AfterAuth user={user} /> : <Auth />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/about" element={<Suspense fallback={<FullScreenLoader />}><About /></Suspense>} />
