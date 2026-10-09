@@ -28,13 +28,19 @@ def is_premium(user: User) -> bool:
     return bool(user and user.premium_until and user.premium_until > _now() and app_settings.premium_mode())
 
 
+def has_premium_features(user: User) -> bool:
+    """Access to the paid features. While Premium mode is off the app is free and everyone gets them (nothing about
+    Premium is shown); once the admin switches Premium on, only members keep them."""
+    if not app_settings.premium_mode():
+        return user is not None
+    return is_premium(user)
+
+
 def require_premium(user: User) -> None:
-    """403 for Premium-only features: "switched off" while Premium mode is off, otherwise "part of Premium"."""
+    """403 for a paid feature, but only while Premium mode is on and the user is not a member."""
     from fastapi import HTTPException
 
-    if not app_settings.premium_mode():
-        raise HTTPException(status_code=403, detail="Táto funkcia je momentálne vypnutá.")
-    if not is_premium(user):
+    if not has_premium_features(user):
         raise HTTPException(status_code=403, detail="Táto funkcia je dostupná v Premium.")
 
 
@@ -52,7 +58,7 @@ def set_premium_until(user: User, until: Optional[datetime]) -> None:
 
 
 def max_schedules(user: User) -> int:
-    return app_settings.get("premium_schedules" if is_premium(user) else "free_schedules")
+    return app_settings.get("premium_schedules" if has_premium_features(user) else "free_schedules")
 
 
 def ensure_referral_code(db: Session, user: User) -> str:

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.config import DEFAULT_COIN_IDS
 from app.models import PortfolioPosition, PortfolioSnapshot, User
 from app.services import market_data
-from app.services.premium import is_premium
+from app.services.premium import has_premium_features
 
 MAX_POSITIONS = 30
 
@@ -75,7 +75,7 @@ def take_snapshots(db: Session) -> int:
     taken = 0
     for uid in user_ids:
         user = db.get(User, uid)
-        if user is None or not is_premium(user):
+        if user is None or not has_premium_features(user):
             continue
         data = summary(db, user)
         if not data["total"]["value"] or data["unpriced"]:

@@ -20,7 +20,8 @@ from app.rate_limit import rate_limit_by_user
 from app.services import app_settings, audit, billing, challenge, notifications, telegram
 from app.services.account_data import export_user_data, personal_stats
 from app.services.premium import (
-    ambassador_badge, ensure_referral_code, invited_signups, is_premium, require_premium, rewarded_referrals,
+    ambassador_badge, ensure_referral_code, has_premium_features, invited_signups, is_premium, require_premium,
+    rewarded_referrals,
 )
 
 logger = logging.getLogger("aca.community")
@@ -50,12 +51,13 @@ def _require_premium_mode() -> None:
 def membership(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     code = ensure_referral_code(db, user)
     premium = is_premium(user)
+    features = has_premium_features(user)
     signups = invited_signups(db, user.id)
     return {
         "premium": premium, "premium_until": user.premium_until.isoformat() + "Z" if premium else None,
         "has_billing": bool(user.stripe_customer_id),
         "nickname": user.nickname, "digest_opt_in": bool(user.digest_opt_in), "lang": user.lang or "en",
-        "briefing_opt_in": bool(user.briefing_opt_in) and premium,
+        "briefing_opt_in": bool(user.briefing_opt_in) and features, "features": features,
         "telegram": {"available": telegram.enabled(), "linked": bool(user.telegram_chat_id)},
         "referral_code": code, "referral_link": f"{APP_PUBLIC_URL}/?ref={code}",
         "referral_signups": signups, "badge": ambassador_badge(signups), "challenge_wins": challenge.wins(db, user.id),

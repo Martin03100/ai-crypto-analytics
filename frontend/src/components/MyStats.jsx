@@ -3,7 +3,7 @@
 import { BarChart3, FileDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import { useAuth } from "../context/AuthContext";
+import { usePremium } from "../hooks/usePremium";
 import { useLanguage } from "../context/LanguageContext";
 import { QUANT_LABEL } from "../utils/models";
 import { Card } from "./Card";
@@ -36,12 +36,12 @@ function Table({ title, rows, label }) {
 
 export default function MyStats() {
   const { t } = useLanguage();
-  const { user } = useAuth();
+  const { features } = usePremium();
   const [stats, setStats] = useState(null);
 
-  useEffect(() => { if (user?.premium) api.myStats().then(setStats).catch(() => setStats(null)); }, [user?.premium]);
+  useEffect(() => { if (features) api.myStats().then(setStats).catch(() => setStats(null)); }, [features]);
 
-  if (!user?.premium) return <PremiumGate title={t("mystats.title")} text={t("mystats.gate")} />;
+  if (!features) return <PremiumGate title={t("mystats.title")} text={t("mystats.gate")} />;
   if (!stats) return null;
   const providers = stats.by_provider.map((r) => ({ ...r, key: r.key === QUANT_LABEL ? t("provider.quantLabel") : r.key }));
   const horizons = stats.by_horizon.map((r) => ({ ...r, key: t(`forecast.horizon${r.key}`) }));

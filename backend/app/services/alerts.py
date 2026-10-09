@@ -14,7 +14,7 @@ from app.models import PriceAlert, User
 from app.services import app_settings, market_data, telegram
 from app.services.email_service import email_lang, email_shell, is_email_configured, send_email
 from app.services.notifications import notify
-from app.services.premium import is_premium
+from app.services.premium import has_premium_features
 
 logger = logging.getLogger("aca.alerts")
 
@@ -50,7 +50,7 @@ def fmt_price(value: float) -> str:
 
 
 def alert_limit(user: User) -> int:
-    return app_settings.get("premium_alerts" if is_premium(user) else "free_alerts")
+    return app_settings.get("premium_alerts" if has_premium_features(user) else "free_alerts")
 
 
 def crossed(alert: PriceAlert, value: float) -> bool:
@@ -133,7 +133,7 @@ def check_alerts(db: Session) -> int:
         user = db.get(User, alert.user_id)
         if user is None:
             continue
-        if alert.kind in PREMIUM_KINDS and not is_premium(user):
+        if alert.kind in PREMIUM_KINDS and not has_premium_features(user):
             continue                      # Premium ended: the alert waits until it is renewed
         alert.active, alert.triggered_at, alert.triggered_price = False, now, value
         notify(db, alert.user_id, "price_alert", alert_kind=alert.kind, coin=alert.coin, direction=alert.direction,
@@ -143,6 +143,6 @@ def check_alerts(db: Session) -> int:
     for user, text in deliveries:
         if user.email and user.email_verified is not False and is_email_configured():
             send_email(user.email, *_email(user, text))
-        if user.telegram_chat_id and is_premium(user):
+        if user.telegram_chat_id and has_premium_features(user):
             telegram.send(user.telegram_chat_id, f"🔔 {text}")
     return len(deliveries)

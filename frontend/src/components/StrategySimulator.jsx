@@ -32,7 +32,7 @@ const tone = (v) => (v > 0 ? "up" : v < 0 ? "down" : "");
 
 export default function StrategySimulator() {
   const { t, lang } = useLanguage();
-  const { active } = usePremium();
+  const { features } = usePremium();
   const { providers } = useProviders();
   const models = useMemo(() => [
     { value: QUANT_LABEL, label: t("provider.quantLabel") },
@@ -47,7 +47,7 @@ export default function StrategySimulator() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  if (!active) return <PremiumGate title={t("sim.title")} text={t("sim.gate")} />;
+  if (!features) return <PremiumGate title={t("sim.title")} text={t("sim.gate")} />;
 
   const run = async () => {
     setLoading(true);

@@ -350,10 +350,10 @@ export default function Portfolio() {
       <div className="tabs">
         <button className={`tab ${tab === "new" ? "active" : ""}`} onClick={() => setTab("new")}>{t("portfolio.tabNew")}</button>
         <button className={`tab ${tab === "history" ? "active" : ""}`} onClick={() => setTab("history")}>{t("portfolio.tabHistory")}</button>
-        {premiumMode && <button className={`tab ${tab === "tracker" ? "active" : ""}`} onClick={() => setTab("tracker")}><Crown size={13} style={{ marginRight: 5 }} />{t("tracker.tab")}</button>}
+        <button className={`tab ${tab === "tracker" ? "active" : ""}`} onClick={() => setTab("tracker")}>{premiumMode && <Crown size={13} style={{ marginRight: 5 }} />}{t("tracker.tab")}</button>
       </div>
 
-      {tab === "tracker" && premiumMode && <PortfolioTracker />}
+      {tab === "tracker" && <PortfolioTracker />}
 
       {tab === "new" && (
       <>

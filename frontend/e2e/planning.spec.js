@@ -11,7 +11,7 @@ test("a scheduled forecast appears in the list and on the dashboard", async ({ p
   await page.getByRole("button", { name: "Create schedule" }).click();
   await expect(page.getByText("Forecast scheduled.")).toBeVisible();
   await expect(page.getByText(/Every day at/)).toBeVisible();
-  await expect(page.getByText("Your schedules · 1/5")).toBeVisible();
+  await expect(page.getByText("Your schedules · 1/20")).toBeVisible();     // Premium off: everyone has the higher limit
 
   await page.getByRole("button", { name: "Pause" }).click();
   await expect(page.getByText(/paused/)).toBeVisible();

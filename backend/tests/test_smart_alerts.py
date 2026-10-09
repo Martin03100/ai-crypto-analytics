@@ -26,6 +26,7 @@ def _create(client, **body):
 
 def test_alert_kinds_validation_and_premium_kinds(registered):
     client, username, _p = registered
+    set_app_settings(premium_mode=True)          # the limits and gates below exist only while Premium is on
     assert _create(client, kind="move", target_price=0.1).status_code == 400          # below 0.5 %
     assert _create(client, kind="rsi", target_price=150).status_code == 400
     assert _create(client, kind="fear_greed", target_price=20, direction="below").status_code == 403
@@ -79,6 +80,7 @@ def test_smart_alerts_fire_on_their_own_signal(registered, monkeypatch):
 
 def test_premium_kind_waits_when_premium_ends(registered, monkeypatch):
     _client, username, _p = registered
+    set_app_settings(premium_mode=True)          # the limits and gates below exist only while Premium is on
     uid = SessionLocal().query(User).filter(User.username == username).first().id
     _add(uid, "fear_greed", "ALL", "below", 20)
     monkeypatch.setattr(alerts.market_data, "get_fear_greed_index", lambda: (True, {"value": 10}, None))
@@ -93,6 +95,7 @@ def test_telegram_linking_flow(registered, monkeypatch):
     client, username, _p = registered
     monkeypatch.setattr(telegram, "TELEGRAM_BOT_TOKEN", "t")
     monkeypatch.setattr(telegram, "TELEGRAM_BOT_USERNAME", "AcaBot")
+    set_app_settings(premium_mode=True)          # the limits and gates below exist only while Premium is on
     assert client.post("/api/account/telegram/link", headers=csrf_headers(client)).status_code == 403   # not Premium
     _premium(username)
     url = client.post("/api/account/telegram/link", headers=csrf_headers(client)).json()["url"]

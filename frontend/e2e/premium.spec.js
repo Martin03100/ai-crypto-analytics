@@ -20,13 +20,21 @@ test("with Premium mode off the app looks completely free", async ({ page }) => 
   await expect(page.getByText("Profile & community")).toBeVisible();
   await expect(page.getByText(/ambassador badge/)).toBeVisible();
   await expect(page.getByText("Morning briefing (Premium)")).toHaveCount(0);
+  await expect(page.locator("main")).not.toContainText("Premium");
+  // While Premium is off its features are free for everyone, shown without any Premium label or crown.
   await page.goto("/forecast");
-  await expect(page.getByRole("button", { name: "My stats" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Simulator" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "My stats" })).toBeVisible();
+  await page.getByRole("button", { name: "Simulator" }).click();
+  await expect(page.getByRole("link", { name: "Unlock with Premium" })).toHaveCount(0);
+  await expect(page.locator("main")).not.toContainText("Premium");
+  await page.goto("/portfolio");
+  await page.getByRole("button", { name: "P&L tracker" }).click();
+  await expect(page.locator("main")).not.toContainText("Premium");
   await page.goto("/dashboard");
   await expect(page.getByRole("radio", { name: "Big move" })).toBeVisible();
   await expect(page.getByText("Market signals")).toBeVisible();
-  await expect(page.getByRole("radio", { name: "Fear & Greed" })).toHaveCount(0);
+  await expect(page.getByRole("radio", { name: "Fear & Greed" })).toBeVisible();
+  await expect(page.locator("main")).not.toContainText("Premium");
   await page.goto("/market");
   await expect(page.getByText("Market scanner")).toBeVisible();
   await expect(page.getByText("Market signals")).toBeVisible();

@@ -12,22 +12,23 @@ const fmt = (v) => `${v > 0 ? "+" : ""}${v.toFixed(2)} %`;
 
 export default function ConsensusBox({ coin, horizon, series }) {
   const { t } = useLanguage();
-  const { mode, active } = usePremium();
+  const { mode, features } = usePremium();
   const [result, setResult] = useState(null);
   const forecasts = consensusInput(series);
   const signature = JSON.stringify(forecasts);
 
   useEffect(() => {
-    if (!active || forecasts.length < 2) return undefined;
+    if (!features || forecasts.length < 2) return undefined;
     let alive = true;
     api.consensus(coin, horizon, forecasts).then((r) => alive && setResult(r)).catch(() => alive && setResult(null));
     return () => { alive = false; };
     // signature captures the forecasts; the array itself changes on every render
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, coin, horizon, signature]);
+  }, [features, coin, horizon, signature]);
 
-  if (!mode || forecasts.length < 2) return null;
-  if (!active) {
+  if (forecasts.length < 2) return null;
+  if (!features) {
+    if (!mode) return null;
     return (
       <div className="consensus consensus-locked">
         <Crown size={15} /> <span>{t("consensus.teaser")}</span> <Link to="/premium" className="key-link">{t("gate.cta")}</Link>

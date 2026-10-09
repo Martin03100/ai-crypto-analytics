@@ -14,7 +14,7 @@ from app.models import User
 from app.services import quant_engine, signals, telegram
 from app.services.alerts import fmt_price
 from app.services.email_service import email_lang, email_shell, is_email_configured, send_email
-from app.services.premium import is_premium
+from app.services.premium import has_premium_features
 
 logger = logging.getLogger("aca.briefing")
 
@@ -96,7 +96,7 @@ def send_morning_briefings(db: Session) -> int:
     sent = 0
     for user in db.query(User).filter(User.briefing_opt_in.is_(True), User.email.isnot(None),
                                       User.email_verified.isnot(False), User.disabled.isnot(True)).all():
-        if not is_premium(user):
+        if not has_premium_features(user):
             continue
         rows = [r for r in (coin_outlook(c, cache) for c in _watchlist(user)) if r]
         if not rows:

@@ -35,6 +35,7 @@ def _alert(client, coin="BTC", direction="above", price=100000.0):
 
 def test_free_user_gets_one_alert_premium_gets_more(registered):
     client, username, _p = registered
+    set_app_settings(premium_mode=True)          # the limits and gates below exist only while Premium is on
     assert _alert(client).status_code == 201
     res = _alert(client, price=90000)
     assert res.status_code == 400 and "najviac 1" in res.json()["detail"]
@@ -80,8 +81,7 @@ def test_alert_fires_once_with_notification_and_email(registered, monkeypatch):
 
 def test_premium_only_endpoints_are_gated(registered):
     client, username, _p = registered
-    res = client.get("/api/account/stats")
-    assert res.status_code == 403 and res.json()["detail"] == "Táto funkcia je momentálne vypnutá."   # mode off
+    assert client.get("/api/account/stats").status_code == 200        # Premium off: the paid features are free
     set_app_settings(premium_mode=True)
     res = client.get("/api/account/stats")
     assert res.status_code == 403 and res.json()["detail"] == "Táto funkcia je dostupná v Premium."
@@ -278,3 +278,20 @@ def test_limits_apply_when_premium_ends(registered, monkeypatch):
         assert [a.target_price for a in kept] == [1000.0]                         # free plan: only the oldest one
     finally:
         db.close()
+
+
+def test_while_premium_is_off_everyone_gets_the_paid_features(registered):
+    client, _username, _p = registered
+    assert client.get("/api/account/stats").status_code == 200
+    assert client.get("/api/positions").status_code == 200
+    assert client.get("/api/tools/model-ranking?coin=BTC&horizon=24h").status_code == 200
+    res = client.post("/api/alerts", json={"kind": "fear_greed", "coin": "BTC", "direction": "below", "target_price": 20},
+                      headers=csrf_headers(client))
+    assert res.status_code == 201
+    listed = client.get("/api/alerts").json()
+    assert listed["max"] == 25
+    assert client.get("/api/schedules").json()["max"] == 20
+    membership = client.get("/api/account/membership").json()
+    assert membership["features"] is True and membership["premium"] is False and membership["enabled"] is False
+    # Still nothing about Premium in the session: no crown or "member" flag.
+    assert client.get("/api/auth/session").json()["premium"] is False

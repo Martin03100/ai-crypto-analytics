@@ -88,6 +88,7 @@ def test_non_overlapping_trades():
 def test_simulate_endpoint_uses_saved_ai_forecasts(registered):
     client, username, _p = registered
     body = {"coin": "BTC", "horizon": "24h", "model": "Gemini"}
+    set_app_settings(premium_mode=True)          # the limits and gates below exist only while Premium is on
     assert client.post("/api/tools/simulate", json=body, headers=csrf_headers(client)).status_code == 403
     _premium(username)
     assert client.post("/api/tools/simulate", json=body, headers=csrf_headers(client)).status_code == 404
@@ -102,6 +103,7 @@ def test_simulate_endpoint_uses_saved_ai_forecasts(registered):
 def test_consensus_and_ranking_endpoints(registered):
     client, username, _p = registered
     body = {"coin": "BTC", "horizon": "24h", "forecasts": [{"model": "A", "start": 100, "final": 101}]}
+    set_app_settings(premium_mode=True)          # the limits and gates below exist only while Premium is on
     assert client.post("/api/tools/consensus", json=body, headers=csrf_headers(client)).status_code == 403
     assert client.get("/api/tools/model-ranking?coin=BTC&horizon=24h").status_code == 403
     _premium(username)

@@ -40,6 +40,7 @@ def _put(client, coin, amount, price):
 
 def test_tracker_is_premium_only(registered):
     client, _u, _p = registered
+    set_app_settings(premium_mode=True)          # the limits and gates below exist only while Premium is on
     assert client.get("/api/positions").status_code == 403
     assert _put(client, "BTC", 1, 1).status_code == 403
     assert client.get("/api/report.pdf").status_code == 403
@@ -89,7 +90,13 @@ def test_daily_snapshots_only_for_premium(registered, markets):
         assert tracker.take_snapshots(db) == 1                                 # same day: updated, not duplicated
         assert db.query(PortfolioSnapshot).count() == 1
         set_app_settings(premium_mode=False)
-        assert tracker.take_snapshots(db) == 0
+        assert tracker.take_snapshots(db) == 1                                 # Premium off: everyone has the tracker
+        set_app_settings(premium_mode=True)
+        db.query(User).update({"premium_until": None})
+        db.commit()
+        assert tracker.take_snapshots(db) == 0                                 # Premium on, membership ended
+        db.query(User).update({"premium_until": datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=5)})
+        db.commit()
     finally:
         db.close()
     set_app_settings(premium_mode=True)

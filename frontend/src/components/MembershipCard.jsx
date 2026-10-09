@@ -95,7 +95,9 @@ export default function MembershipCard() {
 
   const until = m.premium_until ? new Date(m.premium_until).toLocaleDateString(localeForLang(lang)) : null;
   const next = NEXT_BADGE.find(([n]) => m.referral_signups < n);
-  const showTelegram = mode && m.telegram?.available;
+  // The paid extras (Telegram, morning e-mail) are free for everyone while Premium mode is off.
+  const features = Boolean(m.features ?? m.premium);
+  const showTelegram = (mode || features) && m.telegram?.available;
 
   return (
     <Card title={t(mode ? "membership.title" : "membership.titleFree")} icon={mode ? Crown : UserRound}>
@@ -162,7 +164,7 @@ export default function MembershipCard() {
               <span className="badge badge-buy"><span className="badge-dot" /> {t("membership.telegramLinked")}</span>
               <button className="btn btn-ghost btn-sm" onClick={unlinkTelegram}>{t("membership.telegramUnlink")}</button>
             </div>
-          ) : !m.premium ? (
+          ) : !features ? (
             <Link to="/premium" className="key-link">{t("gate.cta")}</Link>
           ) : tgUrl ? (
             <div className="invite-row">
@@ -175,15 +177,15 @@ export default function MembershipCard() {
         </>
       )}
 
-      {mode && (
+      {(mode || features) && (
         <>
           <Divider />
-          <label className={`toggle-row ${m.premium ? "" : "toggle-locked"}`}>
-            <input type="checkbox" checked={m.briefing_opt_in} disabled={!m.premium} onChange={toggle("briefing_opt_in")} />
+          <label className={`toggle-row ${features ? "" : "toggle-locked"}`}>
+            <input type="checkbox" checked={m.briefing_opt_in} disabled={!features} onChange={toggle("briefing_opt_in")} />
             <span>
               <strong><Sun size={13} style={{ verticalAlign: -2, marginRight: 4 }} />{t("membership.briefingTitle")}</strong>
               <span className="text-sub" style={{ display: "block" }}>
-                {t("membership.briefingText")} {!m.premium && <Link to="/premium" className="key-link">{t("gate.cta")}</Link>}
+                {t("membership.briefingText")} {mode && !features && <Link to="/premium" className="key-link">{t("gate.cta")}</Link>}
               </span>
             </span>
           </label>

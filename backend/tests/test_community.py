@@ -131,10 +131,10 @@ def test_invited_friend_gets_longer_trial(premium_on):
 def test_premium_raises_schedule_limit(registered):
     from app.services.premium import FREE_SCHEDULES, PREMIUM_SCHEDULES
     client, username, _p = registered
+    assert client.get("/api/schedules").json()["max"] == PREMIUM_SCHEDULES   # Premium off: everyone gets the higher limit
+    set_app_settings(premium_mode=True)
     assert client.get("/api/schedules").json()["max"] == FREE_SCHEDULES
     _update_user(username, premium_until=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=3))
-    assert client.get("/api/schedules").json()["max"] == FREE_SCHEDULES      # Premium mode is off
-    set_app_settings(premium_mode=True)
     assert client.get("/api/schedules").json()["max"] == PREMIUM_SCHEDULES
 
 

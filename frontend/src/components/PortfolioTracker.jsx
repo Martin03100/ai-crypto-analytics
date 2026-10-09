@@ -24,7 +24,7 @@ const parse = (raw) => Number(String(raw).trim().replace(/\s/g, "").replace(",",
 export default function PortfolioTracker() {
   const { t, lang } = useLanguage();
   const { push } = useToast();
-  const { active } = usePremium();
+  const { features } = usePremium();
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState(false);
   const [coin, setCoin] = useState("BTC");
@@ -36,9 +36,9 @@ export default function PortfolioTracker() {
     setFailed(false);
     api.positions().then(setData).catch(() => setFailed(true));
   }, []);
-  useEffect(() => { if (active) load(); }, [active, load]);
+  useEffect(() => { if (features) load(); }, [features, load]);
 
-  if (!active) return <PremiumGate title={t("tracker.title")} text={t("tracker.gate")} />;
+  if (!features) return <PremiumGate title={t("tracker.title")} text={t("tracker.gate")} />;
   if (failed) return <LoadError onRetry={load} />;
   if (!data) return <Card title={t("tracker.title")} icon={Wallet}><SkeletonLines count={4} /></Card>;
 

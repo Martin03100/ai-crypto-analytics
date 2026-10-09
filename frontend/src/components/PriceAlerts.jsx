@@ -18,7 +18,7 @@ const RANGES = { price: [0, 1e9], move: [0.5, 100], rsi: [1, 99], fear_greed: [1
 export default function PriceAlerts() {
   const { t } = useLanguage();
   const { push } = useToast();
-  const { mode, active: premium } = usePremium();
+  const { mode, features } = usePremium();
   const [data, setData] = useState(null);
   const [kind, setKind] = useState("price");
   const [coin, setCoin] = useState("BTC");
@@ -32,8 +32,8 @@ export default function PriceAlerts() {
   if (!data) return null;
   const full = data.active >= data.max;
   const premiumKinds = data.premium_kinds || ["fear_greed"];
-  const kinds = KINDS.filter((k) => mode || !premiumKinds.includes(k));
-  const locked = premiumKinds.includes(kind) && !premium;
+  const kinds = KINDS;
+  const locked = premiumKinds.includes(kind) && !features;
 
   const pickKind = (k) => {
     setKind(k);
@@ -78,11 +78,11 @@ export default function PriceAlerts() {
 
   return (
     <Card title={t("alerts.title")} icon={BellRing} style={{ marginTop: 16 }}>
-      <p className="text-sub" style={{ marginTop: 0 }}>{t(premium ? "alerts.introPremium" : "alerts.intro")}</p>
+      <p className="text-sub" style={{ marginTop: 0 }}>{t(mode && features ? "alerts.introPremium" : "alerts.intro")}</p>
       <div className="tabs alert-kinds" role="radiogroup" aria-label={t("alerts.kind")}>
         {kinds.map((k) => (
           <button key={k} type="button" role="radio" aria-checked={kind === k} className={`tab ${kind === k ? "active" : ""}`} onClick={() => pickKind(k)}>
-            {premiumKinds.includes(k) && <Crown size={12} style={{ marginRight: 4 }} />}{t(`alerts.kind_${k}`)}
+            {mode && premiumKinds.includes(k) && <Crown size={12} style={{ marginRight: 4 }} />}{t(`alerts.kind_${k}`)}
           </button>
         ))}
       </div>
@@ -106,7 +106,7 @@ export default function PriceAlerts() {
       )}
       <p className="text-sub alert-limit">
         {t("alerts.limit", { n: data.active, max: data.max })}
-        {full && mode && !premium && <> · <Link to="/premium" className="key-link">{t("alerts.upgrade")}</Link></>}
+        {full && mode && !features && <> · <Link to="/premium" className="key-link">{t("alerts.upgrade")}</Link></>}
       </p>
       {data.items.length > 0 && (
         <ul className="alert-list">

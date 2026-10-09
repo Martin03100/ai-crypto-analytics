@@ -218,9 +218,9 @@ export default function Forecast() {
   }, [urlTab]);
   useEffect(() => {
     // A shared link to a tab that is switched off (or not in this plan) opens the default tab instead of a blank page.
-    const off = { compare: !compare_enabled, backtest: !backtest_enabled, simulator: !premiumMode, mystats: !premiumMode };
+    const off = { compare: !compare_enabled, backtest: !backtest_enabled };
     if (configLoaded && off[tab]) setTab("new");
-  }, [configLoaded, tab, compare_enabled, backtest_enabled, premiumMode]);
+  }, [configLoaded, tab, compare_enabled, backtest_enabled]);
   const providersCtx = useProviders();
   const providers = useMemo(
     () => [...providersCtx.providers, { provider: "quant", label: t("provider.quantLabel"), connected: true }],
@@ -374,8 +374,8 @@ export default function Forecast() {
         {!simple && <button className={`tab ${tab === "leaderboard" ? "active" : ""}`} onClick={() => setTab("leaderboard")}>{t("forecast.tabLeaderboard")}</button>}
         {!simple && compare_enabled && <button className={`tab ${tab === "compare" ? "active" : ""}`} onClick={() => setTab("compare")}>{t("forecast.tabCompare")}</button>}
         {!simple && backtest_enabled && <button className={`tab ${tab === "backtest" ? "active" : ""}`} onClick={() => setTab("backtest")}>{t("forecast.tabBacktest")}</button>}
-        {!simple && premiumMode && <button className={`tab ${tab === "simulator" ? "active" : ""}`} onClick={() => setTab("simulator")}><Crown size={13} style={{ marginRight: 5 }} />{t("sim.tab")}</button>}
-        {!simple && premiumMode && <button className={`tab ${tab === "mystats" ? "active" : ""}`} onClick={() => setTab("mystats")}><Crown size={13} style={{ marginRight: 5 }} />{t("mystats.tab")}</button>}
+        {!simple && <button className={`tab ${tab === "simulator" ? "active" : ""}`} onClick={() => setTab("simulator")}>{premiumMode && <Crown size={13} style={{ marginRight: 5 }} />}{t("sim.tab")}</button>}
+        {!simple && <button className={`tab ${tab === "mystats" ? "active" : ""}`} onClick={() => setTab("mystats")}>{premiumMode && <Crown size={13} style={{ marginRight: 5 }} />}{t("mystats.tab")}</button>}
       </div>
 
       {tab === "new" && (
@@ -465,8 +465,8 @@ export default function Forecast() {
       {tab === "leaderboard" && <Leaderboard />}
       {tab === "compare" && compare_enabled && <ComparePanel />}
       {tab === "backtest" && backtest_enabled && <BacktestPanel />}
-      {tab === "mystats" && premiumMode && <MyStats />}
-      {tab === "simulator" && premiumMode && <StrategySimulator />}
+      {tab === "mystats" && <MyStats />}
+      {tab === "simulator" && <StrategySimulator />}
 
       {tab === "history" && (
         <div>

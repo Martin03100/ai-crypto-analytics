@@ -37,6 +37,8 @@ def test_next_run_keeps_local_time_across_dst_and_half_hour_zones():
 
 def test_crud_and_ownership(registered, client):
     c, _u, _p = registered
+    from tests.conftest import set_app_settings
+    set_app_settings(premium_mode=True)          # the limits and gates below exist only while Premium is on
     res = _create(c)
     assert res.status_code == 201, res.text
     sid = res.json()["id"]
@@ -53,6 +55,8 @@ def test_crud_and_ownership(registered, client):
 
 def test_validation_and_limit(registered):
     c, _u, _p = registered
+    from tests.conftest import set_app_settings
+    set_app_settings(premium_mode=True)          # the limits and gates below exist only while Premium is on
     assert _create(c, provider="nope").status_code == 400
     assert _create(c, coin="FAKECOIN").status_code == 400
     assert _create(c, frequency="weekly").status_code == 422          # weekday missing
@@ -151,7 +155,7 @@ def test_only_schedules_within_the_plan_run(registered):
     from app.services import schedules
     from tests.conftest import set_app_settings
     client, username, _p = registered
-    set_app_settings(free_schedules=2)
+    set_app_settings(free_schedules=2, premium_mode=True)
     ids = [_create(client, hour=h).json()["id"] for h in (6, 7)]
     db = SessionLocal()
     try:

@@ -10,19 +10,19 @@ import { QUANT_LABEL, providerForLabel } from "../utils/models";
 
 export default function SmartModelHint({ coin, horizon, providers, current, onPick }) {
   const { t } = useLanguage();
-  const { mode, active } = usePremium();
+  const { mode, features } = usePremium();
   const [ranking, setRanking] = useState(null);
 
   useEffect(() => {
-    if (!active) return undefined;
+    if (!features) return undefined;
     let alive = true;
     setRanking(null);
     api.modelRanking(coin, horizon).then((r) => alive && setRanking(r)).catch(() => alive && setRanking(null));
     return () => { alive = false; };
-  }, [active, coin, horizon]);
+  }, [features, coin, horizon]);
 
-  if (!mode) return null;
-  if (!active) {
+  if (!features) {
+    if (!mode) return null;
     return (
       <p className="smart-hint smart-hint-locked">
         <Crown size={13} /> {t("smart.teaser")} <Link to="/premium" className="key-link">{t("gate.cta")}</Link>
