@@ -20,8 +20,10 @@ export function notificationText(n, t) {
   const d = n.data || {};
   switch (n.kind) {
     case "forecast_evaluated":
-      return t(d.direction_correct ? "notif.evaluatedHit" : "notif.evaluatedMiss",
-               { coin: d.coin, horizon: t(`forecast.horizon${d.horizon}`), accuracy: d.accuracy_pct });
+      return t(d.direction_correct ? "notif.evaluatedHit" : "notif.evaluatedMiss", {
+        coin: d.coin, horizon: t(`forecast.horizon${d.horizon}`),
+        error: Number.isFinite(d.accuracy_pct) ? Math.round((100 - d.accuracy_pct) * 10) / 10 : "—",
+      });
     case "duel_settled":
       return t(`notif.duel_${d.outcome}`);
     case "referral_reward":

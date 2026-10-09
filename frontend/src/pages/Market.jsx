@@ -2,6 +2,7 @@
 
 import { Calendar, Gauge, Newspaper, Vote } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api";
 import { MockBadge, SentimentBadge } from "../components/Badge";
 import { Card } from "../components/Card";
@@ -75,7 +76,12 @@ export default function Market() {
 
   function loadHeadlines() {
     markFailed("headlines", false);
-    api.headlines().then((r) => setHeadlines(r.headlines)).catch(() => markFailed("headlines", true));
+    api.headlines()
+      .then((r) => {
+        setHeadlines(r.headlines);
+        if (r.headlines.length === 0) markFailed("headlines", true);     // news feeds down: say so, retry offered
+      })
+      .catch(() => markFailed("headlines", true));
   }
 
   function loadEvents() {
@@ -207,10 +213,32 @@ export default function Market() {
         <div style={{ marginBottom: 14 }}>
           <ProviderSelect providers={providers} value={provider} onChange={setProvider} label={t("market.providerLabelNews")} />
         </div>
-        {providers.some((p) => p.connected) && (
+        {providers.some((p) => p.connected) ? (
           <button className="btn btn-ghost btn-sm" onClick={runNewsAnalysis} disabled={newsLoading} style={{ marginBottom: 16 }}>
             {newsLoading ? t("market.analyzingSentiment") : t("market.analyzeSentimentButton")}
           </button>
+        ) : (
+          <p className="text-sub" style={{ marginTop: 0 }}>
+            {t("market.newsNeedsKey")} <Link to="/account" className="key-link">{t("market.newsConnectKey")}</Link>
+          </p>
+        )}
+
+        {!newsLoading && !newsResult && headlines.length > 0 && (
+          <ul className="headline-list">
+            {headlines.slice(0, 8).map((h, i) => {
+              const link = safeUrl(h.link);
+              return (
+                <li key={`${h.title}-${i}`}>
+                  {link ? <a href={link} target="_blank" rel="noopener noreferrer">{h.title}</a> : <span>{h.title}</span>}
+                  {(h.source || h.published_at) && (
+                    <div className="headline-meta">
+                      {h.source}{h.source && h.published_at ? " · " : ""}{h.published_at ? timeAgo(h.published_at) : ""}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         )}
 
         {newsLoading && <SkeletonLines count={5} />}

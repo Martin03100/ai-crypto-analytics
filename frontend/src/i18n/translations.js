@@ -41,9 +41,25 @@ function interpolate(template, params) {
   ));
 }
 
+// Counted texts ("1 deň", "2 dni", "5 dní") have variants "key#one", "#few", "#many" and "#other"; the count is the
+// first of these params that is a number.
+const PLURAL_PARAMS = ["count", "n", "total", "days"];
+const pluralRules = {};
+
+function pluralKey(key, lang, params, dict) {
+  if (!params || dict[`${key}#other`] === undefined) return key;
+  const name = PLURAL_PARAMS.find((p) => typeof params[p] === "number");
+  if (!name) return key;
+  const code = DICTS[lang] ? lang : DEFAULT_LANG;
+  pluralRules[code] ||= new Intl.PluralRules(code);
+  const variant = `${key}#${pluralRules[code].select(params[name])}`;
+  return dict[variant] !== undefined ? variant : `${key}#other`;
+}
+
 export function translate(key, lang, params) {
   const dict = DICTS[lang] || DICTS[DEFAULT_LANG];
-  const template = dict[key] ?? DICTS[DEFAULT_LANG][key] ?? key;
+  const resolved = pluralKey(key, lang, params, dict);
+  const template = dict[resolved] ?? DICTS[DEFAULT_LANG][resolved] ?? dict[key] ?? DICTS[DEFAULT_LANG][key] ?? key;
   return interpolate(template, params);
 }
 

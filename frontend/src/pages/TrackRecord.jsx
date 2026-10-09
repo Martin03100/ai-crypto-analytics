@@ -100,7 +100,7 @@ export default function TrackRecord() {
                       {data.recent.map((r, i) => (
                         <tr key={`${r.evaluated_at}-${i}`}>
                           <td>{r.coin}</td>
-                          <td>{r.horizon}</td>
+                          <td>{t(`forecast.horizon${r.horizon}`)}</td>
                           <td>{label(r.provider)}</td>
                           <td className={r.direction_correct ? "track-hit" : "track-miss"}>{t(r.direction_correct ? "track.hit" : "track.miss")}</td>
                           <td>

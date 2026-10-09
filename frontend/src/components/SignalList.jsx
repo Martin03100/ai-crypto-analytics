@@ -1,7 +1,7 @@
 /** Grouped list of market signals with a coloured direction mark. */
 
 import { useLanguage } from "../context/LanguageContext";
-import { TEXT_SIGNALS, groupSignals, signalLabel, signalText } from "../utils/signals";
+import { TEXT_SIGNALS, groupSignals, localizeDisplay, signalLabel, signalText } from "../utils/signals";
 
 const MARK = { bullish: "▲", bearish: "▼", neutral: "•" };
 
@@ -26,7 +26,7 @@ export default function SignalList({ items, compact = false }) {
                 ) : (
                   <>
                     <span className="signal-label">{signalLabel(s, t)}</span>
-                    <span className="signal-value mono">{s.display}</span>
+                    <span className="signal-value mono">{localizeDisplay(s.display, t)}</span>
                   </>
                 )}
               </li>

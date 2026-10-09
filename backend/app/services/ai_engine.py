@@ -29,15 +29,14 @@ from app.config import (
     PROVIDER_TOKEN_PRICE_USD_PER_1K,
     AI_REQUEST_TIMEOUT_SECONDS, SECTOR_CATEGORIES, TIME_HORIZONS,
 )
-from app.services import data_sources, market_data, quant_engine, signals
+from app.services import data_sources, free_digest, market_data, quant_engine, signals
 from app.services.validators import (
     language_instruction,
     build_daily_digest_prompt, build_forecast_prompt, build_news_prompt, build_portfolio_prompt,
     validate_digest_payload, validate_forecast_payload, validate_news_payload, validate_portfolio_payload,
 )
 from app.i18n_content import (
-    missing_api_key_message, mock_chat_reply, mock_digest_summary, mock_forecast_reasoning,
-    mock_portfolio_reason, unit_label, MOCK_DIGEST_KEY_POINTS, MOCK_NEWS_TRENDS,
+    missing_api_key_message, mock_chat_reply, mock_forecast_reasoning, sample_portfolio_reason, unit_label,
     MOCK_PORTFOLIO_ANALYSIS_TEXT, MOCK_REBALANCING_CHECKLIST, normalize_lang,
 )
 
@@ -358,36 +357,29 @@ def _generate_mock_forecast(coin: str, horizon: str, lang: str = "en") -> Dict[s
     }
 
 
+# Sector of the supported coins, for the sample analysis (no AI key): real composition instead of invented weights.
+_COIN_SECTORS = {
+    "UNI": "DeFi", "LINK": "DeFi", "DOGE": "Memes", "SHIB": "Memes", "PEPE": "Memes",
+    **{c: "L1/L2" for c in ("BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "AVAX", "DOT", "TON", "TRX", "LTC", "BCH", "SUI",
+                            "NEAR", "APT")},
+}
+
+
 def _generate_mock_portfolio_analysis(holdings: List[Dict[str, Any]], lang: str = "en") -> Dict[str, Any]:
-    actions = ["BUY", "SELL", "HOLD"]
-    recommendations = []
+    """Sample shown without an AI key. It must not look like advice: every position is a neutral HOLD with a note
+    that no analysis was done, and the sector split is the real one (by number of coins)."""
+    recommendations = [{"minca": item.get("minca", "N/A"), "akcia": "HOLD",
+                        "dovod": sample_portfolio_reason(str(item.get("minca", "N/A")), lang)} for item in holdings]
+    counts = {s: 0 for s in SECTOR_CATEGORIES}
     for item in holdings:
-        coin = item.get("minca", "N/A")
-        action = random.Random(coin).choice(actions)
-        recommendations.append({"minca": coin, "akcia": action, "dovod": mock_portfolio_reason(action, coin, lang)})
-
-    sector_rng = random.Random("sector-mock")
-    raw_weights = [sector_rng.uniform(5, 30) for _ in SECTOR_CATEGORIES]
-    total_weight = sum(raw_weights)
-    sector_allocation = {s: round((w / total_weight) * 100, 1) for s, w in zip(SECTOR_CATEGORIES, raw_weights)}
-
+        counts[_COIN_SECTORS.get(str(item.get("minca", "")).upper(), "Other")] += 1
+    total = sum(counts.values()) or 1
     lang = normalize_lang(lang)
     return {
         "odporucania": recommendations,
         "odborna_analyza": MOCK_PORTFOLIO_ANALYSIS_TEXT[lang],
-        "sektorova_alokacia": sector_allocation,
+        "sektorova_alokacia": {s: round(n / total * 100, 1) for s, n in counts.items()},
         "rebalancing_checklist": MOCK_REBALANCING_CHECKLIST[lang],
-    }
-
-
-def _generate_mock_news_summary(headlines: List[str], lang: str = "en") -> Dict[str, Any]:
-    sentiments = ["Bullish", "Bearish", "Neutral"]
-    news = []
-    for i, title in enumerate(headlines):
-        news.append({"titulok": title, "sentiment": random.Random(f"{title}-{i}").choice(sentiments)})
-    return {
-        "spravy": news,
-        "trendy": MOCK_NEWS_TRENDS[normalize_lang(lang)],
     }
 
 
@@ -743,12 +735,13 @@ def get_portfolio_analysis(provider: str, holdings: List[Dict[str, Any]], api_ke
     portfolio_context, sources_used = _build_portfolio_context(holdings)
     prompt = build_portfolio_prompt(holdings, portfolio_context) + language_instruction(lang)
     success, raw_text, call_error = call_ai_provider(provider, prompt, api_key)
+    # A failed AI call is reported as such: invented BUY/SELL ratings for someone's real holdings are never shown.
     if not success:
-        return AIEngineResult(True, _generate_mock_portfolio_analysis(holdings, lang), True, call_error)
+        return AIEngineResult(False, None, False, call_error)
 
     is_valid, parsed, validation_error = validate_portfolio_payload(raw_text)
     if not is_valid or parsed is None:
-        return AIEngineResult(True, _generate_mock_portfolio_analysis(holdings, lang), True, validation_error)
+        return AIEngineResult(False, None, False, validation_error)
 
     parsed["zdroje_dat"] = sources_used
     parsed["signaly"] = _used_signals("BTC")
@@ -769,46 +762,45 @@ def get_news_sentiment_summary(provider: str, headlines: List[str], api_key: Opt
     if not headlines:
         return AIEngineResult(False, None, False, "Ziadne titulky na analyzu.")
 
+    # Without a working AI there is no sentiment: random labels on real headlines would mislead.
     if not api_key:
-        return AIEngineResult(True, _generate_mock_news_summary(headlines, lang), True,
-                               missing_api_key_message(lang))
+        return AIEngineResult(False, None, False, missing_api_key_message(lang))
 
     block = market_signals_block("BTC")
     prompt = build_news_prompt(headlines) + (f"\n\n{block}" if block else "") + language_instruction(lang)
     success, raw_text, call_error = call_ai_provider(provider, prompt, api_key)
     if not success:
-        return AIEngineResult(True, _generate_mock_news_summary(headlines, lang), True, call_error)
+        return AIEngineResult(False, None, False, call_error)
 
     is_valid, parsed, validation_error = validate_news_payload(raw_text)
     if not is_valid or parsed is None:
-        return AIEngineResult(True, _generate_mock_news_summary(headlines, lang), True, validation_error)
+        return AIEngineResult(False, None, False, validation_error)
 
     return AIEngineResult(True, parsed, False)
 
 
-def _generate_mock_digest(fg_value: int, fg_classification: str, lang: str = "en") -> Dict[str, Any]:
-    return {
-        "zhrnutie": mock_digest_summary(fg_value, fg_classification, lang),
-        "kluceve_body": MOCK_DIGEST_KEY_POINTS[normalize_lang(lang)],
-    }
+FREE_DIGEST_PROVIDER = "free"
 
 
 def get_daily_digest(provider: str, fg_value: int, fg_classification: str,
                       headlines: List[str], api_key: Optional[str], lang: str = "en") -> AIEngineResult:
+    """The AI morning overview; without a key (or when the AI fails) a plain overview built from live data."""
     if not api_key:
-        return AIEngineResult(True, _generate_mock_digest(fg_value, fg_classification, lang), True,
-                               missing_api_key_message(lang))
+        return AIEngineResult(True, free_digest.build(fg_value, fg_classification, lang), False, None,
+                              provider_used=FREE_DIGEST_PROVIDER)
 
     block = market_signals_block("BTC")
     prompt = (build_daily_digest_prompt(fg_value, fg_classification, headlines) + (f"\n\n{block}" if block else "")
               + language_instruction(lang))
     success, raw_text, call_error = call_ai_provider(provider, prompt, api_key)
     if not success:
-        return AIEngineResult(True, _generate_mock_digest(fg_value, fg_classification, lang), True, call_error)
+        return AIEngineResult(True, free_digest.build(fg_value, fg_classification, lang), False, call_error,
+                              provider_used=FREE_DIGEST_PROVIDER)
 
     is_valid, parsed, validation_error = validate_digest_payload(raw_text)
     if not is_valid or parsed is None:
-        return AIEngineResult(True, _generate_mock_digest(fg_value, fg_classification, lang), True, validation_error)
+        return AIEngineResult(True, free_digest.build(fg_value, fg_classification, lang), False, validation_error,
+                              provider_used=FREE_DIGEST_PROVIDER)
 
     return AIEngineResult(True, parsed, False)
 

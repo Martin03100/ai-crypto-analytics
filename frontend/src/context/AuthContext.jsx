@@ -31,6 +31,7 @@ export function AuthProvider({ children }) {
       .then((res) => {
         const next = res.user_id ? toUser(res) : null;
         if (next) rememberOfflineSession(next);
+        else clearOfflineData();     // not signed in (any more): drop the previous account's cached data
         setUser(next);
       })
       .catch((err) => {

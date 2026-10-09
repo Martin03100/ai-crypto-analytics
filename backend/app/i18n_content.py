@@ -123,192 +123,38 @@ def quant_reasoning(lang: str, coin: str, horizon: str, sigma_day_pct: float, ch
     return templates.get(lang, templates[DEFAULT_LANG])
 
 
-def mock_portfolio_reason(action: str, coin: str, lang: str) -> str:
+def sample_portfolio_reason(coin: str, lang: str) -> str:
+    """Sample analysis without an AI key: says plainly that nothing was assessed (no invented advice)."""
     lang = normalize_lang(lang)
     templates = {
-        "en": {
-            "BUY": f"[MOCK] {coin} shows a favorable technical structure for accumulating.",
-            "SELL": f"[MOCK] {coin} looks overheated — consider a partial sell.",
-            "HOLD": f"[MOCK] {coin} is in a stable range — holding is recommended.",
-        },
-        "sk": {
-            "BUY": f"[MOCK] {coin} vykazuje priaznivú technickú štruktúru pre dokúpenie.",
-            "SELL": f"[MOCK] {coin} sa javí prehriaty, zváž čiastočný predaj.",
-            "HOLD": f"[MOCK] {coin} je v stabilnom pásme, odporúča sa držať.",
-        },
-        "cs": {
-            "BUY": f"[MOCK] {coin} vykazuje příznivou technickou strukturu pro dokoupení.",
-            "SELL": f"[MOCK] {coin} se jeví přehřátý, zvaž částečný prodej.",
-            "HOLD": f"[MOCK] {coin} je ve stabilním pásmu, doporučuje se držet.",
-        },
-        "de": {
-            "BUY": f"[MOCK] {coin} zeigt eine günstige technische Struktur zum Nachkaufen.",
-            "SELL": f"[MOCK] {coin} wirkt überhitzt, überleg dir einen Teilverkauf.",
-            "HOLD": f"[MOCK] {coin} bewegt sich in einer stabilen Spanne, Halten wird empfohlen.",
-        },
-        "pl": {
-            "BUY": f"[MOCK] {coin} ma korzystną strukturę techniczną do dokupienia.",
-            "SELL": f"[MOCK] {coin} wygląda na przegrzany, rozważ częściową sprzedaż.",
-            "HOLD": f"[MOCK] {coin} jest w stabilnym przedziale, zalecane jest trzymanie.",
-        },
-    }
-    return templates.get(lang, templates[DEFAULT_LANG])[action]
-
-
-MOCK_PORTFOLIO_ANALYSIS_TEXT: Dict[str, str] = {
-    "en": (
-        "[SAMPLE DATA] The portfolio could benefit from broader diversification "
-        "across sectors such as RWA, L2 solutions and DeFi protocols. Consider "
-        "reducing concentration in a single dominant position. Connect a valid "
-        "API key for a real AI analysis."
-    ),
-    "sk": (
-        "[UKÁŽKOVÉ DÁTA] Portfólio by mohlo profitovať zo širšej diverzifikácie "
-        "naprieč sektormi ako RWA, L2 riešenia a DeFi protokoly. Zváž zníženie "
-        "koncentrácie do jednej dominantnej pozície. Pripoj platný API kľúč "
-        "pre reálnu AI analýzu."
-    ),
-    "cs": (
-        "[UKÁZKOVÁ DATA] Portfolio by mohlo profitovat ze širší diverzifikace "
-        "napříč sektory jako RWA, L2 řešení a DeFi protokoly. Zvaž snížení "
-        "koncentrace do jedné dominantní pozice. Připoj platný API klíč "
-        "pro reálnou AI analýzu."
-    ),
-    "de": (
-        "[BEISPIELDATEN] Das Portfolio könnte von einer breiteren Diversifikation "
-        "über Sektoren wie RWA, L2-Lösungen und DeFi-Protokolle profitieren. Überleg dir, "
-        "die Konzentration auf eine einzelne dominante Position zu verringern. Hinterlege einen "
-        "gültigen API-Schlüssel für eine echte KI-Analyse."
-    ),
-    "pl": (
-        "[DANE PRZYKŁADOWE] Portfel mógłby skorzystać na szerszej dywersyfikacji "
-        "w sektorach takich jak RWA, rozwiązania L2 i protokoły DeFi. Rozważ zmniejszenie "
-        "koncentracji w jednej dominującej pozycji. Podłącz ważny klucz API, "
-        "aby otrzymać prawdziwą analizę AI."
-    ),
-}
-
-MOCK_REBALANCING_CHECKLIST: Dict[str, List[str]] = {
-    "en": [
-        "[MOCK] Check concentration in your largest position (recommended < 40%).",
-        "[MOCK] Consider adding exposure to the DeFi sector.",
-        "[MOCK] Set stop-loss levels for volatile positions.",
-        "[MOCK] Review your portfolio every 2-4 weeks.",
-    ],
-    "sk": [
-        "[MOCK] Skontroluj koncentráciu do najväčšej pozície (odporúčané < 40 %).",
-        "[MOCK] Zváž pridanie expozície voči DeFi sektoru.",
-        "[MOCK] Nastav si stop-loss úrovne pre volatilné pozície.",
-        "[MOCK] Prehodnoť portfólio každé 2-4 týždne.",
-    ],
-    "cs": [
-        "[MOCK] Zkontroluj koncentraci do největší pozice (doporučeno < 40 %).",
-        "[MOCK] Zvaž přidání expozice vůči DeFi sektoru.",
-        "[MOCK] Nastav si stop-loss úrovně pro volatilní pozice.",
-        "[MOCK] Přehodnoť portfolio každé 2-4 týdny.",
-    ],
-    "de": [
-        "[MOCK] Prüfe die Konzentration in deiner größten Position (empfohlen < 40 %).",
-        "[MOCK] Überleg dir, Engagement im DeFi-Sektor aufzubauen.",
-        "[MOCK] Setz Stop-Loss-Marken für volatile Positionen.",
-        "[MOCK] Überprüfe dein Portfolio alle 2-4 Wochen.",
-    ],
-    "pl": [
-        "[MOCK] Sprawdź koncentrację w swojej największej pozycji (zalecane < 40%).",
-        "[MOCK] Rozważ zwiększenie ekspozycji na sektor DeFi.",
-        "[MOCK] Ustaw poziomy stop-loss dla zmiennych pozycji.",
-        "[MOCK] Przeglądaj portfel co 2-4 tygodnie.",
-    ],
-}
-
-
-MOCK_NEWS_TRENDS: Dict[str, List[str]] = {
-    "en": [
-        "[MOCK] Growing interest in L2 scaling solutions.",
-        "[MOCK] Regulatory uncertainty is affecting altcoin sentiment.",
-        "[MOCK] Institutional capital is shifting toward BTC/ETH.",
-    ],
-    "sk": [
-        "[MOCK] Rastúci záujem o L2 škálovacie riešenia.",
-        "[MOCK] Regulačná neistota ovplyvňuje sentiment altcoinov.",
-        "[MOCK] Inštitucionálny kapitál sa presúva smerom k BTC/ETH.",
-    ],
-    "cs": [
-        "[MOCK] Rostoucí zájem o L2 škálovací řešení.",
-        "[MOCK] Regulační nejistota ovlivňuje sentiment altcoinů.",
-        "[MOCK] Institucionální kapitál se přesouvá směrem k BTC/ETH.",
-    ],
-    "de": [
-        "[MOCK] Wachsendes Interesse an L2-Skalierungslösungen.",
-        "[MOCK] Regulatorische Unsicherheit belastet die Stimmung bei Altcoins.",
-        "[MOCK] Institutionelles Kapital verlagert sich in Richtung BTC/ETH.",
-    ],
-    "pl": [
-        "[MOCK] Rosnące zainteresowanie rozwiązaniami skalującymi L2.",
-        "[MOCK] Niepewność regulacyjna wpływa na sentyment wobec altcoinów.",
-        "[MOCK] Kapitał instytucjonalny przesuwa się w stronę BTC/ETH.",
-    ],
-}
-
-
-def mock_digest_summary(fg_value: int, fg_classification: str, lang: str) -> str:
-    lang = normalize_lang(lang)
-    templates = {
-        "en": (
-            f"[SAMPLE DATA] The Fear & Greed Index is at {fg_value} today ({fg_classification}). "
-            f"The market is currently in demo mode — connect a valid API key in "
-            f"Account & API Keys for a real AI morning overview."
-        ),
-        "sk": (
-            f"[UKÁŽKOVÉ DÁTA] Fear & Greed Index je dnes na {fg_value} ({fg_classification}). "
-            f"Trh sa momentálne pohybuje v demonštračnom režime — pripoj platný API "
-            f"kľúč v Účet & API kľúče pre reálny AI ranný prehľad."
-        ),
-        "cs": (
-            f"[UKÁZKOVÁ DATA] Fear & Greed Index je dnes na {fg_value} ({fg_classification}). "
-            f"Trh se momentálně pohybuje v demonstračním režimu — připoj platný API "
-            f"klíč v Účet & API klíče pro reálný AI ranní přehled."
-        ),
-        "de": (
-            f"[BEISPIELDATEN] Der Fear & Greed Index steht heute bei {fg_value} ({fg_classification}). "
-            f"Der Markt läuft gerade im Demo-Modus — hinterlege einen gültigen API-Schlüssel unter "
-            f"Konto & API-Schlüssel für einen echten KI-Morgenüberblick."
-        ),
-        "pl": (
-            f"[DANE PRZYKŁADOWE] Fear & Greed Index wynosi dziś {fg_value} ({fg_classification}). "
-            f"Rynek działa obecnie w trybie demonstracyjnym — podłącz ważny klucz API "
-            f"w sekcji Konto i klucze API, aby otrzymać prawdziwy poranny przegląd AI."
-        ),
+        "en": f"[MOCK] Sample only: {coin} was not assessed. Connect an AI key for a real analysis.",
+        "sk": f"[MOCK] Len ukážka: {coin} nebol posúdený. Pre skutočnú analýzu pripoj AI kľúč.",
+        "cs": f"[MOCK] Jen ukázka: {coin} nebyl posouzen. Pro skutečnou analýzu připoj AI klíč.",
+        "de": f"[MOCK] Nur ein Beispiel: {coin} wurde nicht bewertet. Für eine echte Analyse hinterlege einen KI-Schlüssel.",
+        "pl": f"[MOCK] Tylko przykład: {coin} nie został oceniony. Podłącz klucz AI, aby otrzymać prawdziwą analizę.",
     }
     return templates.get(lang, templates[DEFAULT_LANG])
 
 
-MOCK_DIGEST_KEY_POINTS: Dict[str, List[str]] = {
-    "en": [
-        "[MOCK] Keep an eye on the Fear & Greed Index throughout the day.",
-        "[MOCK] Check the latest headlines in the Market Sentiment section.",
-        "[MOCK] Review your portfolio status in Portfolio Advisor.",
-    ],
-    "sk": [
-        "[MOCK] Sleduj vývoj Fear & Greed Indexu počas dňa.",
-        "[MOCK] Skontroluj najnovšie titulky v sekcii Trhový Sentiment.",
-        "[MOCK] Over si stav svojho portfólia v Portfolio Advisor.",
-    ],
-    "cs": [
-        "[MOCK] Sleduj vývoj Fear & Greed Indexu během dne.",
-        "[MOCK] Zkontroluj nejnovější titulky v sekci Tržní Sentiment.",
-        "[MOCK] Ověř si stav svého portfolia v Portfolio Advisor.",
-    ],
-    "de": [
-        "[MOCK] Behalte den Fear & Greed Index im Laufe des Tages im Blick.",
-        "[MOCK] Sieh dir die neuesten Schlagzeilen im Bereich Marktstimmung an.",
-        "[MOCK] Prüfe den Stand deines Portfolios im Portfolio Advisor.",
-    ],
-    "pl": [
-        "[MOCK] Śledź Fear & Greed Index w ciągu dnia.",
-        "[MOCK] Sprawdź najnowsze nagłówki w sekcji Sentyment rynku.",
-        "[MOCK] Sprawdź stan swojego portfela w Portfolio Advisor.",
-    ],
+MOCK_PORTFOLIO_ANALYSIS_TEXT: Dict[str, str] = {
+    "en": "[SAMPLE DATA] This is only a sample: your portfolio was not analysed. The sector split below is simply "
+          "the number of coins per sector. Connect an AI key in Account & API keys for a real look at risks and diversification.",
+    "sk": "[UKÁŽKOVÉ DÁTA] Toto je len ukážka: tvoje portfólio nebolo analyzované. Rozdelenie podľa sektorov nižšie "
+          "je len počet mincí v každom sektore. Pre skutočný pohľad na riziká a diverzifikáciu pripoj AI kľúč v Účet & API kľúče.",
+    "cs": "[UKÁZKOVÁ DATA] Toto je jen ukázka: tvoje portfolio nebylo analyzováno. Rozdělení podle sektorů níže "
+          "je jen počet mincí v každém sektoru. Pro skutečný pohled na rizika a diverzifikaci připoj AI klíč v Účet & API klíče.",
+    "de": "[BEISPIELDATEN] Das ist nur ein Beispiel: dein Portfolio wurde nicht analysiert. Die Sektorverteilung unten "
+          "zählt nur die Coins pro Sektor. Für einen echten Blick auf Risiken und Diversifikation hinterlege einen KI-Schlüssel unter Konto & API-Schlüssel.",
+    "pl": "[DANE PRZYKŁADOWE] To tylko przykład: twój portfel nie został przeanalizowany. Podział na sektory poniżej "
+          "to tylko liczba monet w każdym sektorze. Aby zobaczyć prawdziwe ryzyka i dywersyfikację, podłącz klucz AI w sekcji Konto i klucze API.",
+}
+
+MOCK_REBALANCING_CHECKLIST: Dict[str, List[str]] = {
+    "en": ["[MOCK] Connect an AI key to get a checklist for your own portfolio."],
+    "sk": ["[MOCK] Pripoj AI kľúč a dostaneš kontrolný zoznam pre svoje portfólio."],
+    "cs": ["[MOCK] Připoj AI klíč a dostaneš kontrolní seznam pro své portfolio."],
+    "de": ["[MOCK] Hinterlege einen KI-Schlüssel, um eine Checkliste für dein eigenes Portfolio zu bekommen."],
+    "pl": ["[MOCK] Podłącz klucz AI, aby otrzymać listę kontrolną dla swojego portfela."],
 }
 
 

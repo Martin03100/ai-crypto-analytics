@@ -233,3 +233,25 @@
 /* ---------- 2FA recovery codes ---------- */
 .recovery-box { margin: 0 0 14px; padding: 14px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--bg-inset); }
 .recovery-list { list-style: none; margin: 0 0 12px; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; font-size: 14px; letter-spacing: 0.04em; }
+
+/* ---------- plain headlines (before an AI sentiment analysis) ---------- */
+.headline-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.headline-list li { padding: 10px 12px; border-radius: 10px; background: var(--bg-inset); border: 1px solid var(--border-subtle); font-size: 13px; }
+.headline-list a { color: var(--text-primary); text-decoration: none; }
+.headline-list a:hover { text-decoration: underline; }
+
+/* ---------- "not investment advice" note on portfolio ratings ---------- */
+.advice-note {
+  display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; font-size: 13px; line-height: 1.55;
+  color: var(--text-secondary); background: var(--bg-inset); border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--amber, #f59e0b); border-radius: var(--radius-md);
+}
+.advice-note svg { flex: none; margin-top: 2px; color: var(--amber, #f59e0b); }
+
+/* ---------- keep content clear of the floating chat button ---------- */
+@media (min-width: 861px) {
+  .main { padding-right: 96px; }
+}
+@media (max-width: 860px) {
+  .main { padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+}

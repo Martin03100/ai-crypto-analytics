@@ -31,6 +31,17 @@ export function signalText(s, t) {
   return s.display;
 }
 
+/** The server writes values with English period marks ("+2.5% 1w", "3.7% y/y"); show them in the reader's language. */
+export function localizeDisplay(display, t) {
+  const text = String(display ?? "");
+  const liquidations = /^(\d+)% long$/.exec(text);
+  if (liquidations) return t("signals.u.liqLongs", { n: liquidations[1] });
+  return text
+    .replace(/(\s)(24h|7d|30d|1w|1m)(?=\)|$)/g, (_m, space, unit) => `${space}${t(`signals.u.${unit}`)}`)
+    .replace(/\/ 8h$/, `/ ${t("signals.u.8h")}`)
+    .replace(/ y\/y$/, ` ${t("signals.u.yy")}`);
+}
+
 export function signalBalance(items) {
   const count = (tone) => (items || []).filter((s) => s.tone === tone).length;
   return { bullish: count("bullish"), bearish: count("bearish"), neutral: count("neutral") };

@@ -204,3 +204,11 @@ def test_reset_password_blocks_brute_force_per_email(client):
                       json={"email": "obet@example.com", "code": "000000", "new_password": "noveheslo123"},
                       headers=anon_csrf_headers(client))
     assert res.status_code == 429
+
+
+def test_session_is_empty_for_a_visitor_and_filled_when_signed_in(client):
+    res = client.get("/api/auth/session")
+    assert res.status_code == 200 and res.json() == {}
+    client.post("/api/auth/register", json={"username": "sessionuser", "password": "TestPass123", "email": "s@example.com"})
+    body = client.get("/api/auth/session").json()
+    assert body["username"] == "sessionuser" and body["user_id"] > 0

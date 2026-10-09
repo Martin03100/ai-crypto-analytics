@@ -2,6 +2,7 @@
 
 import { AlertCircle, History, MessageCircle, Plus, Send, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { useConfirm } from "../context/ConfirmContext";
@@ -249,7 +250,8 @@ export default function ChatWidget() {
                 </select>
                 {!activeConnected && provider && (
                   <div className="chat-key-warning">
-                    <AlertCircle size={12} /> {t("chat.missingKeyWarning")}
+                    <AlertCircle size={12} /> {t("chat.missingKeyWarning")}{" "}
+                    <Link to="/account" className="key-link" onClick={() => setOpen(false)}>{t("chat.connectKey")}</Link>
                   </div>
                 )}
               </div>
@@ -284,9 +286,10 @@ export default function ChatWidget() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
+                  disabled={!activeConnected}
                   style={{ resize: "none", flex: 1 }}
                 />
-                <button className="btn btn-primary btn-sm" onClick={send} disabled={sending || !input.trim()} aria-label={t("chat.sendMessage")}>
+                <button className="btn btn-primary btn-sm" onClick={send} disabled={sending || !input.trim() || !activeConnected} aria-label={t("chat.sendMessage")}>
                   <Send size={14} />
                 </button>
               </div>

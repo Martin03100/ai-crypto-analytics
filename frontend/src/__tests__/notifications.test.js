@@ -7,7 +7,7 @@ const t = (key, params) => translate(key, "en", params);
 describe("notifications", () => {
   it("describes each kind", () => {
     expect(notificationText({ kind: "forecast_evaluated", data: { coin: "BTC", horizon: "4h", direction_correct: true, accuracy_pct: 98.1 } }, t))
-      .toBe("✓ Your BTC 4H forecast got the direction right (98.1% accuracy).");
+      .toBe("✓ Your BTC forecast (4 hours) got the direction right; the price was off by 1.9 % on average.");
     expect(notificationText({ kind: "duel_settled", data: { outcome: "loss" } }, t)).toContain("AI won");
     expect(notificationText({ kind: "referral_reward", data: { days: 30 } }, t)).toContain("30 days");
     expect(notificationText({ kind: "price_alert", data: { coin: "ETH", direction: "below", price: 2450.5 } }, t))

@@ -39,7 +39,8 @@ export default function DailyDigest() {
   useEffect(() => {
     if (dismissed || providersLoading) return;
     const cached = loadCached(userId);
-    const cacheIsStale = Boolean(cached?.isMock && defaultProvider);
+    // An overview made without AI (or a sample) is replaced as soon as the user has an AI key.
+    const cacheIsStale = Boolean((cached?.isMock || cached?.isFree) && defaultProvider);
     if (cached && !cacheIsStale) {
       setDigest(cached);
       return;
@@ -50,7 +51,7 @@ export default function DailyDigest() {
     api.dailyDigest(provider)
       .then((res) => {
         if (cancelled || !res.data) return;
-        const payload = { date: todayKey(), data: res.data, isMock: res.is_mock };
+        const payload = { date: todayKey(), data: res.data, isMock: res.is_mock, isFree: res.provider_used === "free" };
         try { localStorage.setItem(keyFor(userId), JSON.stringify(payload)); } catch {  }
         setDigest(payload);
       })
@@ -73,6 +74,7 @@ export default function DailyDigest() {
       <div className="daily-digest-body">
         <div className="daily-digest-title">
           {t("digest.title")} {digest?.isMock && <span className="badge badge-mock" style={{ marginLeft: 6 }}>{t("badge.mock")}</span>}
+          {digest?.isFree && <span className="badge badge-neutral" style={{ marginLeft: 6 }} title={t("digest.freeHint")}>{t("digest.freeBadge")}</span>}
         </div>
         {loading && !digest && <p className="text-sub" style={{ margin: "4px 0 0" }}>{t("digest.preparing")}</p>}
         {digest && (

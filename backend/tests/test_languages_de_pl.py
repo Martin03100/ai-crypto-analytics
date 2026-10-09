@@ -72,7 +72,7 @@ def test_helpers_translate_and_fall_back():
     assert "Fed" in i18n_content.market_events_for_lang("de")["fomc"][0]
     assert "[BEISPIELDATEN]" in i18n_content.mock_forecast_reasoning("BTC", "7 Tage", "up", "de")
     assert "[DANE PRZYKŁADOWE]" in i18n_content.mock_chat_reply("?", "pl")
-    assert i18n_content.mock_portfolio_reason("SELL", "ETH", "pl").startswith("[MOCK] ETH")
+    assert i18n_content.sample_portfolio_reason("ETH", "pl").startswith("[MOCK] Tylko przykład: ETH")
     assert email_service.email_lang("de") == "de" and email_service.email_lang("xx") == "en"
     assert "deutsch" in validators.language_instruction("de")
     assert "polski" in validators.language_instruction("pl", json_mode=False)

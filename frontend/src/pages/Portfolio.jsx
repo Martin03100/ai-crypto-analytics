@@ -1,6 +1,6 @@
 /** Portfolio advisor page. */
 
-import { CheckCircle2, Compass, Crown, Download, FileText, GraduationCap, Loader2, Plus, RefreshCw, Save, Search, Trash2, Upload, Wallet } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Compass, Crown, Download, FileText, GraduationCap, Loader2, Plus, RefreshCw, Save, Search, Trash2, Upload, Wallet } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { api } from "../api";
@@ -256,8 +256,12 @@ export default function Portfolio() {
     setSaved(false);
     try {
       const res = await api.analyzePortfolio(provider, holdings.map(({ minca, mnozstvo, coin_id }) => ({ minca, mnozstvo, coin_id })));
+      if (!res.success) {          // the AI failed: say so instead of showing anything made up
+        push(humanizeError(res.error_message || "", lang, "errors.aiFailed"), "error");
+        return;
+      }
       setResult(res);
-      if (res.is_mock) push(res.error_message ? humanizeError(res.error_message, lang, "errors.aiFallback") : t("portfolio.mockNotice"), "warn");
+      if (res.is_mock) push(t("portfolio.mockNotice"), "warn");
     } catch (err) {
       push(err, "error");
     } finally {
@@ -440,7 +444,11 @@ export default function Portfolio() {
           </div>
 
           <Card title={t("portfolio.coinRatingTitle")} icon={Compass}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <p className="advice-note" role="note" data-testid="advice-note">
+              <AlertTriangle size={15} aria-hidden="true" />
+              <span>{t("portfolio.notAdvice")}</span>
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
               {(Array.isArray(result.data.odporucania) ? result.data.odporucania : []).filter((rec) => rec && typeof rec === "object").map((rec, i) => (
                 <div key={i} style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",

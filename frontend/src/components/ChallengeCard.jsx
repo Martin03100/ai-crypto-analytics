@@ -27,7 +27,8 @@ export default function ChallengeCard({ style }) {
   if (!data || (!data.current && !data.last)) return null;
   const cur = data.current;
   const locale = localeForLang(lang);
-  const when = (iso) => new Date(iso).toLocaleString(locale, { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+  // Full weekday: short Slovak/Czech forms like "po" read as the word "after".
+  const when = (iso) => new Date(iso).toLocaleString(locale, { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
 
   const submit = async (e) => {
     e.preventDefault();
@@ -41,7 +42,7 @@ export default function ChallengeCard({ style }) {
       setData(await api.enterChallenge(value));
       push(t("weekly.saved"), "success", { translated: true });
     } catch (err) {
-      push(err?.message || "error", "error");
+      push(err, "error");
     } finally {
       setBusy(false);
     }

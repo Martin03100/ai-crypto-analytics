@@ -20,8 +20,7 @@ from app.services import jobs, signals
 from app.services.ai_engine import get_daily_digest, get_news_sentiment_summary
 from app.services.market_data import (
     VALID_CHART_DAYS, VALID_VS_CURRENCIES, is_valid_coin_id,
-    get_crypto_headlines, get_dummy_crypto_headlines, get_dummy_fear_greed_index,
-    get_fear_greed_index, get_live_prices, get_market_chart, get_upcoming_market_events, search_coins,
+    get_crypto_headlines, get_fear_greed_index, get_live_prices, get_market_chart, get_upcoming_market_events, search_coins,
 )
 
 router = APIRouter(prefix="/api/market", tags=["market"])
@@ -37,11 +36,13 @@ def _check_vs_currency(value: str) -> str:
     return value
 
 
+# When a source is down the app says so ("could not load, try again") instead of showing an invented value.
+
 @router.get("/fear-greed", dependencies=_PUBLIC_LIMITS)
 def fear_greed(refresh: bool = False) -> dict:
     success, data, error = get_fear_greed_index(force_refresh=refresh)
     if not success or data is None:
-        return {"data": get_dummy_fear_greed_index(), "is_mock": True, "error_message": error}
+        return {"data": None, "is_mock": False, "error_message": error}
     return {"data": data, "is_mock": False, "error_message": None}
 
 
@@ -49,7 +50,7 @@ def fear_greed(refresh: bool = False) -> dict:
 def headlines() -> dict:
     success, items, error = get_crypto_headlines(limit=8)
     if not success or not items:
-        return {"headlines": get_dummy_crypto_headlines(limit=6), "is_mock": True, "error_message": error}
+        return {"headlines": [], "is_mock": False, "error_message": error or "unavailable"}
     return {"headlines": items, "is_mock": False, "error_message": None}
 
 
@@ -103,8 +104,8 @@ def daily_digest(payload: DailyDigestRequest, request: Request, user: User = Dep
 
 def _daily_digest(payload: DailyDigestRequest, api_key) -> dict:
     fg_success, fg_data, _ = get_fear_greed_index()
-    fg_value = fg_data["value"] if fg_success and fg_data else 50
-    fg_classification = fg_data["classification"] if fg_success and fg_data else "Neutral"
+    fg_value = fg_data["value"] if fg_success and fg_data else None         # unknown, never a made-up 50
+    fg_classification = fg_data["classification"] if fg_success and fg_data else None
 
     news_success, headlines_raw, _ = get_crypto_headlines(limit=6)
     headlines = [h["title"] for h in headlines_raw] if news_success else []

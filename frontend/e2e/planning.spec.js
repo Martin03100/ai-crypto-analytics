@@ -19,7 +19,7 @@ test("a scheduled forecast appears in the list and on the dashboard", async ({ p
 
   await page.goto("/dashboard");
   await expect(page.getByText("Scheduled forecasts")).toBeVisible();
-  await expect(page.getByText("ETH · 1W")).toBeVisible();
+  await expect(page.getByText("ETH · 1 week")).toBeVisible();
 });
 
 test("watchlist can be edited and the history exports to CSV", async ({ page }) => {

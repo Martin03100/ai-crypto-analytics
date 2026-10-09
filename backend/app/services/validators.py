@@ -232,12 +232,14 @@ def validate_digest_payload(raw_text: str) -> Tuple[bool, Optional[Dict[str, Any
     return True, data, None
 
 
-def build_daily_digest_prompt(fear_greed_value: int, fear_greed_classification: str, headlines: List[str]) -> str:
+def build_daily_digest_prompt(fear_greed_value: int | None, fear_greed_classification: str | None,
+                              headlines: List[str]) -> str:
     headlines_text = "\n".join(f"- {title}" for title in headlines[:6])
+    fear_greed = (f"Fear & Greed Index je dnes {fear_greed_value} ({fear_greed_classification})."
+                  if fear_greed_value is not None else "Fear & Greed Index dnes nie je k dispozicii.")
     return (
         f"Si krypto trhovy analytik pripravujuci rychle ranne zhrnutie pre "
-        f"investora. Fear & Greed Index je dnes {fear_greed_value} "
-        f"({fear_greed_classification}). Dnesne titulky:\n{headlines_text}\n\n"
+        f"investora. {fear_greed} Dnesne titulky:\n{headlines_text}\n\n"
         f"{GLOBAL_CONTEXT_INSTRUCTION} "
         f"Naps zhrnutie v 3-4 vetach a 3-5 klucovych bodov na sledovanie dnes. "
         f"Odpovedz VYHRADNE ako platny JSON bez markdown obalu, bez sprievodneho "

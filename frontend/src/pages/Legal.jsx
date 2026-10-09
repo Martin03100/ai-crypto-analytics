@@ -24,13 +24,19 @@ function LegalPage({ titleKey, sections }) {
   );
 }
 
+// GDPR requires the controller's identity in the privacy notice even while the app is free. The business id and
+// address are seller details: they appear only while the paid plan is switched on.
+const CONTROLLER_NAME = "Martin Masaryk";
+
 function Operator({ t }) {
   const { operator_name: name, operator_business_id: businessId, operator_address: address } = useAppConfig();
+  const { mode } = usePremium();
+  const seller = mode ? `${businessId ? `, ${t("legal.businessId")} ${businessId}` : ""}${address ? `, ${address}` : ""}` : "";
   return (
     <div className="card legal-operator">
       <strong>{t("legal.operatorTitle")}</strong>
       <p className="text-sub">
-        {name ? <>{name}{businessId ? `, ${t("legal.businessId")} ${businessId}` : ""}{address ? `, ${address}` : ""}<br /></> : null}
+        {name || CONTROLLER_NAME}{seller}<br />
         {t("legal.contact")}: <a href="mailto:aicryptoanalytics7@gmail.com" className="key-link">aicryptoanalytics7@gmail.com</a>
       </p>
     </div>
@@ -38,7 +44,7 @@ function Operator({ t }) {
 }
 
 const PRIVACY_SECTIONS = ["dataCollected", "purposes", "cookies", "analytics", "alertsData", "pushData", "feedbackData", "premiumData", "waitlist",
-  "payments", "thirdParty", "retention", "rights", "contact"];
+  "payments", "thirdParty", "processors", "retention", "rights", "contact"];
 const TERMS_SECTIONS = ["notAdvice", "eligibility", "account", "premium", "referrals", "withdrawal", "acceptableUse",
   "liability", "law", "changes"];
 // Sections that only apply while the paid plan exists.

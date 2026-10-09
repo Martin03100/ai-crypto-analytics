@@ -6,7 +6,7 @@ import math
 import re
 from defusedxml import ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -60,12 +60,6 @@ def get_fear_greed_index(force_refresh: bool = False) -> Tuple[bool, Optional[Di
         return False, None, f"Chyba siete pri nacitani Fear & Greed Index: {exc}"
     except (ValueError, KeyError, TypeError, AttributeError, IndexError) as exc:
         return False, None, f"Chyba pri spracovani Fear & Greed Index: {exc}"
-
-
-def get_dummy_fear_greed_index() -> Dict[str, Any]:
-    now = datetime.now(timezone.utc)
-    return {"value": 50, "classification": "[DUMMY] Neutral",
-            "timestamp": str(int(now.timestamp())), "updated_at": now.isoformat()}
 
 
 _TAG_STRIP_PATTERN = re.compile(r"<[^>]+>")
@@ -188,24 +182,6 @@ def get_crypto_headlines(limit: int = 8) -> Tuple[bool, List[Dict[str, str]], Op
     _headlines_cache.set(cache_key, result)
     return True, result, None
 
-
-def get_dummy_crypto_headlines(limit: int = 6) -> List[Dict[str, str]]:
-    templates = [
-        "Bitcoin dosahuje nove lokalne maximum uprostred institucionalneho zaujmu",
-        "Regulatori vysetruju velku burzu kvoli suladu s predpismi",
-        "Ethereum upgrade slubuje nizsie transakcne poplatky",
-        "Trh kryptomien zaznamenava vypredaj po makroekonomickych datach",
-        "DeFi protokol oznamuje partnerstvo s tradicnou bankou",
-        "Nova L2 siet prekonala milnik v pocte dennych transakcii",
-    ]
-    now = datetime.now(timezone.utc)
-    return [
-        {
-            "title": f"[DUMMY] {t}", "link": "#", "source": "Demo Zdroj",
-            "published_at": (now - timedelta(hours=i * 2 + 1)).isoformat(),
-        }
-        for i, t in enumerate(templates[:limit])
-    ]
 
 
 def get_upcoming_market_events(lang: str = "en", limit: int = 5,

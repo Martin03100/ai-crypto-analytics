@@ -32,7 +32,7 @@ function extractDetailMessage(detail) {
   return undefined;
 }
 
-const AUTH_401_EXEMPT = ["/auth/login", "/auth/register", "/auth/me", "/auth/forgot-password", "/auth/verify-reset-code", "/auth/reset-password"];
+const AUTH_401_EXEMPT = ["/auth/login", "/auth/register", "/auth/me", "/auth/session", "/auth/forgot-password", "/auth/verify-reset-code", "/auth/reset-password"];
 export const SESSION_EXPIRED_EVENT = "aca:session-expired";
 
 // Generous on purpose: a sleeping free-tier backend can take close to a minute to wake up.
@@ -235,7 +235,8 @@ export const api = {
   login: (username, password, totp_code, captcha_token) =>
     request("/auth/login", { method: "POST", body: { username, password, totp_code, captcha_token: captcha_token || undefined } }),
   logout: () => request("/auth/logout", { method: "POST" }),
-  me: () => request("/auth/me").then(obj),
+  // A visitor gets {} (no 401 logged on every public page); a signed-in user gets the session.
+  me: () => request("/auth/session").then(obj),
   forgotPassword: (email, captcha_token) => request("/auth/forgot-password", { method: "POST", body: { email, captcha_token } }),
   verifyEmail: (code) => request("/auth/verify-email", { method: "POST", body: { code } }),
   resendVerification: () => request("/auth/resend-verification", { method: "POST" }),

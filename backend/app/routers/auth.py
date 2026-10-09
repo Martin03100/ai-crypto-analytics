@@ -175,11 +175,27 @@ def logout(response: Response) -> dict:
     return {"success": True}
 
 
-@router.get("/me", response_model=TokenResponse)
-def me(user: User = Depends(get_current_user)) -> TokenResponse:
+def _session_out(user: User) -> TokenResponse:
     return TokenResponse(access_token="", username=user.username, user_id=user.id, email=user.email,
                          email_verified=user.email_verified, totp_enabled=bool(user.totp_enabled),
                          premium=is_premium(user), admin=is_admin(user), simple_mode=user.simple_mode)
+
+
+@router.get("/me", response_model=TokenResponse)
+def me(user: User = Depends(get_current_user)) -> TokenResponse:
+    return _session_out(user)
+
+
+@router.get("/session")
+def session(request: Request, db: Session = Depends(get_db)) -> dict:
+    """The signed-in user, or {} for a visitor: a plain 200, so every public page view does not log a 401 error."""
+    try:
+        user = get_current_user(request, None, db)
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+            return {}
+        raise
+    return _session_out(user).model_dump()
 
 
 @router.post("/forgot-password", dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_LOGIN))])

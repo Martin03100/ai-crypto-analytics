@@ -17,7 +17,7 @@ describe("offline API cache allowlist", () => {
   it("never caches secrets, exports or account internals", () => {
     for (const path of ["/api/account/api-keys", "/api/account/activity", "/api/forecast/history/export.csv",
       "/api/auth/login", "/api/account/api-keys/links", "/api/public/status", "/api/forecast/backtest?coin=BTC",
-      "/api/auth/me"]) {
+      "/api/auth/me", "/api/auth/session"]) {
       expect(OFFLINE_API.test(path), path).toBe(false);
     }
   });

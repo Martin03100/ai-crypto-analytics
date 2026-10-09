@@ -61,7 +61,7 @@ for (const [device, viewport] of [["desktop", { width: 1440, height: 900 }], ["p
       page.on("pageerror", (err) => note("crash", current, err.message.slice(0, 200)));
       page.on("response", (res) => {
         const url = res.url();
-        if (res.status() >= 400 && !IGNORED_REQUEST.test(url) && !(res.status() === 401 && url.endsWith("/api/auth/me"))) {
+        if (res.status() >= 400 && !IGNORED_REQUEST.test(url) && !(res.status() === 401 && url.endsWith("/api/auth/session"))) {
           note("http", current, `${res.status()} ${res.request().method()} ${url.replace(/^https?:\/\/[^/]+/, "")}`);
         }
       });
