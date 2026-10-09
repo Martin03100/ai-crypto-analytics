@@ -53,13 +53,13 @@ export function ConfidenceBadge({ score }) {
   );
 }
 
-export function AccuracyBadge({ score }) {
-  const { t } = useLanguage();
-  const value = Math.round(score ?? 0);
-  const cls = value >= 70 ? "badge-buy" : value >= 40 ? "badge-hold" : "badge-sell";
+/** How far the forecast was from the real price (100 - accuracy_pct); the direction badge says if it went the right way. */
+export function PriceErrorBadge({ accuracy }) {
+  const { t, lang } = useLanguage();
+  const value = Math.max(0, 100 - (accuracy ?? 0)).toLocaleString(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   return (
-    <span className={`badge ${cls}`}>
-      <span className="badge-dot" /> {t("badge.accuracy", { value })}
+    <span className="badge badge-neutral">
+      <span className="badge-dot" /> {t("badge.priceError", { value })}
     </span>
   );
 }

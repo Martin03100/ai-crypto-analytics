@@ -77,3 +77,11 @@ def test_an_expired_coin_page_is_served_at_once(client, monkeypatch):
     res = client.get("/api/public/coin/ETH")
     assert res.status_code == 200 and res.json()["price"] == 1.0
     assert _wait_until(lambda: rebuilt == ["ETH"])
+
+
+def test_display_values_are_localized_for_emails():
+    assert signals.localize_display("+2.8% 1m", "sk") == "+2.8% 1 mes."
+    assert signals.localize_display("3.7% y/y", "de") == "3.7% ggü. Vorjahr"
+    assert signals.localize_display("0% long", "cs") == "0 % longů"
+    lines = signals.headline([{"key": "funding", "display": "+0.0450% / 8h", "tone": "bearish"}], "pl")
+    assert lines == ["Funding: +0.0450% / 8 h ▼"]

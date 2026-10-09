@@ -4,7 +4,7 @@ import { ArrowLeft, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
-import { AccuracyBadge, ConfidenceBadge, RiskBadge } from "../components/Badge";
+import { ConfidenceBadge, PriceErrorBadge, RiskBadge } from "../components/Badge";
 import ShareBar from "../components/ShareBar";
 import ShareImages from "../components/ShareImages";
 import { Card } from "../components/Card";
@@ -50,7 +50,7 @@ export default function SharedForecast() {
           <div style={{ display: "flex", gap: 8, margin: "12px 0", flexWrap: "wrap" }}>
             {data?.confidence_score !== undefined && <ConfidenceBadge score={data.confidence_score} />}
             {data?.risk_level && <RiskBadge level={data.risk_level} />}
-            {evaluation && <AccuracyBadge score={evaluation.accuracy_pct} />}
+            {evaluation && <PriceErrorBadge accuracy={evaluation.accuracy_pct} />}
             {evaluation && (
               <span className={`badge ${evaluation.direction_correct ? "badge-buy" : "badge-sell"}`}>
                 <span className="badge-dot" /> {t(evaluation.direction_correct ? "forecast.directionCorrect" : "forecast.directionWrong")}

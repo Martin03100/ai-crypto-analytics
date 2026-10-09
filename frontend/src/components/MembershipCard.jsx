@@ -183,7 +183,7 @@ export default function MembershipCard() {
           <label className={`toggle-row ${features ? "" : "toggle-locked"}`}>
             <input type="checkbox" checked={m.briefing_opt_in} disabled={!features} onChange={toggle("briefing_opt_in")} />
             <span>
-              <strong><Sun size={13} style={{ verticalAlign: -2, marginRight: 4 }} />{t("membership.briefingTitle")}</strong>
+              <strong><Sun size={13} style={{ verticalAlign: -2, marginRight: 4 }} />{t(mode ? "membership.briefingTitlePremium" : "membership.briefingTitle")}</strong>
               <span className="text-sub" style={{ display: "block" }}>
                 {t("membership.briefingText")} {mode && !features && <Link to="/premium" className="key-link">{t("gate.cta")}</Link>}
               </span>

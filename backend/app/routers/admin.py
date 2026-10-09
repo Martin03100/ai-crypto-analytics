@@ -225,18 +225,13 @@ def payments_disconnect(request: Request, admin: User = Depends(get_admin_user),
 
 @router.get("/backup", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
 def download_backup(request: Request, admin: User = Depends(get_admin_user), db: Session = Depends(get_db)) -> Response:
-    """Every table as JSON, gzipped. Secrets stay as stored (hashed or encrypted), so keep the file private."""
-    import gzip
-    import json as _json
+    """Every table as JSON, gzipped. Secrets stay as stored (hashed or encrypted), so keep the file private.
+    Restore with: python -m app.services.backup restore FILE (see the README)."""
+    from app.services import backup
 
-    from app.database import Base
-
-    data = {"created_at": _now().isoformat(), "format": 1, "tables": {}}
-    for table in Base.metadata.sorted_tables:
-        rows = db.execute(table.select()).mappings().all()
-        data["tables"][table.name] = [dict(r) for r in rows]
+    data = backup.build_backup(db)
     audit.record(db, admin.id, "admin_backup_downloaded", request, f"{len(data['tables'])} tables")
     db.commit()
-    body = gzip.compress(_json.dumps(data, default=str, ensure_ascii=False).encode("utf-8"))
+    body = backup.dump(data)
     name = f"ai-crypto-analytics-backup-{_now():%Y-%m-%d}.json.gz"
     return Response(body, media_type="application/gzip", headers={"Content-Disposition": f'attachment; filename="{name}"'})

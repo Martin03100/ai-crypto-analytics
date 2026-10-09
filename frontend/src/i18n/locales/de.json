@@ -59,7 +59,6 @@
   "auth.validationUsernameRequiredForgot": "Gib deinen Benutzernamen ein.",
   "auth.verifyCode": "Code bestätigen",
   "auth.verifyCodeInstructions": "Wir haben einen 6-stelligen Code an {email} gesendet. Gib ihn unten ein.",
-  "badge.accuracy": "Trefferquote: {value} %",
   "badge.bearish": "Bärisch",
   "badge.bullish": "Bullisch",
   "badge.buy": "Kaufen",
@@ -279,7 +278,7 @@
   "forecast.timeTooltip": "Zeit: {label}",
   "forecast.title": "KI-Prognose & Verlauf",
   "forecast.usdNote": "KI-Prognosen sind immer in USD — die zugrunde liegenden Marktdaten sind in USD.",
-  "help.accuracy": "100 % minus die durchschnittliche Abweichung der Prognose vom echten Kurs. Vergleiche sie mit der naiven Schätzung — erst das zeigt den echten Mehrwert.",
+  "help.accuracy": "Durchschnittliche Abweichung der Prognose vom echten Kurs über den Horizont — je niedriger, desto besser. Vergleiche sie mit der naiven Schätzung: erst das zeigt den echten Mehrwert.",
   "help.baseline": "Wie oft die KI genauer war als die simple Annahme, dass der Kurs gleich bleibt.",
   "help.confidence": "Die eigene Schätzung des Modells, wie wahrscheinlich der Preis auf der vorhergesagten Seite endet (steigend oder fallend): 50 % ist ein Münzwurf. Wie gut diese Schätzungen stimmen, zeigt die öffentliche Erfolgsbilanz.",
   "help.direction": "Anteil der Prognosen, die richtig vorhergesagt haben, ob der Kurs steigt oder fällt. 50 % entspricht einem Münzwurf.",
@@ -939,7 +938,7 @@
   "mystats.byModel": "Nach KI-Modell",
   "mystats.byCoin": "Nach Coin",
   "mystats.byHorizon": "Nach Horizont",
-  "membership.briefingTitle": "Morgen-Briefing (Premium)",
+  "membership.briefingTitle": "Morgen-Briefing",
   "membership.briefingText": "Jeden Morgen: ein 24-Stunden-Ausblick mit Kursspanne für jeden Coin auf deiner Beobachtungsliste.",
   "settings.dataTitle": "Deine Daten",
   "settings.dataText": "Lade alles, was zu deinem Konto gespeichert ist, als eine JSON-Datei herunter.",
@@ -1676,5 +1675,7 @@
   "settings.navNotifications": "Benachrichtigungen",
   "settings.navProfile": "Profil & Einladungen",
   "settings.navApp": "App",
-  "settings.navData": "Deine Daten"
+  "settings.navData": "Deine Daten",
+  "badge.priceError": "Preisabweichung: {value} %",
+  "membership.briefingTitlePremium": "Morgen-Briefing (Premium)"
 }

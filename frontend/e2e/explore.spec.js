@@ -19,7 +19,8 @@ test("glossary search and changelog badge", async ({ page }) => {
   await expect(page.locator(".glossary-item")).toHaveCount(1);
   await page.goto("/changelog");
   await expect(page.getByRole("heading", { name: "What's new" })).toBeVisible();
-  await expect(page.locator(".changelog-entry").first()).toContainText("Beginner view");
+  await expect(page.locator(".changelog-entry").first()).toContainText("fairer public track record");
+  await expect(page.locator(".changelog-entry").filter({ hasText: "Beginner view" })).toHaveCount(1);
 });
 
 test("public calendar lists macro events; reminders need an account", async ({ page }) => {

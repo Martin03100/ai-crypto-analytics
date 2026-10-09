@@ -59,7 +59,6 @@
   "auth.validationUsernameRequiredForgot": "Zadaj svoje používateľské meno.",
   "auth.verifyCode": "Overiť kód",
   "auth.verifyCodeInstructions": "Poslali sme 6-miestny kód na {email}. Zadaj ho nižšie.",
-  "badge.accuracy": "Presnosť: {value}%",
   "badge.bearish": "Klesajúci",
   "badge.bullish": "Rastúci",
   "badge.buy": "Dokúpiť",
@@ -279,7 +278,7 @@
   "forecast.timeTooltip": "Čas: {label}",
   "forecast.title": "AI Predikcia & História",
   "forecast.usdNote": "AI predikcie sú vždy v USD — trhové dáta, z ktorých vychádzajú, sú v USD.",
-  "help.accuracy": "100 % mínus priemerná odchýlka predikcie od skutočnej ceny. Porovnaj ju s naivným odhadom — až to ukáže skutočnú hodnotu.",
+  "help.accuracy": "Priemerná odchýlka predikcie od skutočnej ceny počas horizontu — čím nižšia, tým lepšie. Porovnaj ju s naivným odhadom: až to ukáže skutočnú hodnotu.",
   "help.baseline": "Ako často bola AI presnejšia než jednoduchý predpoklad, že sa cena nezmení.",
   "help.confidence": "Vlastný odhad modelu, s akou pravdepodobnosťou cena skončí na predikovanej strane (rast alebo pokles): 50 % je hod mincou. Ako dobre tieto odhady sedia, ukazuje verejná úspešnosť.",
   "help.direction": "Podiel predikcií, ktoré správne trafili, či cena stúpne alebo klesne. 50 % je ako hod mincou.",
@@ -939,7 +938,7 @@
   "mystats.byModel": "Podľa AI modelu",
   "mystats.byCoin": "Podľa mince",
   "mystats.byHorizon": "Podľa horizontu",
-  "membership.briefingTitle": "Ranný prehľad (Premium)",
+  "membership.briefingTitle": "Ranný prehľad",
   "membership.briefingText": "Každé ráno: výhľad na 24 hodín s cenovým rozsahom pre každú mincu z tvojho watchlistu.",
   "settings.dataTitle": "Tvoje údaje",
   "settings.dataText": "Stiahni si všetko, čo o tvojom účte uchovávame, v jednom JSON súbore.",
@@ -1676,5 +1675,7 @@
   "settings.navNotifications": "Upozornenia",
   "settings.navProfile": "Profil a pozvánky",
   "settings.navApp": "Aplikácia",
-  "settings.navData": "Tvoje údaje"
+  "settings.navData": "Tvoje údaje",
+  "badge.priceError": "Odchýlka ceny: {value} %",
+  "membership.briefingTitlePremium": "Ranný prehľad (Premium)"
 }

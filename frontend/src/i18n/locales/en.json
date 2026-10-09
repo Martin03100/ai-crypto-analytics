@@ -59,7 +59,6 @@
   "auth.validationUsernameRequiredForgot": "Enter your username.",
   "auth.verifyCode": "Verify code",
   "auth.verifyCodeInstructions": "We sent a 6-digit code to {email}. Enter it below.",
-  "badge.accuracy": "Accuracy: {value}%",
   "badge.bearish": "Bearish",
   "badge.bullish": "Bullish",
   "badge.buy": "Buy",
@@ -279,7 +278,7 @@
   "forecast.timeTooltip": "Time: {label}",
   "forecast.title": "AI forecast & history",
   "forecast.usdNote": "AI forecasts are always in USD — the market data they are based on is in USD.",
-  "help.accuracy": "100% minus the average deviation of the forecast from the real price. Compare it with the naive guess — that shows the real value.",
+  "help.accuracy": "Average deviation of the forecast from the real price over the horizon — lower is better. Compare it with the naive guess: only that shows the real value.",
   "help.baseline": "How often the AI was more accurate than simply assuming the price stays the same.",
   "help.confidence": "The model's own estimate of how likely the price ends on the predicted side (up or down): 50% is a coin flip. How well these estimates hold up is shown on the public track record.",
   "help.direction": "Share of forecasts that correctly predicted whether the price would rise or fall. 50% is a coin flip.",
@@ -939,7 +938,7 @@
   "mystats.byModel": "By AI model",
   "mystats.byCoin": "By coin",
   "mystats.byHorizon": "By horizon",
-  "membership.briefingTitle": "Morning briefing (Premium)",
+  "membership.briefingTitle": "Morning briefing",
   "membership.briefingText": "Every morning: a 24-hour outlook with a price range for each coin on your watchlist.",
   "settings.dataTitle": "Your data",
   "settings.dataText": "Download everything stored about your account as one JSON file.",
@@ -1676,5 +1675,7 @@
   "settings.navNotifications": "Notifications",
   "settings.navProfile": "Profile & invites",
   "settings.navApp": "App",
-  "settings.navData": "Your data"
+  "settings.navData": "Your data",
+  "badge.priceError": "Price error: {value}%",
+  "membership.briefingTitlePremium": "Morning briefing (Premium)"
 }

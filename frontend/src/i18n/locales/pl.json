@@ -59,7 +59,6 @@
   "auth.validationUsernameRequiredForgot": "Podaj nazwę użytkownika.",
   "auth.verifyCode": "Zweryfikuj kod",
   "auth.verifyCodeInstructions": "Wysłaliśmy 6-cyfrowy kod na adres {email}. Wpisz go poniżej.",
-  "badge.accuracy": "Skuteczność: {value}%",
   "badge.bearish": "Spadkowy",
   "badge.bullish": "Wzrostowy",
   "badge.buy": "Kup",
@@ -279,7 +278,7 @@
   "forecast.timeTooltip": "Czas: {label}",
   "forecast.title": "Prognoza AI i historia",
   "forecast.usdNote": "Prognozy AI są zawsze w USD — dane rynkowe, na których się opierają, są w USD.",
-  "help.accuracy": "100% minus średnie odchylenie prognozy od faktycznej ceny. Porównaj z naiwnym założeniem — to pokazuje prawdziwą wartość.",
+  "help.accuracy": "Średnie odchylenie prognozy od faktycznej ceny w całym horyzoncie — im niższe, tym lepiej. Porównaj je z naiwnym założeniem: dopiero to pokazuje prawdziwą wartość.",
   "help.baseline": "Jak często AI było dokładniejsze niż proste założenie, że cena się nie zmieni.",
   "help.confidence": "Własna ocena modelu, z jakim prawdopodobieństwem cena skończy po przewidywanej stronie (wzrost lub spadek): 50% to rzut monetą. Jak dobrze te oceny się sprawdzają, pokazuje publiczna skuteczność.",
   "help.direction": "Odsetek prognoz, które trafnie przewidziały wzrost lub spadek ceny. 50% to rzut monetą.",
@@ -939,7 +938,7 @@
   "mystats.byModel": "Według modelu AI",
   "mystats.byCoin": "Według monety",
   "mystats.byHorizon": "Według horyzontu",
-  "membership.briefingTitle": "Poranny briefing (Premium)",
+  "membership.briefingTitle": "Poranny briefing",
   "membership.briefingText": "Każdego ranka: perspektywa na 24 godziny z zakresem ceny dla każdej monety z Twojej listy obserwowanych.",
   "settings.dataTitle": "Twoje dane",
   "settings.dataText": "Pobierz wszystko, co jest zapisane o Twoim koncie, w jednym pliku JSON.",
@@ -1676,5 +1675,7 @@
   "settings.navNotifications": "Powiadomienia",
   "settings.navProfile": "Profil i zaproszenia",
   "settings.navApp": "Aplikacja",
-  "settings.navData": "Twoje dane"
+  "settings.navData": "Twoje dane",
+  "badge.priceError": "Odchylenie ceny: {value}%",
+  "membership.briefingTitlePremium": "Poranny briefing (Premium)"
 }

@@ -4,7 +4,7 @@ import { Brain, CheckCircle2, ChevronDown, Crown, Copy, Download, Link2, Loader2
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api";
-import { AccuracyBadge, ConfidenceBadge, FallbackBadge, MockBadge, RiskBadge } from "../components/Badge";
+import { ConfidenceBadge, FallbackBadge, MockBadge, PriceErrorBadge, RiskBadge } from "../components/Badge";
 import { Card } from "../components/Card";
 import BacktestPanel from "../components/BacktestPanel";
 import MyStats from "../components/MyStats";
@@ -160,7 +160,7 @@ function HistoryItem({ entry, onDelete }) {
                 <div style={{ display: "flex", gap: 8, margin: "10px 0", flexWrap: "wrap" }}>
                   {entry.forecast_data.confidence_score !== undefined && <ConfidenceBadge score={entry.forecast_data.confidence_score} />}
                   {entry.forecast_data.risk_level && <RiskBadge level={entry.forecast_data.risk_level} />}
-                  {accuracy?.status === "completed" && <><AccuracyBadge score={accuracy.accuracy_pct} /><InfoTip text={t("help.accuracy")} /></>}
+                  {accuracy?.status === "completed" && <><PriceErrorBadge accuracy={accuracy.accuracy_pct} /><InfoTip text={t("help.accuracy")} /></>}
                   {accuracy?.status === "completed" && accuracy.baseline_accuracy_pct != null && accuracy.accuracy_pct != null && (
                     <span className={`badge ${accuracy.accuracy_pct > accuracy.baseline_accuracy_pct ? "badge-buy" : "badge-neutral"}`}>
                       <span className="badge-dot" /> {t(accuracy.accuracy_pct > accuracy.baseline_accuracy_pct ? "forecast.beatNaive" : "forecast.lostNaive",

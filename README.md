@@ -41,8 +41,9 @@ statistical model and real market data. Bachelor's thesis project (Software Deve
   score and daily history, **PDF report**, **Telegram** delivery, Fear & Greed alerts, up to 25 alerts, a **morning
   briefing**, **personal accuracy stats** and 20 scheduled forecasts. Checkout requires accepting the Terms and stays off
   until the seller details are filled in. **GDPR data export** for every user.
-- **Premium mode switch:** the admin can hide everything paid (prices, Premium pages, seller details, paid features)
-  with one switch; it is off by default, so the app looks fully free until payments are ready.
+- **Premium mode switch:** it is off by default. While it is off the app is fully free: every paid feature is open to
+  everyone and nothing about Premium (prices, Premium pages, crowns, seller details) is shown. Switching it on restores
+  the plans and their limits.
 - **Invites:** a friend who signs up with your link gets a 14-day trial; when they pay, the inviter gets 30 days of
   Premium. With Premium off, invites earn bronze / silver / gold **ambassador badges** on the public board.
 - **Admin panel** (`/admin`, users listed in `ADMIN_USERNAMES`, 2FA required): stats, user search, granting or removing
@@ -51,8 +52,15 @@ statistical model and real market data. Bachelor's thesis project (Software Deve
   the Stripe product, prices, webhook and customer portal and shows a checklist of what is still missing before selling.
 - **Beat the AI:** a weekly challenge on one rotating coin - tips close on Thursday, the closest guess wins a badge
   shown on the tipster board and in the profile.
-- **Honest accuracy:** confidence calibration (claimed vs. real hit rate), accuracy by market situation (rising,
-  falling, sideways) and a comparison of every forecast with a naive "price stays the same" guess.
+- **Honest accuracy:** direction hit rates with a 95% confidence interval (a model gets the trophy only after 30
+  checked forecasts), the average price error instead of a flattering "accuracy %", a comparison of every forecast
+  with a naive "price stays the same" guess, confidence calibration (confidence = the probability that the direction
+  is right) and accuracy by market situation (rising, falling, sideways).
+- **A track record that cannot be steered:** a generated forecast can be saved only once and only within 15 minutes;
+  deleting a forecast removes it from the user's history but not from the statistics (it is still scored, and scored
+  results stay anonymously even after the account is deleted).
+- **Account security:** captcha instead of lock-outs after repeated failed sign-ins, 2FA with one-time recovery codes,
+  the password is needed to move a confirmed email (the old address is warned), security notices by email.
 - **Sharing:** forecasts as Story (9:16) and post (1:1) images, invite link as a QR code.
 - **SEO coin pages:** 20 coins in five languages (`/prediction/bitcoin`, `/sk/predikcia/bitcoin`,
   `/cs/predikce/bitcoin`, `/de/prognose/bitcoin`, `/pl/prognoza/bitcoin`); a Netlify edge function adds the title, canonical, hreflang, JSON-LD and a text snippet.
@@ -73,8 +81,9 @@ statistical model and real market data. Bachelor's thesis project (Software Deve
   the admin reads in the admin panel.
 - **Five languages:** English, Slovak, Czech, German and Polish (app, emails, notifications and coin pages).
 - Transactional emails in **English, Slovak, Czech, German and Polish**, following the user's app language.
-- **Demo mode** for presentations: one click fills the whole app with clearly labelled test data ("Gemini test", "Claude test", ...)
-  on synthetic prices - forecasts, evaluated accuracy, leaderboard, tips and portfolio analyses, visible only to the user who loaded it.
+- **Demo mode** for presentations (admins in production, everyone in development): one click fills the whole app with
+  clearly labelled test data ("Gemini test", "Claude test", ...) on synthetic prices - forecasts, evaluated accuracy,
+  leaderboard, tips and portfolio analyses, visible only to the user who loaded it.
 
 ## Architecture
 
@@ -146,6 +155,20 @@ alembic upgrade head
 ```
 
 `tests/test_migrations.py` fails when a model changes without a matching migration.
+
+## Backup and restore
+
+The admin panel downloads the whole database as a gzipped JSON file (Admin → Backup). To restore it into an empty
+database with the current schema (for example a new PostgreSQL instance):
+
+```bash
+cd backend
+DATABASE_URL=postgresql://... python -m app.services.backup restore ai-crypto-analytics-backup-2026-10-09.json.gz
+```
+
+The command applies the migrations first and refuses to overwrite a database that already has users unless you add
+`--force`. Keep the same `API_KEY_ENCRYPTION_SECRET` and `JWT_SECRET_KEY`, otherwise stored API keys and 2FA secrets
+cannot be decrypted.
 
 ## Known limitations
 

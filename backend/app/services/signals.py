@@ -86,11 +86,32 @@ def _label(key: str, idx: int) -> str:
     return names[idx] if idx < len(names) else names[0]
 
 
+# Period marks in the display values ("+2.5% 1w") in each language: en, sk, cs, de, pl (the web app has the same).
+_UNITS = {
+    "24h": ("24h", "24 h", "24 h", "24 Std.", "24 h"), "7d": ("7d", "7 dní", "7 dní", "7 T.", "7 dni"),
+    "30d": ("30d", "30 dní", "30 dní", "30 T.", "30 dni"), "1w": ("1w", "1 týž.", "1 týd.", "1 Wo.", "1 tydz."),
+    "1m": ("1m", "1 mes.", "1 měs.", "1 Mon.", "1 mies."), "8h": ("8h", "8 h", "8 h", "8 Std.", "8 h"),
+    "y/y": ("y/y", "medziročne", "meziročně", "ggü. Vorjahr", "r/r"),
+}
+_LONGS = ("{n}% longs", "{n} % longov", "{n} % longů", "{n} % Longs", "{n}% longów")
+
+
+def localize_display(display: str, lang: str) -> str:
+    idx = _LABEL_INDEX.get(lang, 0)
+    liquidations = re.fullmatch(r"(\d+)% long", display)
+    if liquidations:
+        return _LONGS[idx].format(n=liquidations.group(1))
+    text = re.sub(r"(\s)(24h|7d|30d|1w|1m)(?=\)|$)", lambda m: m.group(1) + _UNITS[m.group(2)][idx], display)
+    text = re.sub(r"/ 8h$", "/ " + _UNITS["8h"][idx], text)
+    return re.sub(r" y/y$", " " + _UNITS["y/y"][idx], text)
+
+
 def headline(items: List[Dict[str, Any]], lang: str, limit: int = 4) -> List[str]:
     """The strongest non-neutral signals as short lines, e.g. "Funding: +0.0450% / 8h ▼"."""
     idx = _LABEL_INDEX.get(lang, 0)
     picked = [s for s in items if s["tone"] != "neutral"][:limit]
-    return [f"{_label(s['key'], idx)}: {s['display']} {'▲' if s['tone'] == 'bullish' else '▼'}" for s in picked]
+    return [f"{_label(s['key'], idx)}: {localize_display(s['display'], lang)} {'▲' if s['tone'] == 'bullish' else '▼'}"
+            for s in picked]
 
 
 def signal(group: str, key: str, value: Optional[float], display: str, tone: str, source: str, note: str,
