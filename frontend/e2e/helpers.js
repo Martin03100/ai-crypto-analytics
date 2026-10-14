@@ -15,7 +15,7 @@ export async function prepare(page) {
   await page.addInitScript(() => {
     localStorage.setItem("aca_lang", "en");
     localStorage.setItem("aca_onboarding_seen_v1", "1");
-    for (let id = 1; id <= 50; id += 1) localStorage.setItem(`aca_onboarding_seen_v1:${id}`, "1");
+    for (let id = 1; id <= 1000; id += 1) localStorage.setItem(`aca_onboarding_seen_v1:${id}`, "1");   // every test user, all browsers
   });
 }
 

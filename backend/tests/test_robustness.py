@@ -207,3 +207,22 @@ def test_gemini_retries_without_thinking_config(monkeypatch):
     ok, text, err = ai_providers._call_gemini("prompt", "key")
     assert ok, err
     assert len(calls) == 2 and "thinking_config" not in calls[1]
+
+
+def test_cache_fetches_once_when_many_visitors_arrive_together():
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    from app.utils.ttl_cache import TTLCache
+    cache, calls, gate = TTLCache(ttl_seconds=60), [], threading.Event()
+
+    def slow_fetch():
+        calls.append(1)
+        gate.wait(2)            # keep the first fetch running while the others arrive
+        return {"events": []}
+
+    with ThreadPoolExecutor(max_workers=20) as pool:
+        futures = [pool.submit(cache.get_or_set, "calendar", slow_fetch) for _ in range(20)]
+        gate.set()
+        results = [f.result(timeout=5) for f in futures]
+    assert len(calls) == 1 and all(r == {"events": []} for r in results)

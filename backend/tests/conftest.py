@@ -9,7 +9,7 @@ import tempfile
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 _TEST_DB_PATH = os.path.join(tempfile.gettempdir(), "aca_test.db")
-if os.path.exists(_TEST_DB_PATH):
+if not os.environ.get("TEST_DATABASE_URL") and os.path.exists(_TEST_DB_PATH):   # the SQLite file only
     os.remove(_TEST_DB_PATH)
 os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{_TEST_DB_PATH}"
 os.environ.setdefault("APP_ENV", "development")
@@ -130,3 +130,14 @@ def patch_accuracy(monkeypatch, fake) -> None:
     from app.services import scoring
     monkeypatch.setattr(forecast, "compute_forecast_accuracy", fake)
     monkeypatch.setattr(scoring, "compute_forecast_accuracy", fake)
+
+
+def owner_id(db) -> int:
+    """A user to own rows a test inserts directly (PostgreSQL checks the foreign key, SQLite does not)."""
+    from app.models import User
+    user = db.query(User).order_by(User.id).first()
+    if user is None:
+        user = User(username="rowowner", password_hash="x", email="rowowner@example.com")
+        db.add(user)
+        db.flush()
+    return user.id

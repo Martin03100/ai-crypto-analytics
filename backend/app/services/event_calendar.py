@@ -102,10 +102,8 @@ def block_height() -> Optional[int]:
 
 
 def halving_event(now: datetime) -> Optional[Dict[str, Any]]:
-    height = _cache.get("height")
-    if height is None:
-        height = block_height() or 0          # 0 = unreachable; remembered too, so a dead API is not retried each time
-        _cache.set("height", height)
+    # 0 = unreachable; remembered too, so a dead API is not retried each time
+    height = _cache.get_or_set("height", lambda: block_height() or 0)
     if not height:
         return None
     blocks = HALVING_HEIGHT - height
@@ -148,16 +146,16 @@ def unlocks_from_series(coin: str, data: Any, today: date, days: int = UNLOCK_DA
 
 
 def token_unlocks(today: date) -> List[Dict[str, Any]]:
-    cached = _cache.get(f"unlocks:{today}")
-    if cached is not None:
-        return cached
+    return _cache.get_or_set(f"unlocks:{today}", lambda: _fetch_unlocks(today))
+
+
+def _fetch_unlocks(today: date) -> List[Dict[str, Any]]:
     coins = [(c, s) for c, s in UNLOCK_SLUGS.items() if c in DEFAULT_COIN_IDS]
     with ThreadPoolExecutor(max_workers=len(coins) or 1) as pool:
         datasets = list(pool.map(lambda cs: _get_json(EMISSIONS_URL.format(slug=cs[1])), coins))
     out: List[Dict[str, Any]] = []
     for (coin, _slug), data in zip(coins, datasets):
         out += unlocks_from_series(coin, data, today)
-    _cache.set(f"unlocks:{today}", out)
     return out
 
 

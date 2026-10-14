@@ -32,7 +32,7 @@ test("wrong password is rejected and logged as a failed sign-in", async ({ page,
 
 test("a new account starts on the dashboard with the view choice", async ({ page }) => {
   await page.addInitScript(() => {   // undo prepare(): this user has not seen the tour yet
-    for (let id = 1; id <= 50; id += 1) localStorage.removeItem(`aca_onboarding_seen_v1:${id}`);
+    for (let id = 1; id <= 1000; id += 1) localStorage.removeItem(`aca_onboarding_seen_v1:${id}`);
   });
   await register(page);
   await expect(page).toHaveURL(/\/dashboard$/);

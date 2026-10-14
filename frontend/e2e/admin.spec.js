@@ -10,8 +10,10 @@ test("regular users have no admin panel", async ({ page }) => {
   await expect(page).toHaveURL(/\/dashboard$/);
 });
 
-test("admin turns on 2FA, manages users and switches a feature off", async ({ page, browser }) => {
-  await register(page, "e2eadmin");
+test("admin turns on 2FA, manages users and switches a feature off", async ({ page, browser }, testInfo) => {
+  // Every browser runs against the same database, so each one has its own admin (all listed in ADMIN_USERNAMES).
+  const project = testInfo.project.name;
+  await register(page, project === "chromium" ? "e2eadmin" : `e2eadmin${project}`);
   await page.goto("/admin");
   await expect(page.getByText("the admin panel needs two-factor authentication")).toBeVisible();
 

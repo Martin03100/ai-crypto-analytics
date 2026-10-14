@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from app.database import SessionLocal
 from app.models import ForecastEvaluation, ForecastHistory, User
 from app.services import insights
-from tests.conftest import csrf_headers, set_app_settings
+from tests.conftest import csrf_headers, owner_id, set_app_settings
 
 
 def _premium(username):
@@ -24,11 +24,12 @@ def _evals(rows):
     """rows: (provider, coin, horizon, hit, start, predicted, actual, days_ago)"""
     db = SessionLocal()
     try:
+        uid = owner_id(db)
         for i, (provider, coin, horizon, hit, start, predicted, actual, days_ago) in enumerate(rows, start=1):
             created = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days_ago)
-            db.add(ForecastHistory(id=i, user_id=1, crypto_symbol=coin, timeframe=horizon, model_used=provider,
+            db.add(ForecastHistory(id=i, user_id=uid, crypto_symbol=coin, timeframe=horizon, model_used=provider,
                                    forecast_json=json.dumps({"ceny": [predicted], "aktualna_cena": start}), created_at=created))
-            db.add(ForecastEvaluation(forecast_id=i, user_id=1, provider=provider, coin=coin, timeframe=horizon,
+            db.add(ForecastEvaluation(forecast_id=i, user_id=uid, provider=provider, coin=coin, timeframe=horizon,
                                       accuracy_pct=95.0, direction_correct=hit, actual_final_price=actual))
         db.commit()
     finally:

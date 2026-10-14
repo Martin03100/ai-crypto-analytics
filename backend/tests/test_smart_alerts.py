@@ -40,6 +40,11 @@ def test_alert_kinds_validation_and_premium_kinds(registered):
     assert client.get("/api/alerts").json()["premium_kinds"] == ["fear_greed"]
 
 
+def _user_id(username):
+    with SessionLocal() as db:      # closed right away: an open session would block the next test on PostgreSQL
+        return db.query(User).filter(User.username == username).first().id
+
+
 def _add(user_id, kind, coin, direction, target):
     db = SessionLocal()
     try:
@@ -52,7 +57,7 @@ def _add(user_id, kind, coin, direction, target):
 def test_smart_alerts_fire_on_their_own_signal(registered, monkeypatch):
     client, username, _p = registered
     _premium(username)
-    uid = SessionLocal().query(User).filter(User.username == username).first().id
+    uid = _user_id(username)
     _add(uid, "move", "BTC", "below", 5)        # fires on a 24h drop of 5 % or more
     _add(uid, "move", "ETH", "above", 5)        # +5 % or more: not reached
     _add(uid, "rsi", "SOL", "above", 70)
@@ -82,7 +87,7 @@ def test_smart_alerts_fire_on_their_own_signal(registered, monkeypatch):
 def test_premium_kind_waits_when_premium_ends(registered, monkeypatch):
     _client, username, _p = registered
     set_app_settings(premium_mode=True)          # the limits and gates below exist only while Premium is on
-    uid = SessionLocal().query(User).filter(User.username == username).first().id
+    uid = _user_id(username)
     _add(uid, "fear_greed", "ALL", "below", 20)
     monkeypatch.setattr(alerts.market_data, "get_fear_greed_index", lambda: (True, {"value": 10}, None))
     db = SessionLocal()

@@ -57,6 +57,9 @@ export default defineConfig({
     // Playwright end-to-end specs in e2e/ run with `npm run test:e2e`, not with Vitest.
     include: ["src/**/*.test.{js,jsx}"],
     setupFiles: ["src/testSetup.js"],
+    // `npm run test:coverage`: the logic the unit tests load (pages and components are covered by the e2e tests).
+    // The thresholds stop the coverage from quietly dropping.
+    coverage: { provider: "v8", reporter: ["text-summary"], thresholds: { lines: 55, branches: 55 } },
   },
   server: {
     port: 5173,

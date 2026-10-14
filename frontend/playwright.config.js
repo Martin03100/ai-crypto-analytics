@@ -22,7 +22,15 @@ export default defineConfig({
     // Optional: reuse an already installed Chromium instead of `npx playwright install`.
     launchOptions: process.env.E2E_CHROMIUM ? { executablePath: process.env.E2E_CHROMIUM } : {},
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  // Firefox and WebKit (Safari, iPhone) run with E2E_ALL_BROWSERS=1; CI does that in a separate job.
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    ...(process.env.E2E_ALL_BROWSERS ? [
+      { name: "firefox", use: { ...devices["Desktop Firefox"] } },
+      { name: "webkit", use: { ...devices["Desktop Safari"] } },
+      { name: "iphone", use: { ...devices["iPhone 15"] }, testMatch: /(public|planning|growth)\.spec\.js/ },
+    ] : []),
+  ],
   webServer: [
     {
       command: `${python} -m uvicorn app.main:app --port 8000`,
@@ -37,7 +45,7 @@ export default defineConfig({
         API_KEY_ENCRYPTION_SECRET: "e2e-only-fernet-secret-not-for-production",
         PASSWORD_HASH_ROUNDS: "1000",
         RATE_LIMIT_LOGIN_PER_MINUTE: "100",   // the suite signs up more than 10 test users per minute
-        ADMIN_USERNAMES: "e2eadmin,e2eowner",
+        ADMIN_USERNAMES: "e2eadmin,e2eowner,e2eadminfirefox,e2eadminwebkit,e2eadminiphone",
         TURNSTILE_SECRET_KEY: "",
         BREVO_API_KEY: "",
         SMTP_HOST: "",

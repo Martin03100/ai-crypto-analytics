@@ -191,9 +191,9 @@ def test_disabled_admin_loses_admin_role(admin):
 def test_system_check_reports_services_without_secrets(admin):
     client, _username = admin
     report = client.get("/api/admin/system").json()
-    assert report["database"]["engine"] == "sqlite"
+    assert report["database"]["engine"] in ("sqlite", "postgresql")
     assert set(report["checks"]) >= {"email", "captcha", "sentry_backend", "proxy_signature", "scheduler", "google_login"}
-    assert "sqlite:" not in str(report) and "postgres" not in str(report)
+    assert "://" not in str(report) and "sqlite:" not in str(report)   # never a connection string
 
 
 def test_database_provider_is_recognised_from_the_host():

@@ -13,6 +13,7 @@ class TTLCache:
         self.max_entries = max_entries
         self._store: Dict[str, Tuple[float, Any]] = {}
         self._lock = threading.Lock()
+        self._key_locks: Dict[str, threading.Lock] = {}
 
     def get(self, key: str, allow_stale: bool = False) -> Optional[Any]:
         with self._lock:
@@ -47,9 +48,17 @@ class TTLCache:
                 del self._store[key]
 
     def get_or_set(self, key: str, factory: Callable[[], Any]) -> Any:
+        """The cached value, or factory() computed by ONE caller while the others wait for its result: many visitors
+        arriving at once with an empty cache must not all fetch the same slow external data (a "cache stampede")."""
         cached = self.get(key)
         if cached is not None:
             return cached
-        value = factory()
-        self.set(key, value)
-        return value
+        with self._lock:
+            key_lock = self._key_locks.setdefault(key, threading.Lock())
+        with key_lock:
+            cached = self.get(key)          # filled by the caller that held the lock before us
+            if cached is not None:
+                return cached
+            value = factory()
+            self.set(key, value)
+            return value

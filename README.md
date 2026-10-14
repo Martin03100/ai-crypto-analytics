@@ -102,9 +102,10 @@ REST API (FastAPI, Render) ── rate limiting, validation, security headers, o
 
 | Layer | Tool | What it covers |
 | --- | --- | --- |
-| Backend | pytest | API, security (auth, CSRF, rate limits, lockout, 2FA), models, backtest on real BTC data, fallbacks |
+| Backend | pytest (+ coverage floor) | API, security (auth, CSRF, rate limits, lockout, 2FA, Google sign-in), models, backtest on real BTC data, fallbacks; also on PostgreSQL in CI |
 | Frontend | Vitest | API client, parsers (CSV), formatting, translations, pure UI logic |
-| End-to-end | Playwright | Sign-up / sign-in / activity log, CSV import, demo data (history, leaderboard, portfolio, dashboard), model tabs, public pages, redirects |
+| End-to-end | Playwright | Sign-up / sign-in / activity log, CSV import, demo data (history, leaderboard, portfolio, dashboard), model tabs, public pages, redirects; Chromium, and in CI also Firefox, Safari (WebKit) and an iPhone |
+| Load | `backend/scripts/load_test.py` | Response times and errors under many concurrent visitors (local server only) |
 | Lint | ruff, ESLint | Backend (pyflakes, bugbear) and frontend (React hook rules, unused code) |
 | CI | GitHub Actions | All of the above on every push and pull request |
 
@@ -118,7 +119,8 @@ python -m venv .venv && .venv/Scripts/activate   # Windows; on Linux/macOS: sour
 pip install -r requirements-dev.txt
 cp .env.example .env                              # fill in secrets, see comments in the file
 uvicorn app.main:app --reload --port 8000
-python -m pytest -q                               # tests
+python -m pytest -q                               # tests (TEST_DATABASE_URL=postgresql://... to run them on PostgreSQL)
+python scripts/load_test.py --users 50            # load test against the local server
 ruff check .                                      # lint
 ```
 
@@ -130,7 +132,9 @@ npm install
 npm run dev          # http://localhost:5173, proxies /api to the backend
 npm test             # unit tests
 npm run lint         # ESLint
+npm run test:coverage   # unit tests with coverage
 npx playwright install chromium && npm run test:e2e   # end-to-end tests (start both servers automatically)
+E2E_ALL_BROWSERS=1 npx playwright test --project=firefox --project=webkit --project=iphone   # other browsers
 ```
 
 ## Configuration

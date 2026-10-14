@@ -75,9 +75,12 @@ def overall_status(services: List[Dict]) -> str:
 
 
 def collect_status(checks: List[Tuple[str, str, Callable[[], Tuple[str, int]]]] | None = None) -> Dict:
-    cached = _cache.get("status")
-    if checks is None and cached is not None:
-        return cached
+    if checks is None:   # the public page: one check at a time, every visitor in between gets its result
+        return _cache.get_or_set("status", lambda: _run_checks(None))
+    return _run_checks(checks)
+
+
+def _run_checks(checks: List[Tuple[str, str, Callable[[], Tuple[str, int]]]] | None) -> Dict:
     if checks is None:
         checks = [("backend", "core", lambda: ("up", 0)), ("database", "core", _check_database)]
         checks += [(sid, group, (lambda u=url: _check_http(u))) for sid, group, url in HTTP_CHECKS]
@@ -90,10 +93,8 @@ def collect_status(checks: List[Tuple[str, str, Callable[[], Tuple[str, int]]]] 
             except Exception:  # noqa: BLE001
                 status, latency = "down", None
             services.append({"id": sid, "group": group, "status": status, "latency_ms": latency})
-    result = {"overall": overall_status(services), "checked_at": datetime.now(timezone.utc).isoformat(),
-              "services": services}
-    _cache.set("status", result)
-    return result
+    return {"overall": overall_status(services), "checked_at": datetime.now(timezone.utc).isoformat(),
+            "services": services}
 
 
 HISTORY_DAYS = 30

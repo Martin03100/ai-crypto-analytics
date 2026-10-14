@@ -55,7 +55,7 @@ for (const [device, viewport] of [["desktop", { width: 1440, height: 900 }], ["p
       await page.addInitScript((l) => {
         if (!localStorage.getItem("audit_hold_lang")) localStorage.setItem("aca_lang", l);
         localStorage.setItem("aca_onboarding_seen_v1", "1");
-        for (let id = 1; id <= 80; id += 1) localStorage.setItem(`aca_onboarding_seen_v1:${id}`, "1");
+        for (let id = 1; id <= 1000; id += 1) localStorage.setItem(`aca_onboarding_seen_v1:${id}`, "1");
       }, lang);
       let current = "";
       page.on("console", (msg) => {

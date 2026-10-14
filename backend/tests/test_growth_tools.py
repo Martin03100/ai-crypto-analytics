@@ -11,7 +11,7 @@ from app.database import SessionLocal
 from app.models import (Challenge, ChallengeEntry, ForecastEvaluation, ForecastHistory, Notification, StatusSample,
                         User)
 from app.services import accuracy, challenge, coin_page, status_check
-from tests.conftest import csrf_headers
+from tests.conftest import csrf_headers, owner_id
 
 MONDAY = datetime(2026, 10, 12, 9, 0)
 
@@ -111,10 +111,11 @@ def test_accuracy_insights(client):
     try:
         rows = [("Gemini", 85, 100, 110, True), ("Gemini", 82, 100, 90, False), ("Gemini", 55, 100, 101, True),
                 ("Claude", 75, 100, 95, True)]
+        uid = owner_id(db)
         for i, (provider, conf, start, end, hit) in enumerate(rows, start=1):
-            db.add(ForecastHistory(id=i, user_id=1, crypto_symbol="BTC", timeframe="24h", model_used=provider,
+            db.add(ForecastHistory(id=i, user_id=uid, crypto_symbol="BTC", timeframe="24h", model_used=provider,
                                    forecast_json=json.dumps({"ceny": [1], "aktualna_cena": start, "confidence_score": conf})))
-            db.add(ForecastEvaluation(forecast_id=i, user_id=1, provider=provider, coin="BTC", timeframe="24h",
+            db.add(ForecastEvaluation(forecast_id=i, user_id=uid, provider=provider, coin="BTC", timeframe="24h",
                                       accuracy_pct=95, direction_correct=hit, actual_final_price=end))
         db.commit()
     finally:
