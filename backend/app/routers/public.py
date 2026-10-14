@@ -111,7 +111,22 @@ def _track_record(db: Session) -> dict:
             for e in recent
         ],
         "challenge": _tip_summary(db),
+        "versus_holding": versus_holding(db, real),
     }
+
+
+def versus_holding(db: Session, visibility) -> Optional[dict]:
+    """Average move per checked forecast for someone who followed its direction (long for up, short for down)
+    against someone who simply held the coin over the same period. No fees; a rough sanity check, not a backtest."""
+    rows = (db.query(ForecastEvaluation.start_price, ForecastEvaluation.actual_final_price,
+                     ForecastEvaluation.direction_correct)
+            .filter(visibility, ForecastEvaluation.start_price > 0, ForecastEvaluation.actual_final_price > 0).all())
+    if not rows:
+        return None
+    moves = [((end - start) / start * 100, bool(correct)) for start, end, correct in rows]
+    followed = sum(abs(m) if correct else -abs(m) for m, correct in moves) / len(moves)
+    held = sum(m for m, _ in moves) / len(moves)
+    return {"forecasts": len(moves), "followed_pct": round(followed, 2), "held_pct": round(held, 2)}
 
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")

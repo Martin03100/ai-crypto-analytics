@@ -46,6 +46,7 @@ export default function TrackRecord() {
 
   const label = (name) => providerName(name, t);
   const pct = (v) => (v == null ? "—" : `${v}%`);
+  const signedPct = (v) => (v == null ? "—" : `${v > 0 ? "+" : ""}${v}%`);
   const totals = data?.totals || {};
   const challenge = data?.challenge;
   const reliable = data?.reliable_sample ?? 30;
@@ -74,6 +75,16 @@ export default function TrackRecord() {
               <Info size={14} aria-hidden="true" />
               <span>{t("track.fewData", { n: totals.evaluated, low: ci[0], high: ci[1], min: reliable })}</span>
             </p>
+          )}
+
+          {data.versus_holding && (
+            <Card title={t("track.versusTitle")} style={{ marginTop: 16 }}>
+              <div className="track-stats" data-testid="track-versus">
+                <Stat label={t("track.versusFollowed")} value={signedPct(data.versus_holding.followed_pct)} />
+                <Stat label={t("track.versusHeld")} value={signedPct(data.versus_holding.held_pct)} />
+              </div>
+              <p className="text-sub" style={{ marginBottom: 0 }}>{t("track.versusNote", { n: data.versus_holding.forecasts })}</p>
+            </Card>
           )}
 
           {data.providers.length === 0 ? (

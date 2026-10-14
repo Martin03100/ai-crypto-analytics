@@ -65,3 +65,14 @@ test("coin page accuracy table fits a phone screen and marks small samples", asy
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 });
+
+test("track record compares following the forecasts with just holding", async ({ page }) => {
+  await page.route("**/api/public/track-record", async (route) => {
+    const res = await route.fetch();
+    await route.fulfill({ response: res, json: { ...(await res.json()), versus_holding: { forecasts: 12, followed_pct: 1.25, held_pct: -0.4 } } });
+  });
+  await page.goto("/track-record");
+  await expect(page.getByTestId("track-versus")).toContainText("+1.25%");
+  await expect(page.getByTestId("track-versus")).toContainText("-0.4%");
+  await expect(page.getByText("Average price move over 12 checked forecasts")).toBeVisible();
+});

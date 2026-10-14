@@ -89,3 +89,20 @@ def test_waitlist_is_rate_limited(client):
     codes = [client.post("/api/public/waitlist", json={"email": f"fan{i}@example.com"}, headers=headers).status_code
              for i in range(7)]
     assert codes[:5] == [200] * 5 and codes[-1] == 429
+
+
+def test_track_record_compares_following_the_forecasts_with_holding(client):
+    assert client.get("/api/public/track-record").json()["versus_holding"] is None
+    db = SessionLocal()
+    try:
+        # +10 % move called right, -4 % move called wrong (the forecast said up), a demo row that must not count.
+        for i, (start, end, correct, demo) in enumerate(((100.0, 110.0, True, None), (100.0, 96.0, False, None),
+                                                        (100.0, 50.0, True, True))):
+            db.add(ForecastEvaluation(forecast_id=i + 1, user_id=1, provider="Gemini", coin="BTC", timeframe="1T",
+                                      accuracy_pct=95.0, direction_correct=correct, actual_final_price=end,
+                                      start_price=start, is_demo=demo))
+        db.commit()
+    finally:
+        db.close()
+    versus = client.get("/api/public/track-record").json()["versus_holding"]
+    assert versus == {"forecasts": 2, "followed_pct": 3.0, "held_pct": 3.0}
