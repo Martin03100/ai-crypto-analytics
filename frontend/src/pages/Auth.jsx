@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import CandlestickArt from "../components/CandlestickArt";
+import GoogleSignIn from "../components/GoogleSignIn";
 import PasswordInput from "../components/PasswordInput";
 import Turnstile from "../components/Turnstile";
 import { useAppConfig } from "../context/AppConfigContext";
@@ -64,7 +65,26 @@ export default function Auth() {
   const [totpCode, setTotpCode] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaKey, setCaptchaKey] = useState(0);
-  const { login, register } = useAuth();
+  const { login, loginWithGoogle, register } = useAuth();
+  // A Google sign-in waiting for the 2FA code (the Google token stays valid for a while).
+  const [googleCredential, setGoogleCredential] = useState("");
+
+  async function signInWithGoogle(credential, code) {
+    setError("");
+    setLoading(true);
+    try {
+      await loginWithGoogle(credential, code);
+    } catch (err) {
+      if (err?.code === "totp_required") {
+        setGoogleCredential(credential);
+        setTotpCode("");
+      } else {
+        setError(humanizeError(err, lang));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
   const { signups_enabled } = useAppConfig();
   const { t, lang } = useLanguage();
   usePageTitle("auth.pageTitle");
@@ -242,7 +262,22 @@ export default function Auth() {
           {info && <div className={`alert ${info === "__expired__" ? "alert-warn" : "alert-success"}`}>{info === "__expired__" ? <AlertTriangle size={14} style={{ marginRight: 6 }} /> : <CheckCircle2 size={14} style={{ marginRight: 6 }} />}{info === "__expired__" ? t("auth.sessionExpiredNote") : info}</div>}
           {(tab !== "login" || needCaptcha) && <Turnstile key={captchaKey} onToken={setCaptchaToken} />}
 
-          {(tab === "login" || tab === "register") && (
+          {googleCredential && (tab === "login" || tab === "register") && (
+            <form onSubmit={(e) => { e.preventDefault(); signInWithGoogle(googleCredential, totpCode.trim()); }} data-testid="google-totp">
+              <div className="field">
+                <label>{t("auth.totpLabel")}</label>
+                <input className="input" autoComplete="one-time-code" maxLength={11} value={totpCode} autoCapitalize="none"
+                  onChange={(e) => setTotpCode(e.target.value.replace(/[^0-9A-Za-z -]/g, ""))} placeholder="123456" autoFocus />
+                <span className="text-sub" style={{ display: "block", marginTop: 4 }}>{t("auth.totpRecoveryHint")}</span>
+              </div>
+              <button className="btn btn-primary btn-block" type="submit" disabled={loading || totpCode.trim().length < 6}>
+                {loading && <Loader2 size={15} className="spin" />} {t("auth.login")}
+              </button>
+              <button type="button" className="link-btn" onClick={() => { setGoogleCredential(""); setError(""); }}>{t("auth.backToLogin")}</button>
+            </form>
+          )}
+
+          {!googleCredential && (tab === "login" || tab === "register") && (
             <form onSubmit={handleSubmit}>
               <div className="field">
                 <label>{t("auth.username")}</label>
@@ -284,6 +319,9 @@ export default function Auth() {
                 </button>
               )}
             </form>
+          )}
+          {!googleCredential && (tab === "login" || (tab === "register" && signups_enabled)) && (
+            <GoogleSignIn onCredential={(credential) => signInWithGoogle(credential)} />
           )}
 
           {tab === "forgot" && (

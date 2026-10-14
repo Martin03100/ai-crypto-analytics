@@ -23,7 +23,7 @@ ACTIONS = frozenset({
     "share_created", "share_revoked", "demo_data_loaded",
     "admin_settings_changed", "admin_payments_connected", "admin_payments_disconnected", "admin_user_changed",
     "admin_backup_downloaded",
-    "premium_checkout_consent",
+    "premium_checkout_consent", "google_linked",
 })
 
 

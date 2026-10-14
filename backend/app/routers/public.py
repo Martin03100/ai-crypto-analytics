@@ -17,7 +17,7 @@ from sqlalchemy import case, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.config import RATE_LIMIT_MARKET_PUBLIC, RATE_LIMIT_WAITLIST
+from app.config import GOOGLE_CLIENT_ID, RATE_LIMIT_MARKET_PUBLIC, RATE_LIMIT_WAITLIST
 from app.deps import get_db
 from app.models import ForecastEvaluation, ForecastHistory, PriceTip, User, WaitlistEntry
 from app.rate_limit import rate_limit_by_ip
@@ -261,7 +261,9 @@ def premium() -> dict:
 @router.get("/config")
 def public_config() -> dict:
     """Feature switches and the announcement banner the admin controls, plus the Premium offer."""
-    return {**public_settings(), "premium": premium_info(), "demo_for_all": demo_for_all()}
+    # The Google client ID is public by design (it is in every sign-in page); one setting on the server is enough.
+    return {**public_settings(), "premium": premium_info(), "demo_for_all": demo_for_all(),
+            "google_client_id": GOOGLE_CLIENT_ID}
 
 
 class UnsubscribeRequest(BaseModel):

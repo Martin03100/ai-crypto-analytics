@@ -61,6 +61,10 @@ class User(Base):
     simple_mode: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=None)
     # JSON {"alerts": bool, "flips": bool, "results": bool, "events": bool}; missing keys mean on.
     notify_prefs_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
+    # "Sign in with Google": the Google account id (the `sub` claim), set when the account is created or linked.
+    google_sub: Mapped[Optional[str]] = mapped_column(String(64), unique=True, index=True, nullable=True, default=None)
+    # False for an account made with Google that has no password of its own yet; None (older rows) = has one.
+    password_set: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True, default=None)
 
     reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 

@@ -46,6 +46,15 @@ class TokenResponse(BaseModel):
     premium: bool = False
     admin: bool = False
     simple_mode: Optional[bool] = None
+    has_password: bool = True
+    google: bool = False
+
+
+class GoogleLoginRequest(BaseModel):
+    credential: str = Field(min_length=20, max_length=4096)
+    totp_code: Optional[str] = Field(default=None, max_length=20)
+    referral_code: Optional[str] = Field(default=None, max_length=16)
+    lang: Optional[str] = Field(default=None, pattern=r"^(en|sk|cs|de|pl)$")
 
 
 class ApiKeyIn(BaseModel):
@@ -81,8 +90,9 @@ class TotpCodeRequest(BaseModel):
 
 
 class TotpDisableRequest(BaseModel):
-    """Also used to issue new recovery codes; `code` may be a recovery code when the phone is lost."""
-    password: str = Field(min_length=1, max_length=128)
+    """Also used to issue new recovery codes; `code` may be a recovery code when the phone is lost.
+    `password` stays empty only for an account made with Google that has no password yet."""
+    password: str = Field(default="", max_length=128)
     code: str = Field(min_length=6, max_length=20)
 
 
@@ -188,7 +198,7 @@ class TipRequest(BaseModel):
 
 
 class DeleteAccountRequest(BaseModel):
-    password: str = Field(min_length=1, max_length=128)
+    password: str = Field(default="", max_length=128)   # empty only for a Google account without a password
 
 
 class CostEstimateOut(BaseModel):

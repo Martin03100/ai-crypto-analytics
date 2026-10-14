@@ -35,7 +35,7 @@ export default function Settings() {
   usePageTitle("settings.title");
   const { theme, setTheme } = useTheme();
   const { currency, setCurrency } = useCurrency();
-  const { logout, user, updateEmail } = useAuth();
+  const { logout, user, updateEmail, patchUser } = useAuth();
   const navigate = useNavigate();
   const confirm = useConfirm();
   const [deletePassword, setDeletePassword] = useState("");
@@ -46,7 +46,10 @@ export default function Settings() {
   const [emailPassword, setEmailPassword] = useState("");
   const [savingEmail, setSavingEmail] = useState(false);
   // Moving a confirmed address needs the password (a stolen session alone must not redirect the password reset).
-  const emailNeedsPassword = email.trim().toLowerCase() !== (user?.email || "").toLowerCase() && user?.emailVerified !== false;
+  // An account made with Google that never set a password has none to type; its session is enough.
+  const hasPassword = user?.hasPassword !== false;
+  const emailNeedsPassword = hasPassword && email.trim().toLowerCase() !== (user?.email || "").toLowerCase()
+    && user?.emailVerified !== false;
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
@@ -69,13 +72,14 @@ export default function Settings() {
 
   async function handleChangePassword(e) {
     e.preventDefault();
-    if (!currentPassword || newPassword.length < 8) {
+    if ((hasPassword && !currentPassword) || newPassword.length < 8) {
       push(t("settings.passwordMinLengthWarning"), "warn");
       return;
     }
     setSavingPassword(true);
     try {
       await api.changePassword(currentPassword, newPassword);
+      patchUser({ hasPassword: true });
       push(t("settings.passwordChanged"), "success");
       setCurrentPassword("");
       setNewPassword("");
@@ -191,18 +195,21 @@ export default function Settings() {
           <hr className="divider" />
 
           <form onSubmit={handleChangePassword}>
+            {!hasPassword && <p className="text-sub" style={{ marginTop: 0 }} data-testid="set-password-note">{t("settings.setPasswordNote")}</p>}
             <div className="grid grid-2">
-              <div className="field">
-                <label>{t("settings.currentPassword")}</label>
-                <PasswordInput value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
-              </div>
+              {hasPassword && (
+                <div className="field">
+                  <label>{t("settings.currentPassword")}</label>
+                  <PasswordInput value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+                </div>
+              )}
               <div className="field">
                 <label>{t("settings.newPassword")}</label>
                 <PasswordInput value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t("settings.newPasswordPlaceholder")} autoComplete="new-password" />
               </div>
             </div>
             <button className="btn btn-primary btn-sm" type="submit" disabled={savingPassword}>
-              <Key size={14} /> {t("settings.changePassword")}
+              <Key size={14} /> {t(hasPassword ? "settings.changePassword" : "settings.setPassword")}
             </button>
           </form>
 
@@ -256,11 +263,13 @@ export default function Settings() {
 
         <Card title={t("settings.deleteAccountTitle")} icon={Trash2} className="danger-zone">
           <p className="text-sub" style={{ marginBottom: 10 }}>{t("settings.deleteAccountDesc")}</p>
-          <div className="field">
-            <label>{t("settings.currentPassword")}</label>
-            <PasswordInput value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} />
-          </div>
-          <button className="btn btn-danger-ghost btn-sm" onClick={handleDeleteAccount} disabled={deleting || !deletePassword}>
+          {hasPassword && (
+            <div className="field">
+              <label>{t("settings.currentPassword")}</label>
+              <PasswordInput value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} />
+            </div>
+          )}
+          <button className="btn btn-danger-ghost btn-sm" onClick={handleDeleteAccount} disabled={deleting || (hasPassword && !deletePassword)}>
             <Trash2 size={14} /> {t("settings.deleteAccountButton")}
           </button>
         </Card>

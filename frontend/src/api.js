@@ -32,7 +32,7 @@ function extractDetailMessage(detail) {
   return undefined;
 }
 
-const AUTH_401_EXEMPT = ["/auth/login", "/auth/register", "/auth/me", "/auth/session", "/auth/forgot-password", "/auth/verify-reset-code", "/auth/reset-password"];
+const AUTH_401_EXEMPT = ["/auth/login", "/auth/register", "/auth/google", "/auth/me", "/auth/session", "/auth/forgot-password", "/auth/verify-reset-code", "/auth/reset-password"];
 export const SESSION_EXPIRED_EVENT = "aca:session-expired";
 
 // Generous on purpose: a sleeping free-tier backend can take close to a minute to wake up.
@@ -234,6 +234,9 @@ export const api = {
   }),
   login: (username, password, totp_code, captcha_token) =>
     request("/auth/login", { method: "POST", body: { username, password, totp_code, captcha_token: captcha_token || undefined } }),
+  googleLogin: (credential, totp_code, referral_code) => request("/auth/google", {
+    method: "POST", body: { credential, totp_code: totp_code || undefined, referral_code: referral_code || undefined, lang: currentLang() },
+  }),
   logout: () => request("/auth/logout", { method: "POST" }),
   // A visitor gets {} (no 401 logged on every public page); a signed-in user gets the session.
   me: () => request("/auth/session").then(obj),

@@ -21,8 +21,8 @@ from app.schemas import (
     WatchlistIn,
 )
 from app.security import (
-    create_access_token, decrypt_secret, encrypt_secret, generate_totp_secret, hash_password, mask_key, sanitize_text,
-    totp_uri, verify_password,
+    create_access_token, decrypt_secret, encrypt_secret, generate_totp_secret, hash_password, mask_key, password_confirms,
+    sanitize_text, totp_uri,
 )
 from app.services import audit, jobs
 from app.services.demo_data import create_demo_data, demo_for_all, remove_demo_data
@@ -90,7 +90,7 @@ def update_email(payload: UpdateEmailRequest, request: Request, background_tasks
     changed = previous != email
     # A confirmed address leads to the password reset, so moving it needs the password (a hijacked session alone
     # is not enough). Fixing a typo in an address that was never confirmed does not.
-    if changed and user.email_verified is not False and not verify_password(payload.password or "", user.password_hash):
+    if changed and user.email_verified is not False and not password_confirms(user, payload.password):
         raise HTTPException(status_code=400, detail="Aktuálne heslo nie je správne.")
     existing = db.query(User).filter(User.email == email, User.id != user.id).first()
     if existing is not None:
@@ -113,9 +113,10 @@ def update_email(payload: UpdateEmailRequest, request: Request, background_tasks
 @router.post("/change-password", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
 def change_password(payload: ChangePasswordRequest, response: Response, request: Request, background_tasks: BackgroundTasks,
                      user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
-    if not verify_password(payload.current_password, user.password_hash):
+    if not password_confirms(user, payload.current_password):
         raise HTTPException(status_code=400, detail="Aktuálne heslo nie je správne.")
     user.password_hash = hash_password(payload.new_password)
+    user.password_set = True
     user.token_version += 1
     audit.record(db, user.id, "password_changed", request)
     db.commit()
@@ -189,7 +190,7 @@ def delete_api_key(provider: str, request: Request, user: User = Depends(get_cur
 @router.post("/delete", dependencies=[Depends(rate_limit_by_user(*RATE_LIMIT_ACCOUNT_SENSITIVE))])
 def delete_account(payload: DeleteAccountRequest, response: Response, user: User = Depends(get_current_user),
                    db: Session = Depends(get_db)) -> dict:
-    if not verify_password(payload.password, user.password_hash):
+    if not password_confirms(user, payload.password):
         raise HTTPException(status_code=400, detail="Aktuálne heslo nie je správne.")
     if is_admin(user):
         # Admin rights follow the username (ADMIN_USERNAMES): a deleted admin account would leave the name free for
@@ -236,7 +237,7 @@ def totp_enable(payload: TotpCodeRequest, request: Request, background_tasks: Ba
 
 
 def _check_password_and_second_factor(db: Session, user: User, password: str, code: str) -> None:
-    if not verify_password(password, user.password_hash):
+    if not password_confirms(user, password):
         raise HTTPException(status_code=400, detail="Aktuálne heslo nie je správne.")
     secret = decrypt_secret(user.totp_secret or "", user.id)
     if verify_second_factor(db, user, secret, code) not in (OK, RECOVERY):

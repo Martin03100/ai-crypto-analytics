@@ -99,6 +99,7 @@ export default function TwoFactorSettings() {
     </div>
   );
   const codeReady = code.trim().length >= 6;
+  const hasPassword = user?.hasPassword !== false;     // a Google account may have none yet
 
   return (
     <div>
@@ -127,17 +128,19 @@ export default function TwoFactorSettings() {
             </p>
           )}
           <div className="grid grid-2">
-            <div className="field">
-              <label>{t("settings.currentPassword")}</label>
-              <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} />
-            </div>
+            {hasPassword && (
+              <div className="field">
+                <label>{t("settings.currentPassword")}</label>
+                <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} />
+              </div>
+            )}
             {codeInput(true)}
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button className="btn btn-ghost btn-sm" onClick={renew} disabled={busy || !password || !codeReady}>
+            <button className="btn btn-ghost btn-sm" onClick={renew} disabled={busy || (hasPassword && !password) || !codeReady}>
               {t("twofa.recoveryRenew")}
             </button>
-            <button className="btn btn-ghost btn-sm" onClick={disable} disabled={busy || !password || !codeReady}>
+            <button className="btn btn-ghost btn-sm" onClick={disable} disabled={busy || (hasPassword && !password) || !codeReady}>
               {t("twofa.disableButton")}
             </button>
           </div>

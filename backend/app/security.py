@@ -77,6 +77,14 @@ def verify_password(password: str, password_hash: str) -> bool:
     return hmac.compare_digest(_pbkdf2(password, salt, rounds), checksum)
 
 
+def password_confirms(user, password: str) -> bool:
+    """The password check before a sensitive change. An account made with Google that never set a password has
+    nothing to type, so its signed-in session is enough there (it can set a password any time)."""
+    if getattr(user, "password_set", None) is False:
+        return True
+    return verify_password(password or "", user.password_hash)
+
+
 def create_access_token(subject: int, username: str, token_version: int = 0) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=JWT_EXPIRE_MINUTES)
     payload: Dict[str, Any] = {

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hmac
+import secrets
 import threading
 from datetime import datetime, timedelta, timezone
 
@@ -20,7 +21,7 @@ from app.deps import get_current_user, get_db
 from app.models import AuditEvent, EmailVerificationCode, PasswordResetToken, User
 from app.rate_limit import check_rate_limit, get_client_ip, rate_limit_by_ip
 from app.schemas import (
-    USERNAME_RE, ForgotPasswordRequest, LoginRequest, RegisterRequest, ResetPasswordRequest, TokenResponse,
+    USERNAME_RE, ForgotPasswordRequest, GoogleLoginRequest, LoginRequest, RegisterRequest, ResetPasswordRequest, TokenResponse,
     VerifyEmailRequest, VerifyResetCodeRequest,
 )
 from app.security import (
@@ -30,10 +31,10 @@ from app.security import (
 from app.services import audit
 from app.services.account_cleanup import release_email_if_unverified
 from app.services.captcha import is_captcha_enabled, verify_captcha
-from app.services import totp
+from app.services import google_auth, totp
 from app.services.email_service import (
-    is_email_configured, render_lockout_email, render_new_login_email, render_reset_password_email, send_email,
-    send_security_notice, subject as email_subject,
+    is_email_configured, mask_email, render_lockout_email, render_new_login_email, render_reset_password_email,
+    send_email, send_security_notice, subject as email_subject,
 )
 from app.services.app_settings import require_feature
 from app.services.premium import find_referrer, is_premium
@@ -185,7 +186,72 @@ def logout(response: Response, request: Request, db: Session = Depends(get_db)) 
 def _session_out(user: User) -> TokenResponse:
     return TokenResponse(access_token="", username=user.username, user_id=user.id, email=user.email,
                          email_verified=user.email_verified, totp_enabled=bool(user.totp_enabled),
-                         premium=is_premium(user), admin=is_admin(user), simple_mode=user.simple_mode)
+                         premium=is_premium(user), admin=is_admin(user), simple_mode=user.simple_mode,
+                         has_password=user.password_set is not False, google=bool(user.google_sub))
+
+
+@router.post("/google", response_model=TokenResponse, dependencies=[Depends(rate_limit_by_ip(*RATE_LIMIT_LOGIN))])
+def google_login(payload: GoogleLoginRequest, response: Response, request: Request, background_tasks: BackgroundTasks,
+                 db: Session = Depends(get_db)) -> TokenResponse:
+    """Sign in (or sign up) with a Google ID token. An existing account is linked only through an e-mail address it
+    has confirmed, so nobody can take over an account by registering its address at Google first."""
+    if not google_auth.enabled():
+        raise HTTPException(status_code=404, detail="Prihlásenie cez Google nie je zapnuté.")
+    claims = google_auth.verify_credential(payload.credential)
+    if claims is None:
+        raise HTTPException(status_code=401, detail="Prihlásenie cez Google sa nepodarilo. Skús to znova.")
+    sub, email = str(claims["sub"])[:64], sanitize_text(str(claims["email"]), max_length=255).lower()
+    now = datetime.now(timezone.utc)
+
+    user = db.query(User).filter(User.google_sub == sub).first()
+    linked = created = False
+    if user is None:
+        user = db.query(User).filter(User.email == email).first()
+        if user is not None:
+            if user.email_verified is not True:
+                raise HTTPException(status_code=409, detail="Účet s týmto e-mailom už existuje. Prihlás sa menom a heslom.")
+            linked = True           # saved only after the second factor below has passed
+    if user is None:
+        require_feature("signups_enabled")
+        referrer = find_referrer(db, payload.referral_code)
+        user = User(username=google_auth.free_username(db, email), password_hash=hash_password(secrets.token_urlsafe(32)),
+                    password_set=False, email=email, email_verified=True, google_sub=sub, lang=payload.lang or "en",
+                    referred_by_id=referrer.id if referrer else None)
+        db.add(user)
+        db.flush()
+        created = True
+    if user.disabled:
+        raise HTTPException(status_code=403, detail="Tento účet je zablokovaný.")
+    if user.totp_enabled:   # Google replaces the password, not the second factor
+        if not payload.totp_code:
+            raise HTTPException(status_code=401, detail="Zadaj 6-miestny kód z overovacej aplikácie (2FA).",
+                                headers={"X-Error-Code": "totp_required"})
+        outcome = totp.verify_second_factor(db, user, decrypt_secret(user.totp_secret or "", user.id), payload.totp_code)
+        if outcome == totp.REUSED:
+            raise HTTPException(status_code=401, detail="Tento kód z overovacej aplikácie už bol použitý. Počkaj na ďalší.")
+        if outcome not in (totp.OK, totp.RECOVERY):
+            _register_failed_attempt(db, user, now, background_tasks, request, details="2fa")
+            raise HTTPException(status_code=401, detail="Nesprávny kód z overovacej aplikácie (2FA).")
+
+    if linked:
+        user.google_sub = sub
+    ip, user_agent = audit.client_info(request)
+    new_device = not created and audit.is_new_device(db, user.id, user_agent)
+    audit.record(db, user.id, "register" if created else "login_success", request, "google")
+    if linked:
+        audit.record(db, user.id, "google_linked", request)
+    user.failed_login_attempts, user.locked_until = 0, None
+    try:
+        db.commit()
+    except IntegrityError:          # the same Google account signing up twice at once
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Prihlásenie cez Google sa nepodarilo. Skús to znova.") from None
+    if linked:
+        send_security_notice(background_tasks, user, "google", email=mask_email(email))
+    if new_device and is_email_configured():
+        _send_new_login_alert(background_tasks, user, now, user_agent, ip)
+    _set_auth_cookie(response, user)
+    return _session_out(user)
 
 
 @router.get("/me", response_model=TokenResponse)
@@ -280,6 +346,7 @@ def reset_password(payload: ResetPasswordRequest, request: Request, db: Session 
         raise HTTPException(status_code=400, detail="Kód je nesprávny alebo expirovaný.")
 
     user.password_hash = hash_password(payload.new_password)
+    user.password_set = True
     user.token_version += 1
     user.failed_login_attempts = 0
     user.locked_until = None

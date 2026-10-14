@@ -60,6 +60,10 @@
 .search-field .input { flex: 1; }
 .glossary-list { display: grid; gap: 10px; margin: 0; }
 .faq-list { display: grid; gap: 10px; }
+.google-signin { margin-top: 14px; }
+.google-signin-divider { display: flex; align-items: center; gap: 10px; color: var(--text-tertiary); font-size: 12px; margin-bottom: 12px; }
+.google-signin-divider::before, .google-signin-divider::after { content: ""; flex: 1; height: 1px; background: var(--border-subtle); }
+.google-signin-button { display: flex; justify-content: center; min-height: 44px; }
 .faq-item { padding: 0; scroll-margin-top: 80px; }
 .faq-item summary { cursor: pointer; padding: 14px 16px; font-weight: 650; list-style-position: inside; }
 .faq-item p { margin: 0; padding: 0 16px 14px; line-height: 1.65; color: var(--text-secondary); }

@@ -14,6 +14,7 @@ function toUser(res) {
     username: res.username, id: res.user_id, email: res.email,
     emailVerified: res.email_verified, totpEnabled: Boolean(res.totp_enabled), premium: Boolean(res.premium), admin: Boolean(res.admin),
     simpleMode: typeof res.simple_mode === "boolean" ? res.simple_mode : null,
+    hasPassword: res.has_password !== false, google: Boolean(res.google),
   };
 }
 
@@ -74,6 +75,14 @@ export function AuthProvider({ children }) {
     return res;
   }, []);
 
+  const loginWithGoogle = useCallback(async (credential, totpCode) => {
+    const res = await api.googleLogin(credential, totpCode, getReferralCode());
+    await clearOfflineData();
+    rememberOfflineSession(toUser(res));
+    setUser(toUser(res));
+    return res;
+  }, []);
+
   const logout = useCallback(async () => {
     // This browser must stop receiving the signed-out account's notifications.
     await Promise.race([disablePush().catch(() => {}), new Promise((r) => setTimeout(r, 1500))]);
@@ -96,8 +105,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, checking, login, register, logout, updateEmail, patchUser }),
-    [user, checking, login, register, logout, updateEmail, patchUser]
+    () => ({ user, checking, login, loginWithGoogle, register, logout, updateEmail, patchUser }),
+    [user, checking, login, loginWithGoogle, register, logout, updateEmail, patchUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

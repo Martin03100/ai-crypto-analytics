@@ -283,6 +283,7 @@ _SECURITY = {
         "twofa_off": ("Two-factor authentication was turned off", "2FA was turned off for your account."),
         "recovery": ("A recovery code was used", "Someone signed in to your account with a 2FA recovery code. Codes left: {n}."),
         "recovery_new": ("New recovery codes", "New 2FA recovery codes were created for your account; the old ones no longer work."),
+        "google": ("Google sign-in was linked", "Your account can now also be opened with the Google account {email}."),
     },
     "sk": {
         "subject": "Bezpečnostná zmena v účte — AI Crypto Analytics",
@@ -293,6 +294,7 @@ _SECURITY = {
         "twofa_off": ("Dvojfaktorové overenie bolo vypnuté", "Pre tvoj účet bolo vypnuté 2FA."),
         "recovery": ("Bol použitý záložný kód", "Do tvojho účtu sa niekto prihlásil záložným kódom 2FA. Zostávajúce kódy: {n}."),
         "recovery_new": ("Nové záložné kódy", "Pre tvoj účet boli vytvorené nové záložné kódy 2FA; staré už neplatia."),
+        "google": ("Bolo pripojené prihlásenie cez Google", "Do tvojho účtu sa odteraz dá prihlásiť aj Google účtom {email}."),
     },
     "cs": {
         "subject": "Bezpečnostní změna v účtu — AI Crypto Analytics",
@@ -303,6 +305,7 @@ _SECURITY = {
         "twofa_off": ("Dvoufázové ověření bylo vypnuto", "Pro tvůj účet bylo vypnuto 2FA."),
         "recovery": ("Byl použit záložní kód", "Do tvého účtu se někdo přihlásil záložním kódem 2FA. Zbývající kódy: {n}."),
         "recovery_new": ("Nové záložní kódy", "Pro tvůj účet byly vytvořeny nové záložní kódy 2FA; staré už neplatí."),
+        "google": ("Bylo připojeno přihlášení přes Google", "Do tvého účtu se nyní dá přihlásit i Google účtem {email}."),
     },
     "de": {
         "subject": "Sicherheitsänderung an deinem Konto — AI Crypto Analytics",
@@ -313,6 +316,7 @@ _SECURITY = {
         "twofa_off": ("Zwei-Faktor-Authentifizierung wurde deaktiviert", "2FA wurde für dein Konto deaktiviert."),
         "recovery": ("Ein Wiederherstellungscode wurde verwendet", "Jemand hat sich mit einem 2FA-Wiederherstellungscode bei deinem Konto angemeldet. Verbleibende Codes: {n}."),
         "recovery_new": ("Neue Wiederherstellungscodes", "Für dein Konto wurden neue 2FA-Wiederherstellungscodes erstellt; die alten gelten nicht mehr."),
+        "google": ("Google-Anmeldung wurde verknüpft", "Dein Konto lässt sich jetzt auch mit dem Google-Konto {email} öffnen."),
     },
     "pl": {
         "subject": "Zmiana zabezpieczeń konta — AI Crypto Analytics",
@@ -323,6 +327,7 @@ _SECURITY = {
         "twofa_off": ("Uwierzytelnianie dwuskładnikowe zostało wyłączone", "Na twoim koncie wyłączono 2FA."),
         "recovery": ("Użyto kodu zapasowego", "Ktoś zalogował się na twoje konto kodem zapasowym 2FA. Pozostałe kody: {n}."),
         "recovery_new": ("Nowe kody zapasowe", "Dla twojego konta utworzono nowe kody zapasowe 2FA; stare już nie działają."),
+        "google": ("Połączono logowanie przez Google", "Na twoje konto można teraz wejść także kontem Google {email}."),
     },
 }
 
