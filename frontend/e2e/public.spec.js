@@ -23,7 +23,30 @@ test("protected pages redirect to sign-in", async ({ page }) => {
   await expect(page).toHaveURL(/\/auth$/);
 });
 
+test("an unknown address shows a not-found page with a way home", async ({ page }) => {
+  await page.goto("/this-page-does-not-exist");
+  await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
+  await expect(page.locator('meta[name="robots"][content="noindex"]')).toHaveCount(1);
+  await page.getByRole("link", { name: "Go to the home page" }).click();
+  await expect(page).toHaveURL(/\/$/);
+});
+
 test("unknown share link shows a clear message", async ({ page }) => {
   await page.goto("/share/this-link-does-not-exist-123");
   await expect(page.getByText("This forecast does not exist or is no longer shared.")).toBeVisible();
+});
+
+test("coin page accuracy table fits a phone screen and marks small samples", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.route("**/api/public/coin/BTC", (route) => route.fulfill({ json: {
+    coin: "BTC", name: "Bitcoin", price: 65000, change_24h: 1.2, change_7d: -2.5, change_30d: 4.1, rsi: 55, signal: "neutral",
+    outlook: [], signals: [], balance: null, updated_at: null,
+    accuracy: [{ provider: "Statistical model", forecasts: 4, hit_pct: 25 }, { provider: "Gemini", forecasts: 40, hit_pct: 55 }],
+  } }));
+  await page.goto("/de/prognose/bitcoin");
+  await expect(page.locator("table.lb-table")).toBeVisible();
+  await expect(page.locator("table.lb-table tr", { hasText: "25%" })).toContainText("·");   // 4 forecasts: few data
+  await expect(page.locator("table.lb-table tr", { hasText: "55%" })).not.toContainText("·");
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
 });

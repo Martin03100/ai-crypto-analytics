@@ -46,3 +46,16 @@ describe("backend error messages", () => {
     expect(missing).toEqual([]);
   });
 });
+
+describe("account activity log", () => {
+  it("has a text for every action the backend records", () => {
+    const source = readFileSync(path.join(BACKEND, "services/audit.py"), "utf-8");
+    const block = source.match(/ACTIONS = frozenset\(\{([\s\S]*?)\}\)/)[1];
+    const actions = [...block.matchAll(/"([a-z_0-9]+)"/g)].map((m) => m[1]);
+    expect(actions.length).toBeGreaterThan(15);
+    for (const lang of ["en.json", "sk.json", "cz.json", "de.json", "pl.json"]) {
+      const dict = JSON.parse(readFileSync(path.resolve(BACKEND, "../../frontend/src/i18n/locales", lang), "utf-8"));
+      expect(actions.filter((a) => !dict[`activity.action.${a}`]), lang).toEqual([]);
+    }
+  });
+});

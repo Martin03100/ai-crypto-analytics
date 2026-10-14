@@ -47,8 +47,9 @@ const PRIVACY_SECTIONS = ["dataCollected", "purposes", "cookies", "analytics", "
   "payments", "thirdParty", "processors", "retention", "rights", "contact"];
 const TERMS_SECTIONS = ["notAdvice", "eligibility", "account", "premium", "referrals", "withdrawal", "acceptableUse",
   "liability", "law", "changes"];
-// Sections that only apply while the paid plan exists.
-const PAID_ONLY = new Set(["premiumData", "waitlist", "payments", "premium", "referrals", "withdrawal"]);
+// Sections that only apply while the paid plan exists. "premiumData" (portfolio tracker, Telegram) is not one of them:
+// with Premium off those features are free for everyone, so the privacy notice must describe their data.
+const PAID_ONLY = new Set(["waitlist", "payments", "premium", "referrals", "withdrawal"]);
 
 function LegalSections({ prefix, t }) {
   const { mode } = usePremium();

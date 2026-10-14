@@ -170,7 +170,14 @@ def login(payload: LoginRequest, response: Response, request: Request, backgroun
 
 
 @router.post("/logout")
-def logout(response: Response) -> dict:
+def logout(response: Response, request: Request, db: Session = Depends(get_db)) -> dict:
+    try:
+        user = get_current_user(request, None, db)
+    except HTTPException:   # already signed out, expired or blocked: just clear the cookie
+        user = None
+    if user is not None:
+        audit.record(db, user.id, "logout", request)
+        db.commit()
     response.delete_cookie(key=AUTH_COOKIE_NAME, path="/")
     return {"success": True}
 

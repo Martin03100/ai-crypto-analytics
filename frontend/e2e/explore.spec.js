@@ -112,7 +112,7 @@ test("feedback reaches the admin; tipster profiles are public", async ({ page })
   await page.locator(".sidebar .feedback-btn").click({ force: true });
   await page.getByRole("radio", { name: "Idea" }).click();
   await page.getByLabel("Your message").fill("Please add a dark mode for charts");
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByText("Thank you! Your message was sent.")).toBeVisible();
   const { ctx } = await ownerSession();
   const list = await (await ctx.get("/api/admin/feedback")).json();

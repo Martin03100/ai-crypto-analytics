@@ -12,6 +12,9 @@ import { formatPrice } from "../utils/formatPrice";
 import { QUANT_LABEL } from "../utils/models";
 import { SEO_COINS, coinBySlug, coinPath, langFromPath } from "../utils/seoCoins";
 
+// Like the track record: a hit rate from fewer checked forecasts than this is marked as not yet reliable.
+const RELIABLE_SAMPLE = 30;
+
 const pct = (v) => (v == null ? "—" : `${v > 0 ? "+" : ""}${Number(v).toFixed(2)} %`);
 const tone = (v) => (v > 0 ? "up" : v < 0 ? "down" : "");
 
@@ -97,15 +100,16 @@ export default function CoinPage() {
 
           <Card title={t("coin.accuracyTitle", { coin: meta.coin })} icon={Target} style={{ marginTop: 16 }}>
             {data.accuracy.length === 0 ? <p className="text-sub" style={{ margin: 0 }}>{t("coin.accuracyEmpty")}</p> : (
-              <table className="lb-table">
+              <div className="table-scroll"><table className="lb-table lb-table-wrap-first">
                 <thead><tr><th>{t("leaderboard.colProvider")}</th><th>{t("leaderboard.colEvaluated")}</th><th>{t("leaderboard.colDirection")}</th></tr></thead>
                 <tbody>
                   {data.accuracy.map((r) => (
-                    <tr key={r.provider}><td>{r.provider === QUANT_LABEL || r.provider === "Statistical model" ? t("provider.quantLabel") : r.provider}</td>
+                    <tr key={r.provider}><td>{r.provider === QUANT_LABEL || r.provider === "Statistical model" ? t("provider.quantLabel") : r.provider}
+                      {r.forecasts < RELIABLE_SAMPLE && <span className="text-sub"> · {t("leaderboard.fewData")}</span>}</td>
                       <td>{r.forecasts}</td><td>{r.hit_pct}%</td></tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             )}
           </Card>
         </>

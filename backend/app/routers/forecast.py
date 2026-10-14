@@ -247,6 +247,11 @@ def get_forecast_accuracy(entry_id: Annotated[int, Path(ge=1, le=MAX_DB_ID)], us
     )
 
 
+def _price_error(accuracy_pct):
+    """Exports show how far the forecast was from the real price (as the app does), not a flattering "accuracy"."""
+    return None if accuracy_pct is None else round(max(0.0, 100 - accuracy_pct), 2)
+
+
 _UTF8_BOM = chr(0xFEFF)  # lets Excel detect UTF-8 (diacritics in model names)
 
 
@@ -274,7 +279,7 @@ def export_history_csv(user: User = Depends(get_current_user), db: Session = Dep
     out = io.StringIO()
     writer = csv.writer(out)
     writer.writerow(["created_at_utc", "coin", "horizon", "model", "price_at_forecast", "predicted_final_price",
-                     "predicted_change_pct", "actual_final_price", "accuracy_pct", "direction_correct"])
+                     "predicted_change_pct", "actual_final_price", "price_error_pct", "direction_correct"])
     for row in rows:
         try:
             data = json.loads(row.forecast_json)
@@ -289,7 +294,7 @@ def export_history_csv(user: User = Depends(get_current_user), db: Session = Dep
         created = row.created_at.replace(tzinfo=timezone.utc) if row.created_at.tzinfo is None else row.created_at
         writer.writerow([_csv_cell(v) for v in (
             created.isoformat(timespec="seconds"), row.crypto_symbol, row.timeframe, row.model_used, start, final, change,
-            ev.actual_final_price if ev else None, ev.accuracy_pct if ev else None,
+            ev.actual_final_price if ev else None, _price_error(ev.accuracy_pct) if ev else None,
             (ev.direction_correct if ev else None),
         )])
     return Response(content=_UTF8_BOM + out.getvalue(), media_type="text/csv; charset=utf-8",

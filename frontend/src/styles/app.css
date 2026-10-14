@@ -811,6 +811,8 @@ input[type="checkbox"] { accent-color: var(--cyan); }
   padding: 8px 10px; border-bottom: 1px solid var(--border-subtle); white-space: nowrap;
 }
 .lb-table td { padding: 10px; border-bottom: 1px solid var(--border-subtle); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* Long model names ("Free statistical model (no API key)") wrap instead of pushing the table off a phone screen. */
+.lb-table-wrap-first td:first-child { white-space: normal; min-width: 120px; }
 .tip-box {
   margin-top: 10px; padding: 12px 14px; border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md); background: var(--bg-inset);

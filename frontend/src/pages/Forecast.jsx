@@ -175,7 +175,7 @@ function HistoryItem({ entry, onDelete }) {
                 </div>
               )}
               {accuracy?.status === "completed" && accuracy.baseline_accuracy_pct != null && (
-                <p className="text-sub" style={{ marginTop: 4 }}>{t("forecast.baselineComparison", { baseline: accuracy.baseline_accuracy_pct.toFixed(1) })}</p>
+                <p className="text-sub" style={{ marginTop: 4 }}>{t("forecast.baselineComparison", { baseline: Math.max(0, 100 - accuracy.baseline_accuracy_pct).toFixed(1) })}</p>
               )}
               <TipBox entryId={entry.id} accuracy={accuracy} onTipped={(price) => setAccuracy((a) => ({ ...a, tip_price: price, can_tip: false }))} />
               {accuracyLoading && <p className="text-sub" style={{ marginTop: 4 }}>{t("forecast.accuracyLoading")}</p>}

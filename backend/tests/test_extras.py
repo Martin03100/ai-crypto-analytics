@@ -364,3 +364,13 @@ def test_account_delete_removes_new_data(registered):
         assert db.query(Feedback).one().user_id is None
     finally:
         db.close()
+
+
+def test_weekly_cards_of_both_formats_stay_cached(client, monkeypatch):
+    from app.routers import extras
+    calls = []
+    monkeypatch.setattr(extras.cards, "weekly_card", lambda fmt, _data: calls.append(fmt) or b"png")
+    extras._card_cache.clear()
+    for fmt in ("square", "story", "square", "story"):
+        assert client.get(f"/api/public/weekly-summary/card.png?fmt={fmt}").status_code == 200
+    assert calls == ["square", "story"]

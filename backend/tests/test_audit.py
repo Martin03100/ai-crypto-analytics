@@ -110,3 +110,14 @@ def test_known_device_login_sends_no_alert(registered, monkeypatch):
     sent = _capture_emails(monkeypatch)
     _login(client, username, password, user_agent="testclient")
     assert sent == []
+
+
+def test_logout_is_logged(registered):
+    client, username, password = registered
+    client.post("/api/auth/logout", headers=csrf_headers(client))
+    assert _login(client, username, password).status_code == 200
+    assert _actions(client)[:2] == ["login_success", "logout"]
+
+
+def test_logout_without_a_session_still_succeeds(client):
+    assert client.post("/api/auth/logout", headers=anon_csrf_headers(client)).status_code == 200

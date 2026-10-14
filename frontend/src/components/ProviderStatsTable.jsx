@@ -11,7 +11,7 @@ export default function ProviderStatsTable({ providers, reliableSample = 30 }) {
   return (
     <>
       <div className="table-scroll">
-        <table className="lb-table">
+        <table className="lb-table lb-table-wrap-first">
           <thead>
             <tr>
               <th>{t("leaderboard.colProvider")}</th>

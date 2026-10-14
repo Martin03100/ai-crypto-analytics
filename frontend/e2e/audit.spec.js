@@ -12,10 +12,13 @@ import { register } from "./helpers";
 test.skip(!process.env.AUDIT, "set AUDIT=1 to run the page audit");
 test.setTimeout(600_000);
 
+const EN_KEYS = Object.keys(JSON.parse(readFileSync(new URL("../src/i18n/locales/en.json", import.meta.url), "utf8")));
+const KEY_PREFIXES = new Set(EN_KEYS.map((k) => k.split(".")[0]));
 const AXE = readFileSync(createRequire(import.meta.url).resolve("axe-core/axe.min.js"), "utf8");
-const PUBLIC = ["/", "/auth", "/about", "/status", "/privacy", "/terms"];
+const PUBLIC = ["/", "/auth", "/about", "/status", "/privacy", "/terms", "/track-record", "/calendar", "/glossary",
+  "/changelog", "/links", "/prediction", "/prediction/bitcoin", "/sk/predikcia/ethereum"];
 const PRIVATE = ["/dashboard", "/forecast", "/forecast?tab=history", "/forecast?tab=schedule", "/forecast?tab=leaderboard",
-  "/forecast?tab=compare", "/forecast?tab=backtest", "/portfolio", "/market", "/account", "/settings"];
+  "/forecast?tab=compare", "/forecast?tab=backtest", "/portfolio", "/market", "/account", "/settings", "/quick", "/calendar"];
 // External data the sandboxed CI/dev machine may not reach; their failures are not app bugs.
 const IGNORED_REQUEST = /coingecko|alternative\.me|blockchair|reddit|coindesk|cointelegraph|decrypt|challenges\.cloudflare|sentry/i;
 
@@ -29,9 +32,10 @@ async function audit(page, where, { phone }) {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     if (overflow > 1) note("overflow", where, `page is ${overflow}px wider than the phone screen`);
   }
-  const rawKeys = await page.evaluate(() =>
-    [...document.body.innerText.matchAll(/\b[a-z]+\.[a-z][A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*\b/g)]
-      .map((m) => m[0]).filter((k) => /^(common|nav|forecast|dashboard|schedule|watchlist|pwa|settings|errors|market|portfolio|account)\./.test(k)));
+  // Any "prefix.word" text whose prefix is a translation namespace is a key that was shown instead of its text.
+  const rawKeys = (await page.evaluate(() =>
+    [...document.body.innerText.matchAll(/\b[a-z]+\.[a-zA-Z][\w]+(?:\.[\w]+)*\b/g)].map((m) => m[0])))
+    .filter((k) => KEY_PREFIXES.has(k.split(".")[0]));
   if (rawKeys.length) note("i18n", where, `raw translation keys: ${[...new Set(rawKeys)].join(", ")}`);
   await page.addScriptTag({ content: AXE });
   const violations = await page.evaluate(async () => {

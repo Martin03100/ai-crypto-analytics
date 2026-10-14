@@ -32,6 +32,7 @@ const Glossary = lazy(() => import("./pages/Glossary"));
 const Changelog = lazy(() => import("./pages/Changelog"));
 const TipsterProfile = lazy(() => import("./pages/TipsterProfile"));
 const QuickView = lazy(() => import("./pages/QuickView"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 const CoinIndex = lazy(() => import("./pages/CoinPage").then((m) => ({ default: m.CoinIndex })));
 
 function FullScreenLoader() {
@@ -106,7 +107,7 @@ export default function App() {
           <Route path="admin" element={<Admin />} />
           <Route path="quick" element={<QuickView />} />
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Suspense fallback={<FullScreenLoader />}><NotFound /></Suspense>} />
       </Routes>
     </>
   );

@@ -24,7 +24,9 @@ test("privacy policy describes analytics and the new data", async ({ page }) => 
   await page.goto("/privacy");
   await expect(page.getByRole("heading", { name: "Analytics" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Alerts", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Portfolio tracker and Telegram" })).toHaveCount(0);
+  // The tracker and Telegram are free while Premium is off, so the notice must describe their data.
+  await expect(page.getByRole("heading", { name: "Portfolio tracker and Telegram" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /payments/i })).toHaveCount(0);
 });
 
 test("track record offers sharing and SEO files are served", async ({ page, request }) => {

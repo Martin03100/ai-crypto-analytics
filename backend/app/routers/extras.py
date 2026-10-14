@@ -24,6 +24,7 @@ from app.rate_limit import check_rate_limit, rate_limit_by_ip, rate_limit_by_use
 from app.schemas import MAX_DB_ID
 from app.security import sanitize_text
 from app.services import cards, event_calendar, profiles, push, whatif
+from app.routers.forecast import _price_error
 from app.services.app_settings import require_feature
 
 router = APIRouter(tags=["extras"])
@@ -60,7 +61,8 @@ def weekly_summary_card(fmt: Literal["square", "story"] = Query(default="square"
     png = _card_cache.get(key)
     if png is None:
         png = cards.weekly_card(fmt, profiles.weekly_summary(db))
-        _card_cache.clear()
+        for old in [k for k in _card_cache if not k.endswith(f":{hour}")]:   # keeps the other format of this hour
+            del _card_cache[old]
         _card_cache[key] = png
     return Response(png, media_type="image/png", headers={"Cache-Control": "public, max-age=900"})
 
@@ -270,12 +272,13 @@ def export_rows(db: Session, user: User, kind: str):
             start, final = _forecast_numbers(f.forecast_json)
             yield [f.id, f.created_at, f.crypto_symbol, f.timeframe, f.model_used, start, final, bool(f.share_token)]
     elif kind == "evaluations":
-        yield ["forecast_id", "evaluated_at", "model", "coin", "horizon", "accuracy_pct", "naive_guess_accuracy_pct",
+        yield ["forecast_id", "evaluated_at", "model", "coin", "horizon", "price_error_pct", "naive_guess_error_pct",
                "direction_correct", "actual_final_price"]
         for e in (db.query(ForecastEvaluation).filter(ForecastEvaluation.user_id == user.id,
                                                       ForecastEvaluation.is_demo.isnot(True))
                   .order_by(ForecastEvaluation.evaluated_at)):
-            yield [e.forecast_id, e.evaluated_at, e.provider, e.coin, e.timeframe, e.accuracy_pct, e.baseline_accuracy_pct,
+            yield [e.forecast_id, e.evaluated_at, e.provider, e.coin, e.timeframe, _price_error(e.accuracy_pct),
+                   _price_error(e.baseline_accuracy_pct),
                    e.direction_correct, e.actual_final_price]
     elif kind == "alerts":
         yield ["id", "created_at", "kind", "coin", "direction", "target", "active", "triggered_at", "triggered_value"]
