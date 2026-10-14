@@ -19,7 +19,7 @@ import ProviderSelect from "../components/ProviderSelect";
 import { useToast } from "../context/ToastContext";
 import { useProviders } from "../context/ProvidersContext";
 import { useLanguage } from "../context/LanguageContext";
-import { humanizeError } from "../i18n/errorMessages";
+import { aiError, humanizeError } from "../i18n/errorMessages";
 import { safeUrl } from "../utils/safeUrl";
 import { localeForLang } from "../i18n/locale";
 import { stripMockTag } from "../utils/mockText";
@@ -113,7 +113,7 @@ export default function Market() {
         return;
       }
       setNewsResult(res);
-      if (res.is_mock) push(res.error_message ? humanizeError(res.error_message, lang, "errors.aiFallback") : t("market.mockNotice"), "warn");
+      if (res.is_mock) push(res.error_message ? humanizeError(aiError(res), lang, "errors.aiFallback") : t("market.mockNotice"), "warn");
     } catch (err) {
       push(err, "error");
     } finally {

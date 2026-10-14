@@ -20,7 +20,7 @@ import { useCurrency } from "../context/CurrencyContext";
 import { useProviders } from "../context/ProvidersContext";
 import { useToast } from "../context/ToastContext";
 import { useLanguage } from "../context/LanguageContext";
-import { humanizeError } from "../i18n/errorMessages";
+import { aiError, humanizeError } from "../i18n/errorMessages";
 import { localeForLang } from "../i18n/locale";
 import { usePageTitle } from "../hooks/usePageTitle";
 import { stripMockTag } from "../utils/mockText";
@@ -257,7 +257,7 @@ export default function Portfolio() {
     try {
       const res = await api.analyzePortfolio(provider, holdings.map(({ minca, mnozstvo, coin_id }) => ({ minca, mnozstvo, coin_id })));
       if (!res.success) {          // the AI failed: say so instead of showing anything made up
-        push(humanizeError(res.error_message || "", lang, "errors.aiFailed"), "error");
+        push(humanizeError(aiError(res), lang, "errors.aiFailed"), "error");
         return;
       }
       setResult(res);

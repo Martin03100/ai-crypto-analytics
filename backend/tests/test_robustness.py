@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.services import market_data
-from tests.conftest import anon_csrf_headers, csrf_headers, signed_forecast_payload
+from tests.conftest import anon_csrf_headers, csrf_headers, patch_accuracy, signed_forecast_payload
 
 
 class _Resp:
@@ -116,12 +116,11 @@ def test_history_without_days_back_includes_old_forecasts(registered):
 
 def test_duplicate_evaluation_commit_is_ignored(registered, monkeypatch):
     client, _, _ = registered
-    from app.routers import forecast as forecast_router
     created = (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
     res = client.post("/api/forecast/save", json=signed_forecast_payload(client, created=created),
                       headers=csrf_headers(client))
     entry_id = res.json()["id"]
-    monkeypatch.setattr(forecast_router, "compute_forecast_accuracy", lambda *a, **k: {
+    patch_accuracy(monkeypatch, lambda *a, **k: {
         "status": "completed", "accuracy_pct": 90.0, "actual_prices": [101.0, 109.0], "predicted_prices": [100.0, 110.0],
         "time_labels": ["a", "b"], "matures_at": created, "direction_correct": True, "baseline_accuracy_pct": 80.0})
     original_commit = Session.commit

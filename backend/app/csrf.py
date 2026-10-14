@@ -23,7 +23,8 @@ class CSRFMiddleware(BaseHTTPMiddleware):
             if not existing_token or not header_token or not secrets.compare_digest(existing_token, header_token):
                 return JSONResponse(
                     status_code=403,
-                    content={"detail": "Neplatný alebo chýbajúci CSRF token. Obnov stránku a skús to znova."},
+                    content={"detail": "Neplatný alebo chýbajúci CSRF token. Obnov stránku a skús to znova.",
+                             "code": "csrfInvalid"},
                 )
 
         response = await call_next(request)

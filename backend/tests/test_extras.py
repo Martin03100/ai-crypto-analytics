@@ -303,7 +303,9 @@ def test_csv_export_is_spreadsheet_safe(registered):
     for kind in extras.EXPORT_KINDS:
         assert client.get(f"/api/account/export/{kind}.csv").status_code == 200
     assert client.get("/api/account/export/users.csv").status_code == 422
-    assert extras._cell("=HYPERLINK(1)") == "'=HYPERLINK(1)" and extras._cell(-5) == -5 and extras._cell(None) == ""
+    from app.services.csv_safe import safe_cell
+    assert safe_cell("=HYPERLINK(1)") == "'=HYPERLINK(1)" and safe_cell(-5) == -5 and safe_cell(None) == ""
+    assert safe_cell("-5.2") == "-5.2"
 
 
 # ---------- beginner view ----------

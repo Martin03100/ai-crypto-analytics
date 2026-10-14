@@ -21,13 +21,12 @@ from app.config import GOOGLE_CLIENT_ID, RATE_LIMIT_MARKET_PUBLIC, RATE_LIMIT_WA
 from app.deps import get_db
 from app.models import ForecastEvaluation, ForecastHistory, PriceTip, User, WaitlistEntry
 from app.rate_limit import rate_limit_by_ip
-from app.routers.forecast import _MIN_SAMPLE, _tip_summary, provider_stats
-from app.routers.community import premium_info
+from app.services.scoring import MIN_SAMPLE, provider_stats, tip_summary
 from app.services import accuracy, app_settings, cards, challenge, coin_page, status_check
 from app.utils.ttl_cache import TTLCache
 from app.services.app_settings import public_settings, require_feature
 from app.services.digest import check_unsubscribe_token
-from app.services.premium import ambassador_badge, invited_signups, is_premium
+from app.services.premium import ambassador_badge, invited_signups, is_premium, premium_info
 from app.services.demo_data import demo_for_all
 from app.services.stats import RELIABLE_SAMPLE, wilson_interval
 from app.services.status_check import collect_status
@@ -95,7 +94,7 @@ def _track_record(db: Session) -> dict:
               .order_by(ForecastEvaluation.evaluated_at.desc(), ForecastEvaluation.id.desc()).limit(_RECENT_LIMIT).all())
     return {
         "providers": provider_stats(db, real),
-        "min_sample": _MIN_SAMPLE,
+        "min_sample": MIN_SAMPLE,
         "reliable_sample": RELIABLE_SAMPLE,
         "totals": {
             "evaluated": total or 0,
@@ -110,7 +109,7 @@ def _track_record(db: Session) -> dict:
              "evaluated_at": _iso(e.evaluated_at)}
             for e in recent
         ],
-        "challenge": _tip_summary(db),
+        "challenge": tip_summary(db),
         "versus_holding": versus_holding(db, real),
     }
 

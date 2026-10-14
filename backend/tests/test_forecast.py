@@ -1,6 +1,6 @@
 """Forecast API tests."""
 
-from tests.conftest import anon_csrf_headers, csrf_headers, signed_forecast_payload
+from tests.conftest import anon_csrf_headers, csrf_headers, signed_forecast_payload, patch_accuracy
 
 
 def test_generate_forecast_requires_auth(client):
@@ -189,13 +189,12 @@ def _save_real_forecast(client, prices=(100.0, 110.0), is_mock=False):
 
 
 def test_tip_challenge_and_leaderboard(registered, monkeypatch):
-    from app.routers import forecast as forecast_router
     client, _u, _p = registered
     entry_id = _save_real_forecast(client)
     assert client.get(f"/api/forecast/history/{entry_id}/accuracy").json()["can_tip"] is True
     assert client.post(f"/api/forecast/history/{entry_id}/tip", json={"price": 108}, headers=csrf_headers(client)).status_code == 200
     assert client.post(f"/api/forecast/history/{entry_id}/tip", json={"price": 109}, headers=csrf_headers(client)).status_code == 400
-    monkeypatch.setattr(forecast_router, "compute_forecast_accuracy", lambda *a, **k: {
+    patch_accuracy(monkeypatch, lambda *a, **k: {
         "status": "completed", "accuracy_pct": 97.0, "predicted_prices": [100.0, 110.0], "actual_prices": [101.0, 107.0],
         "time_labels": ["a", "b"], "matures_at": "x", "baseline_accuracy_pct": 95.0, "direction_correct": True})
     body = client.get(f"/api/forecast/history/{entry_id}/accuracy").json()
@@ -336,14 +335,13 @@ _COMPLETED = {"status": "completed", "accuracy_pct": 97.0, "predicted_prices": [
 
 
 def test_leaderboard_not_blocked_by_unripe_yearly_forecasts(registered, monkeypatch):
-    from app.routers import forecast as forecast_router
     client, username, _p = registered
     uid = _user_id(username)
     for _ in range(60):                       # older than the 24h one, but their year has not passed yet
         _insert_forecast(uid, "1R", age_days=30)
     _insert_forecast(uid, "24h", age_days=2)
     seen = []
-    monkeypatch.setattr(forecast_router, "compute_forecast_accuracy", lambda *a, **k: seen.append(a) or _COMPLETED)
+    patch_accuracy(monkeypatch, lambda *a, **k: seen.append(a) or _COMPLETED)
     board = client.get("/api/forecast/leaderboard").json()
     assert len(seen) == 1 and board["providers"][0]["evaluated"] == 1
 
@@ -352,12 +350,12 @@ def test_leaderboard_gives_up_on_forecasts_that_cannot_be_scored(registered, mon
     from datetime import datetime, timedelta, timezone
     from app.database import SessionLocal
     from app.models import ForecastHistory
-    from app.routers import forecast as forecast_router
+    from app.services import scoring
     client, username, _p = registered
     uid = _user_id(username)
     stuck = [_insert_forecast(uid, "24h", age_days=400) for _ in range(5)]
     good = _insert_forecast(uid, "24h", age_days=3)
-    monkeypatch.setattr(forecast_router, "compute_forecast_accuracy",
+    patch_accuracy(monkeypatch,
                         lambda coin, tf, prices, labels, created: _COMPLETED
                         if created > datetime.now(timezone.utc) - timedelta(days=10) else {"status": "unavailable"})
     client.get("/api/forecast/leaderboard")   # first round: only the 5 oldest (unavailable) fit the batch
@@ -368,13 +366,13 @@ def test_leaderboard_gives_up_on_forecasts_that_cannot_be_scored(registered, mon
         assert all(db.get(ForecastHistory, i).eval_attempts == 1 for i in stuck)
         assert db.get(ForecastHistory, good).eval_attempts is None
         for i in stuck:   # after enough failed rounds the forecast is no longer retried
-            db.get(ForecastHistory, i).eval_attempts = forecast_router._EVAL_MAX_ATTEMPTS
+            db.get(ForecastHistory, i).eval_attempts = scoring._EVAL_MAX_ATTEMPTS
             db.get(ForecastHistory, i).eval_last_try_at = None
         db.commit()
     finally:
         db.close()
     calls = []
-    monkeypatch.setattr(forecast_router, "compute_forecast_accuracy", lambda *a, **k: calls.append(a) or _COMPLETED)
+    patch_accuracy(monkeypatch, lambda *a, **k: calls.append(a) or _COMPLETED)
     client.get("/api/forecast/leaderboard")
     assert calls == []
 

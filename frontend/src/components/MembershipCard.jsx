@@ -34,7 +34,7 @@ export default function MembershipCard() {
   useEffect(() => { load(); }, [load]);
 
   if (!m) return null;
-  const fail = (err) => push(err?.message || "error", "error");
+  const fail = (err) => push(err, "error");
 
   const saveNickname = async (e) => {
     e.preventDefault();

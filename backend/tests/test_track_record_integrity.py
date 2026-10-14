@@ -11,7 +11,7 @@ from app.models import ForecastEvaluation, ForecastHistory
 from app.routers import forecast as forecast_router
 from app.services.quant_engine import direction_confidence
 from app.services.stats import wilson_interval
-from tests.conftest import csrf_headers, signed_forecast_payload
+from tests.conftest import csrf_headers, patch_accuracy, signed_forecast_payload
 
 
 def _save(client, **kwargs):
@@ -25,10 +25,10 @@ def _completed(prices=(101.0, 109.0), correct=True):
 
 
 def _score_all(monkeypatch, correct=True):
-    monkeypatch.setattr(forecast_router, "compute_forecast_accuracy", lambda *a, **k: _completed(correct=correct))
+    patch_accuracy(monkeypatch, lambda *a, **k: _completed(correct=correct))
     db = SessionLocal()
     try:
-        forecast_router._evaluate_pending(db, limit=10)
+        forecast_router.evaluate_pending(db, limit=10)
     finally:
         db.close()
 

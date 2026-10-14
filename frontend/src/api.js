@@ -113,13 +113,18 @@ async function requestOnce(path, { method = "GET", body, timeoutMs = DEFAULT_TIM
   }
   if (!res.ok) {
     let detail = `Server error (${res.status})`;
+    let errorKey;
+    let errorParams;
     try {
       const payload = await res.json();
       detail = extractDetailMessage(payload?.detail) || detail;
+      // The server's stable error code: translated as errors.<code>, whatever the wording of the message.
+      if (typeof payload?.code === "string" && /^\w+$/.test(payload.code)) errorKey = `errors.${payload.code}`;
+      if (isObj(payload?.params)) errorParams = payload.params;
     } catch {
       // Non-JSON error page (e.g. a proxy's 502 HTML) — keep the status-based message.
     }
-    const err = apiError(detail, { status: res.status, code: res.headers.get("X-Error-Code") || undefined });
+    const err = apiError(detail, { status: res.status, code: res.headers.get("X-Error-Code") || undefined, errorKey, errorParams });
     if (res.status === 401 && !AUTH_401_EXEMPT.some((p) => path.startsWith(p))) {
       window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
     }

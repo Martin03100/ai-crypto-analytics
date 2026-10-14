@@ -56,7 +56,7 @@ export default function NotificationSettings() {
       setPrefs((await api.setNotifyPrefs({ [key]: next[key] })).prefs);
     } catch (err) {
       setPrefs(prefs);
-      push(err?.message || "error", "error");
+      push(err, "error");
     }
   };
 
@@ -65,7 +65,7 @@ export default function NotificationSettings() {
       const r = await api.pushTest();
       push(t(r.sent ? "notify.testSent" : "notify.testFailed"), r.sent ? "success" : "error", { translated: true });
     } catch (err) {
-      push(err?.message || "error", "error");
+      push(err, "error");
     }
   };
 

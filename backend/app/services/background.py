@@ -70,7 +70,7 @@ def _run(name: str, job: Callable) -> None:
 
 
 def run_periodic_jobs(now: Optional[datetime] = None) -> list[str]:
-    from app.routers.forecast import _evaluate_pending
+    from app.services.scoring import evaluate_pending
     from app.services.alerts import check_alerts
     from app.services.challenge import settle_due, week_start
     from app.services.flips import check_flips, send_event_reminders
@@ -83,7 +83,7 @@ def run_periodic_jobs(now: Optional[datetime] = None) -> list[str]:
     now = (now or datetime.now(timezone.utc)).replace(tzinfo=None)
     ran = []
     if _claim("evaluate_forecasts", now - EVALUATE_EVERY, now):
-        _run("evaluate_forecasts", lambda db: _evaluate_pending(db, limit=10, deadline_seconds=20.0))
+        _run("evaluate_forecasts", lambda db: evaluate_pending(db, limit=10, deadline_seconds=20.0))
         ran.append("evaluate_forecasts")
     if _claim("price_alerts", now - ALERTS_EVERY, now):
         _run("price_alerts", check_alerts)

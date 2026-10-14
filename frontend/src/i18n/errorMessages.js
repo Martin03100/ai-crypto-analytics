@@ -138,6 +138,13 @@ export function humanizeError(error, lang = "en", fallbackKey = "errors.generic"
   const rawMessage = typeof error === "string" ? error : error?.message;
   const status = typeof error === "object" && error !== null ? error.status : undefined;
 
+  // The server's error code comes first; the text patterns below are only a fallback (older answers, AI providers).
+  const errorKey = typeof error === "object" && error !== null ? error.errorKey : undefined;
+  if (errorKey) {
+    const text = translate(errorKey, lang, error.errorParams);
+    if (text !== errorKey) return text;
+  }
+
   if (!rawMessage) return translate(fallbackKey, lang);
 
   for (const pattern of KNOWN_BACKEND_PATTERNS) {
@@ -158,6 +165,12 @@ export function humanizeError(error, lang = "en", fallbackKey = "errors.generic"
   if (statusKey) return translate(statusKey, lang);
 
   return translate(fallbackKey, lang);
+}
+
+/** The error of an AI result ({ error_message, error_code, error_params }) in the shape humanizeError reads. */
+export function aiError(res) {
+  return { message: res?.error_message || "", errorKey: res?.error_code ? `errors.${res.error_code}` : undefined,
+    errorParams: res?.error_params || undefined };
 }
 
 export default humanizeError;

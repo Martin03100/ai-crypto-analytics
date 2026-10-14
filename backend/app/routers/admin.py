@@ -18,7 +18,7 @@ from app.models import ForecastEvaluation, ForecastHistory, PriceTip, User, Wait
 from app.schemas import MAX_DB_ID
 from app.config import RATE_LIMIT_ACCOUNT_SENSITIVE
 from app.rate_limit import rate_limit_by_user
-from app.routers.extras import _cell
+from app.services.csv_safe import safe_cell
 from app.services import app_settings, audit, billing, stripe_connect
 from app.services.premium import extend_premium, is_premium
 from app.services.roles import is_admin
@@ -137,7 +137,7 @@ def waitlist_csv(db: Session = Depends(get_db)) -> Response:
     writer.writerow(["email", "lang", "source", "created_at"])
     for r in db.query(WaitlistEntry).order_by(WaitlistEntry.created_at).all():
         # Addresses are typed by visitors: "=..." must not run as a formula when the file is opened in Excel.
-        writer.writerow([_cell(r.email), r.lang, _cell(r.source or ""), _iso(r.created_at)])
+        writer.writerow([safe_cell(r.email), r.lang, safe_cell(r.source or ""), _iso(r.created_at)])
     return Response(buf.getvalue(), media_type="text/csv",
                     headers={"Content-Disposition": 'attachment; filename="waitlist.csv"'})
 

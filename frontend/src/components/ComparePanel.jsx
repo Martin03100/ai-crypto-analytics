@@ -9,7 +9,7 @@ import { Card } from "./Card";
 import ConsensusBox from "./ConsensusBox";
 import { useLanguage } from "../context/LanguageContext";
 import { useProviders } from "../context/ProvidersContext";
-import { humanizeError } from "../i18n/errorMessages";
+import { aiError, humanizeError } from "../i18n/errorMessages";
 import { COMPARE_COLORS, buildComparisonRows, changePct } from "../utils/compare";
 import { axisDecimals, formatPrice, formatUsd } from "../utils/formatPrice";
 import { COINS } from "../utils/coins";
@@ -46,7 +46,7 @@ export default function ComparePanel() {
       const requested = selected[idx];
       const label = options.find((o) => o.provider === requested)?.label || requested;
       if (s.status === "rejected" || !s.value?.success) {
-        return { key: requested, label, error: humanizeError(s.status === "rejected" ? s.reason : s.value?.error_message, lang) };
+        return { key: requested, label, error: humanizeError(s.status === "rejected" ? s.reason : aiError(s.value), lang) };
       }
       const res = s.value;
       return { key: requested, label, data: res.data, isMock: res.is_mock, fallback: Boolean(res.provider_used && res.provider_used !== requested) };

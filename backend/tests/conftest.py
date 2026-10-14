@@ -122,3 +122,11 @@ def _relaxed_save_window(monkeypatch, request):
     from datetime import timedelta
     from app.routers import forecast
     monkeypatch.setattr(forecast, "SAVE_WINDOW", timedelta(days=3650))
+
+
+def patch_accuracy(monkeypatch, fake) -> None:
+    """Replace the price-history check used when forecasts are scored (on request and in the background)."""
+    from app.routers import forecast
+    from app.services import scoring
+    monkeypatch.setattr(forecast, "compute_forecast_accuracy", fake)
+    monkeypatch.setattr(scoring, "compute_forecast_accuracy", fake)

@@ -38,7 +38,7 @@ export function FeedbackDialog({ onClose }) {
       push(t("feedback.thanks"), "success", { translated: true });
       onClose();
     } catch (err) {
-      push(err?.message || "error", "error");
+      push(err, "error");
     } finally {
       setBusy(false);
     }

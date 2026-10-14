@@ -35,7 +35,7 @@ export default function AdminFeedback() {
       await api.adminFeedbackStatus(id, next);
       load();
     } catch (err) {
-      push(err?.message || "error", "error");
+      push(err, "error");
     }
   };
 
@@ -45,7 +45,7 @@ export default function AdminFeedback() {
       await api.adminFeedbackDelete(id);
       load();
     } catch (err) {
-      push(err?.message || "error", "error");
+      push(err, "error");
     }
   };
 

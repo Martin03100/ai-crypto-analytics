@@ -24,7 +24,7 @@ from app.rate_limit import check_rate_limit, rate_limit_by_ip, rate_limit_by_use
 from app.schemas import MAX_DB_ID
 from app.security import sanitize_text
 from app.services import cards, event_calendar, profiles, push, whatif
-from app.routers.forecast import _price_error
+from app.services.csv_safe import UTF8_BOM, price_error, safe_cell
 from app.services.app_settings import require_feature
 
 router = APIRouter(tags=["extras"])
@@ -244,17 +244,6 @@ def what_if(coin: str = Query(min_length=2, max_length=10), days: int = Query(de
 EXPORT_KINDS = ("forecasts", "evaluations", "alerts", "tips", "challenge")
 
 
-def _cell(value):
-    """Spreadsheet-safe cell: text starting with = + - @ would run as a formula in Excel."""
-    if value is None:
-        return ""
-    if isinstance(value, datetime):
-        return value.isoformat() + "Z"
-    if isinstance(value, str) and value[:1] in ("=", "+", "-", "@", "\t", "\r"):
-        return "'" + value
-    return value
-
-
 def _forecast_numbers(raw: str):
     try:
         data = json.loads(raw)
@@ -278,8 +267,8 @@ def export_rows(db: Session, user: User, kind: str):
         for e in (db.query(ForecastEvaluation).filter(ForecastEvaluation.user_id == user.id,
                                                       ForecastEvaluation.is_demo.isnot(True))
                   .order_by(ForecastEvaluation.evaluated_at)):
-            yield [e.forecast_id, e.evaluated_at, e.provider, e.coin, e.timeframe, _price_error(e.accuracy_pct),
-                   _price_error(e.baseline_accuracy_pct),
+            yield [e.forecast_id, e.evaluated_at, e.provider, e.coin, e.timeframe, price_error(e.accuracy_pct),
+                   price_error(e.baseline_accuracy_pct),
                    e.direction_correct, e.actual_final_price]
     elif kind == "alerts":
         yield ["id", "created_at", "kind", "coin", "direction", "target", "active", "triggered_at", "triggered_value"]
@@ -305,9 +294,9 @@ def export_csv(kind: Literal["forecasts", "evaluations", "alerts", "tips", "chal
     buf = io.StringIO()
     writer = csv.writer(buf)
     for row in export_rows(db, user, kind):
-        writer.writerow([_cell(v) for v in row])
+        writer.writerow([safe_cell(v) for v in row])
     name = f"ai-crypto-{kind}-{datetime.now(timezone.utc):%Y%m%d}.csv"
-    return Response("﻿" + buf.getvalue(), media_type="text/csv; charset=utf-8",
+    return Response(UTF8_BOM + buf.getvalue(), media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
 
 

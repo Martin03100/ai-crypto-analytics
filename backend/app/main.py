@@ -9,6 +9,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from app import error_codes
 
 from app.config import APP_ENV, APP_TITLE, CORS_ORIGINS, SCHEDULER_ENABLED, validate_production_config
 from app.csrf import CSRFMiddleware
@@ -63,11 +66,21 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(ProxyGuardMiddleware)   # outermost: unsigned direct calls stop before any other work
 
 
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(_request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    """Like FastAPI's own handler, plus a stable error code the app translates (see app.error_codes)."""
+    content = {"detail": exc.detail}
+    found = error_codes.lookup(exc.detail)
+    if found:
+        content["code"], content["params"] = found
+    return JSONResponse(status_code=exc.status_code, content=content, headers=getattr(exc, "headers", None))
+
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     logger.error("Neosetrena vynimka na %s %s: %s", request.method, request.url.path, exc, exc_info=exc)
     capture_exception(exc)
-    return JSONResponse(status_code=500, content={"detail": "Nastala neočakávaná chyba na serveri."})
+    return JSONResponse(status_code=500, content={"detail": "Nastala neočakávaná chyba na serveri.", "code": "serverError"})
 
 
 app.include_router(auth.router)

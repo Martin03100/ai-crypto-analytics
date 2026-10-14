@@ -66,7 +66,7 @@ function UsersTab() {
   const [page, setPage] = useState(1);
   const [data, setData] = useState(null);
   const { premium } = useAppConfig();
-  const load = useCallback(() => api.adminUsers(q, page).then(setData).catch((e) => push(e?.message || "error", "error")), [q, page, push]);
+  const load = useCallback(() => api.adminUsers(q, page).then(setData).catch((e) => push(e, "error")), [q, page, push]);
   useEffect(() => { const id = setTimeout(load, 250); return () => clearTimeout(id); }, [load]);
 
   const change = async (u, changes, question) => {
@@ -76,7 +76,7 @@ function UsersTab() {
       setData((prev) => ({ ...prev, items: prev.items.map((x) => (x.id === row.id ? row : x)) }));
       push(t("admin.saved"), "success", { translated: true });
     } catch (e) {
-      push(e?.message || "error", "error");
+      push(e, "error");
     }
   };
   const date = (iso) => (iso ? new Date(iso).toLocaleDateString(localeForLang(lang)) : "—");
@@ -169,7 +169,7 @@ function SettingsTab() {
   const { reload } = useAppConfig();
   const [values, setValues] = useState(null);
   const [saving, setSaving] = useState(false);
-  useEffect(() => { api.adminSettings().then((r) => setValues(r.values)).catch((e) => push(e?.message || "error", "error")); }, [push]);
+  useEffect(() => { api.adminSettings().then((r) => setValues(r.values)).catch((e) => push(e, "error")); }, [push]);
   if (!values) return null;
   const set = (k, v) => setValues((prev) => ({ ...prev, [k]: v }));
 
@@ -182,7 +182,7 @@ function SettingsTab() {
       reload();
       push(t("admin.saved"), "success", { translated: true });
     } catch (err) {
-      push(err?.message || "error", "error");
+      push(err, "error");
     } finally {
       setSaving(false);
     }

@@ -156,6 +156,8 @@ class AIResultOut(BaseModel):
     is_mock: bool = False
     error_message: Optional[str] = None
     provider_used: Optional[str] = None
+    error_code: Optional[str] = None            # see app.error_codes; the app translates it
+    error_params: Optional[Dict[str, str]] = None
 
 
 class ForecastHistoryOut(BaseModel):

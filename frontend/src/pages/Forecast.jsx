@@ -29,7 +29,7 @@ import { useProviders } from "../context/ProvidersContext";
 import { useConfirm } from "../context/ConfirmContext";
 import { useAppConfig } from "../context/AppConfigContext";
 import { useLanguage } from "../context/LanguageContext";
-import { humanizeError } from "../i18n/errorMessages";
+import { aiError, humanizeError } from "../i18n/errorMessages";
 import { localeForLang } from "../i18n/locale";
 import { copyToClipboard } from "../utils/copyToClipboard";
 import { usePageTitle } from "../hooks/usePageTitle";
@@ -336,7 +336,7 @@ export default function Forecast() {
       const fallbackFrom = res.provider_used && res.provider_used !== provider ? provider : null;
       setResult({ ...res, generatedAt: new Date().toISOString(), horizon, coin, provider: usedProvider, fallbackFrom });
       if (fallbackFrom) push(t("forecast.quantFallback"), "warn");
-      else if (res.is_mock) push(res.error_message ? humanizeError(res.error_message, lang, "errors.aiFallback") : t("forecast.mockNotice"), "warn");
+      else if (res.is_mock) push(res.error_message ? humanizeError(aiError(res), lang, "errors.aiFallback") : t("forecast.mockNotice"), "warn");
     } catch (err) {
       push(err, "error");
     } finally {

@@ -57,7 +57,7 @@ export default function PriceAlerts() {
       push(t("alerts.created"), "success", { translated: true });
       load();
     } catch (err) {
-      push(err?.message || "error", "error");
+      push(err, "error");
     } finally {
       setBusy(false);
     }
@@ -68,7 +68,7 @@ export default function PriceAlerts() {
       await api.deleteAlert(id);
       load();
     } catch (err) {
-      push(err?.message || "error", "error");
+      push(err, "error");
     }
   };
 

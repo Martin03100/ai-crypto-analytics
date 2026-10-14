@@ -88,7 +88,7 @@ export default function Premium() {
       const { url } = await api.checkout({ plan: chosen, accept_terms: terms, start_immediately: startNow });
       window.location.assign(url);
     } catch (err) {
-      push(err?.message || "error", "error");
+      push(err, "error");
       setBusy(false);
     }
   };

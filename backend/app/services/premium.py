@@ -115,3 +115,18 @@ def reward_referrer_for_purchase(db: Session, buyer: User) -> bool:
     extend_premium(referrer, days)
     notify(db, referrer.id, "referral_reward", days=days)
     return True
+
+
+def premium_info() -> dict:
+    """The Premium offer for the app ({"enabled": False} while Premium mode is off: nothing to show)."""
+    from app.services import billing
+
+    s = app_settings.all_settings()
+    if not s["premium_mode"]:
+        return {"enabled": False}
+    return {"enabled": True, "billing_enabled": billing.checkout_ready(), "yearly": billing.yearly_available(),
+            "price_label": s["premium_price_label"], "price_label_yearly": s["premium_price_label_yearly"],
+            "trial_days": s["premium_trial_days"], "referral_trial_days": s["referral_trial_days"],
+            "limits": {"free": {"schedules": s["free_schedules"], "alerts": s["free_alerts"]},
+                       "premium": {"schedules": s["premium_schedules"], "alerts": s["premium_alerts"]}},
+            "referral_days": s["referral_reward_days"], "referrals_enabled": s["referrals_enabled"]}

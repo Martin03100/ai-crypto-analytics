@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 from app.database import SessionLocal
 from app.models import ForecastHistory, JobRun, PriceTip, User
-from tests.conftest import anon_csrf_headers, csrf_headers, set_app_settings, signed_forecast_payload
+from tests.conftest import anon_csrf_headers, csrf_headers, set_app_settings, signed_forecast_payload, patch_accuracy
 
 _COMPLETED = {"status": "completed", "accuracy_pct": 97.0, "predicted_prices": [100.0, 110.0],
               "actual_prices": [101.0, 107.0], "time_labels": ["a", "b"], "matures_at": "x",
@@ -51,11 +51,10 @@ def _save(client, **kwargs):
 
 
 def test_evaluation_and_duel_create_notifications(registered, monkeypatch):
-    from app.routers import forecast as forecast_router
     client, _u, _p = registered
     entry_id = _save(client, horizon="24h")
     client.post(f"/api/forecast/history/{entry_id}/tip", json={"price": 108}, headers=csrf_headers(client))
-    monkeypatch.setattr(forecast_router, "compute_forecast_accuracy", lambda *a, **k: _COMPLETED)
+    patch_accuracy(monkeypatch, lambda *a, **k: _COMPLETED)
     client.get(f"/api/forecast/history/{entry_id}/accuracy")
     body = client.get("/api/account/notifications").json()
     kinds = {n["kind"]: n["data"] for n in body["items"]}
@@ -281,7 +280,7 @@ def test_periodic_jobs_run_once_per_slot(client, monkeypatch):
     monkeypatch.setattr(status_check, "record_sample", lambda db: calls.append("status"))
     monkeypatch.setattr(challenge, "settle_due", lambda db: calls.append("challenge"))
     monkeypatch.setattr(tracker, "take_snapshots", lambda db: calls.append("snap"))
-    monkeypatch.setattr(forecast_router, "_evaluate_pending", lambda db, **k: calls.append("eval"))
+    monkeypatch.setattr(forecast_router, "evaluate_pending", lambda db, **k: calls.append("eval"))
     monkeypatch.setattr(alerts, "check_alerts", lambda db: calls.append("alerts"))
     monkeypatch.setattr(briefing, "send_morning_briefings", lambda db: calls.append("briefing"))
     monkeypatch.setattr(digest, "send_weekly_digests", lambda db: calls.append("digest"))

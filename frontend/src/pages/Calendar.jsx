@@ -63,7 +63,7 @@ export default function Calendar() {
       });
       push(t(on ? "calendar.reminderOff" : "calendar.reminderOn"), "success", { translated: true });
     } catch (err) {
-      push(err?.message || "error", "error");
+      push(err, "error");
     } finally {
       setBusy(null);
     }

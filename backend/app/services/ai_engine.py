@@ -54,10 +54,13 @@ class AIEngineResult:
         self.provider_used = provider_used
 
     def as_dict(self) -> Dict[str, Any]:
+        from app.error_codes import lookup
+        found = lookup(self.error_message)
         return {
             "success": self.success, "data": self.data,
             "is_mock": self.is_mock, "error_message": self.error_message,
             "provider_used": self.provider_used,
+            "error_code": found[0] if found else None, "error_params": found[1] if found else None,
         }
 
 

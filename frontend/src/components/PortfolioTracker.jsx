@@ -57,7 +57,7 @@ export default function PortfolioTracker() {
       setBuy("");
       push(t("tracker.saved"), "success", { translated: true });
     } catch (err) {
-      push(err?.message || "error", "error");
+      push(err, "error");
     } finally {
       setBusy(false);
     }
@@ -74,7 +74,7 @@ export default function PortfolioTracker() {
     try {
       setData(await api.deletePosition(id));
     } catch (err) {
-      push(err?.message || "error", "error");
+      push(err, "error");
     }
   };
 

@@ -59,3 +59,23 @@ describe("account activity log", () => {
     }
   });
 });
+
+describe("backend error codes", () => {
+  const source = readFileSync(path.join(BACKEND, "error_codes.py"), "utf-8");
+  // Each pattern line ends with: "code"),  or  "code", "param"),
+  const codes = [...new Set([...source.matchAll(/, "(\w+)"(?:, "\w+")?\),\s*$/gm)].map((m) => m[1]))];
+
+  it("each has a text in every language", () => {
+    expect(codes.length).toBeGreaterThan(60);
+    for (const lang of ["en.json", "sk.json", "cz.json", "de.json", "pl.json"]) {
+      const dict = JSON.parse(readFileSync(path.resolve(BACKEND, "../../frontend/src/i18n/locales", lang), "utf-8"));
+      expect(codes.filter((c) => !dict[`errors.${c}`]), lang).toEqual([]);
+    }
+  });
+
+  it("is used before the message text, with its params", () => {
+    const err = { message: "a reworded message the patterns do not know", errorKey: "errors.alertLimit", errorParams: { max: 7 } };
+    expect(humanizeError(err, "de")).toContain("7");
+    expect(humanizeError({ message: "x", errorKey: "errors.noSuchCode" }, "de")).toBe(humanizeError("x", "de"));
+  });
+});

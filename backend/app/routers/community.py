@@ -20,6 +20,7 @@ from app.rate_limit import rate_limit_by_user
 from app.services import app_settings, audit, billing, challenge, nicknames, notifications, telegram
 from app.services.account_data import export_user_data, personal_stats
 from app.services.premium import (
+    premium_info,
     ambassador_badge, ensure_referral_code, has_premium_features, invited_signups, is_premium, require_premium,
     rewarded_referrals,
 )
@@ -28,18 +29,6 @@ logger = logging.getLogger("aca.community")
 router = APIRouter(tags=["community"])
 
 NICKNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{3,20}$")
-
-
-def premium_info() -> dict:
-    s = app_settings.all_settings()
-    if not s["premium_mode"]:
-        return {"enabled": False}
-    return {"enabled": True, "billing_enabled": billing.checkout_ready(), "yearly": billing.yearly_available(),
-            "price_label": s["premium_price_label"], "price_label_yearly": s["premium_price_label_yearly"],
-            "trial_days": s["premium_trial_days"], "referral_trial_days": s["referral_trial_days"],
-            "limits": {"free": {"schedules": s["free_schedules"], "alerts": s["free_alerts"]},
-                       "premium": {"schedules": s["premium_schedules"], "alerts": s["premium_alerts"]}},
-            "referral_days": s["referral_reward_days"], "referrals_enabled": s["referrals_enabled"]}
 
 
 def _require_premium_mode() -> None:
