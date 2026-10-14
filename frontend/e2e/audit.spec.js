@@ -16,7 +16,7 @@ const EN_KEYS = Object.keys(JSON.parse(readFileSync(new URL("../src/i18n/locales
 const KEY_PREFIXES = new Set(EN_KEYS.map((k) => k.split(".")[0]));
 const AXE = readFileSync(createRequire(import.meta.url).resolve("axe-core/axe.min.js"), "utf8");
 const PUBLIC = ["/", "/auth", "/about", "/status", "/privacy", "/terms", "/track-record", "/calendar", "/glossary",
-  "/changelog", "/links", "/prediction", "/prediction/bitcoin", "/sk/predikcia/ethereum"];
+  "/changelog", "/links", "/prediction", "/prediction/bitcoin", "/sk/predikcia/ethereum", "/faq", "/security"];
 const PRIVATE = ["/dashboard", "/forecast", "/forecast?tab=history", "/forecast?tab=schedule", "/forecast?tab=leaderboard",
   "/forecast?tab=compare", "/forecast?tab=backtest", "/portfolio", "/market", "/account", "/settings", "/quick", "/calendar"];
 // External data the sandboxed CI/dev machine may not reach; their failures are not app bugs.

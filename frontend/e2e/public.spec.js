@@ -31,6 +31,20 @@ test("an unknown address shows a not-found page with a way home", async ({ page 
   await expect(page).toHaveURL(/\/$/);
 });
 
+test("FAQ answers open on click, carry structured data and link the security page", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "FAQ" }).click();
+  await expect(page.getByRole("heading", { name: "Frequently asked questions" })).toBeVisible();
+  await page.getByText("Do I need an AI API key?").click();
+  await expect(page.getByText("A free statistical model gives real forecasts right away")).toBeVisible();
+  const jsonLd = await page.locator('script[type="application/ld+json"]').last().textContent();
+  expect(JSON.parse(jsonLd)["@type"]).toBe("FAQPage");
+  await expect(page.locator("body")).not.toContainText("Premium");
+  await page.getByText("How do I report a bug or a security problem?").click();
+  await page.getByRole("link", { name: "Security and vulnerability reports" }).click();
+  await expect(page.getByRole("heading", { name: "How to report" })).toBeVisible();
+});
+
 test("unknown share link shows a clear message", async ({ page }) => {
   await page.goto("/share/this-link-does-not-exist-123");
   await expect(page.getByText("This forecast does not exist or is no longer shared.")).toBeVisible();

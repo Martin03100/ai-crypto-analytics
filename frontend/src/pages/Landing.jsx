@@ -132,7 +132,8 @@ export default function Landing() {
 
       <footer className="landing-footer">
         <Link to="/about">{t("about.title")}</Link> · <Link to="/track-record">{t("track.title")}</Link> · <Link to={SEO_LANGS[lang] || SEO_LANGS.en}>{t("coin.indexTitle")}</Link> · {mode && <><Link to="/premium">Premium</Link> · </>}<Link to="/status">{t("status.title")}</Link> ·{" "}
-        <Link to="/privacy">{t("privacy.title")}</Link> · <Link to="/terms">{t("terms.title")}</Link>
+        <Link to="/faq">{t("nav.faq")}</Link> · <Link to="/privacy">{t("privacy.title")}</Link> · <Link to="/terms">{t("terms.title")}</Link> ·{" "}
+        <Link to="/security">{t("security.title")}</Link>
       </footer>
     </main>
   );

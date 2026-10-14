@@ -33,6 +33,8 @@ const Changelog = lazy(() => import("./pages/Changelog"));
 const TipsterProfile = lazy(() => import("./pages/TipsterProfile"));
 const QuickView = lazy(() => import("./pages/QuickView"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const Faq = lazy(() => import("./pages/Faq"));
+const Security = lazy(() => import("./pages/Security"));
 const CoinIndex = lazy(() => import("./pages/CoinPage").then((m) => ({ default: m.CoinIndex })));
 
 function FullScreenLoader() {
@@ -82,6 +84,8 @@ export default function App() {
         <Route path="/unsubscribe" element={<Suspense fallback={<FullScreenLoader />}><Unsubscribe /></Suspense>} />
         <Route path="/calendar" element={<Suspense fallback={<FullScreenLoader />}><Calendar /></Suspense>} />
         <Route path="/glossary" element={<Suspense fallback={<FullScreenLoader />}><Glossary /></Suspense>} />
+        <Route path="/faq" element={<Suspense fallback={<FullScreenLoader />}><Faq /></Suspense>} />
+        <Route path="/security" element={<Suspense fallback={<FullScreenLoader />}><Security /></Suspense>} />
         <Route path="/changelog" element={<Suspense fallback={<FullScreenLoader />}><Changelog /></Suspense>} />
         <Route path="/tipster/:nickname" element={<Suspense fallback={<FullScreenLoader />}><TipsterProfile /></Suspense>} />
         {Object.values(SEO_LANGS).map((base) => [

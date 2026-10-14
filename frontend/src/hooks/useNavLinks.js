@@ -1,6 +1,6 @@
 /** Navigation entries shared by the sidebar and the mobile tab bar. */
 
-import { BookOpen, CalendarDays, Crown, Gift, LayoutDashboard, Settings as SettingsIcon, ShieldCheck, Smartphone, Sparkles, Trophy, TrendingUp, User, Wallet } from "lucide-react";
+import { BookOpen, CalendarDays, CircleHelp, Crown, Gift, LayoutDashboard, Settings as SettingsIcon, ShieldCheck, Smartphone, Sparkles, Trophy, TrendingUp, User, Wallet } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import { usePremium } from "./usePremium";
@@ -21,6 +21,7 @@ export function useNavLinks() {
       { to: "/calendar", label: t("nav.calendar"), icon: CalendarDays },
       { to: "/track-record", label: t("nav.trackRecord"), icon: Trophy },
       { to: "/glossary", label: t("nav.glossary"), icon: BookOpen },
+      { to: "/faq", label: t("nav.faq"), icon: CircleHelp },
       { to: "/changelog", label: t("nav.changelog"), icon: Gift, badge: "changelog" },
     ],
     account: [
