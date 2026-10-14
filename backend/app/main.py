@@ -16,6 +16,7 @@ from app.database import SessionLocal, init_db
 from app.logging_config import configure_logging
 from app.monitoring import capture_exception, init_monitoring
 from app.routers import account, admin, alerts, auth, chat, community, extras, forecast, jobs, market, portfolio, public, schedules, tools, tracker
+from app.proxy_guard import ProxyGuardMiddleware
 from app.request_guard import RequestGuardMiddleware
 from app.security_headers import SecurityHeadersMiddleware
 from app.services import keep_awake
@@ -59,6 +60,7 @@ app.add_middleware(
 app.add_middleware(CSRFMiddleware)
 app.add_middleware(RequestGuardMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(ProxyGuardMiddleware)   # outermost: unsigned direct calls stop before any other work
 
 
 @app.exception_handler(Exception)

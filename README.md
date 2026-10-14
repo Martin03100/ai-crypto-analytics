@@ -177,6 +177,9 @@ cannot be decrypted.
   store such as Redis.
 - **`TRUSTED_PROXY_HOPS` must match the deployment.** Behind the Netlify `/api` proxy and Render it is `2`;
   otherwise rate limits and the activity log see a proxy's IP instead of the user's (see `backend/.env.example`).
+- **The API answers only requests from the Netlify proxy** when `PROXY_SIGNATURE_SECRET` (Render) and
+  `API_SIGNATURE_TOKEN` (Netlify) hold the same random value: Netlify signs every proxied request, and direct calls
+  to the onrender.com address are refused, except `/api/health` and the Stripe webhook.
 - **Scheduled forecasts run inside the backend process** (a background thread polling every minute; each run is
   claimed in the database, so several workers never run it twice). Set `SCHEDULER_ENABLED=0` to turn it off.
 - **Render free plan sleeps after ~15 minutes without traffic.** The backend pings its own public URL

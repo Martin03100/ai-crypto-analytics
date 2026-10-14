@@ -162,6 +162,8 @@ RATE_LIMIT_WAITLIST: Final[tuple] = (5, 300)
 RATE_LIMIT_RESET_CODE: Final[tuple] = (8, 300)
 RATE_LIMIT_MARKET_GLOBAL: Final[tuple] = (600, 60)
 TRUSTED_PROXY_HOPS: Final[int] = int(os.environ.get("TRUSTED_PROXY_HOPS", "0"))
+# Same value as API_SIGNATURE_TOKEN on Netlify: the API then answers only requests signed by the Netlify proxy.
+PROXY_SIGNATURE_SECRET: Final[str] = os.environ.get("PROXY_SIGNATURE_SECRET", "").strip()
 
 PASSWORD_RESET_TOKEN_MINUTES: Final[int] = 15
 BREVO_API_KEY: Final[str] = os.environ.get("BREVO_API_KEY", "")
@@ -214,6 +216,10 @@ def validate_production_config() -> None:
             logging.getLogger("aca.config").warning(
                 "%s je kratsi nez 32 znakov - odporucame dlhsi nahodny retazec (pri API_KEY_ENCRYPTION_SECRET "
                 "vsak zmena znehodnoti ulozene API kluce pouzivatelov).", name)
+    if not PROXY_SIGNATURE_SECRET:
+        logging.getLogger("aca.config").warning(
+            "PROXY_SIGNATURE_SECRET nie je nastavene: API je dostupne aj priamo mimo Netlify proxy a limity podla IP "
+            "sa daju obist. Nastav rovnaku nahodnu hodnotu ako API_SIGNATURE_TOKEN na Netlify.")
     if PASSWORD_HASH_ROUNDS < 100_000:
         problems.append("PASSWORD_HASH_ROUNDS musi byt v produkcii aspon 100000.")
     if problems:
