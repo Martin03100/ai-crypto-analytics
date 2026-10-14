@@ -1,6 +1,7 @@
 /** Accuracy per AI model: direction hit rate with its 95 % interval, average price error and the naive-guess check. */
 
 import InfoTip from "./InfoTip";
+import SmallSampleNote from "./SmallSampleNote";
 import { useLanguage } from "../context/LanguageContext";
 import { providerName } from "../utils/models";
 
@@ -8,8 +9,10 @@ export default function ProviderStatsTable({ providers, reliableSample = 30 }) {
   const { t } = useLanguage();
   // The trophy only goes to a model with enough checked forecasts for the ranking to mean something.
   const trophyIndex = providers.findIndex((p) => (p.reliable ?? p.evaluated >= reliableSample));
+  const reliable = (p) => p.reliable ?? p.evaluated >= reliableSample;
   return (
     <>
+      {providers.some((p) => !reliable(p)) && <SmallSampleNote n={reliableSample} />}
       <div className="table-scroll">
         <table className="lb-table lb-table-wrap-first">
           <thead>
@@ -26,7 +29,7 @@ export default function ProviderStatsTable({ providers, reliableSample = 30 }) {
               <tr key={p.provider}>
                 <td>
                   {i === trophyIndex ? "🏆 " : ""}{providerName(p.provider, t)}
-                  {!(p.reliable ?? p.evaluated >= reliableSample) && <span className="text-sub"> · {t("leaderboard.fewData")}</span>}
+                  {!reliable(p) && <span className="badge badge-mock few-data"> {t("leaderboard.fewData")}</span>}
                 </td>
                 <td>{p.evaluated}</td>
                 <td>

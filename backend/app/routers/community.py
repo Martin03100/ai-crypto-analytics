@@ -17,7 +17,7 @@ from app.config import APP_PUBLIC_URL, MAX_REWARDED_REFERRALS, RATE_LIMIT_ACCOUN
 from app.deps import get_current_user, get_db
 from app.models import StripeEvent, User
 from app.rate_limit import rate_limit_by_user
-from app.services import app_settings, audit, billing, challenge, notifications, telegram
+from app.services import app_settings, audit, billing, challenge, nicknames, notifications, telegram
 from app.services.account_data import export_user_data, personal_stats
 from app.services.premium import (
     ambassador_badge, ensure_referral_code, has_premium_features, invited_signups, is_premium, require_premium,
@@ -79,6 +79,8 @@ def set_nickname(payload: NicknameIn, user: User = Depends(get_current_user), db
     else:
         if not NICKNAME_RE.match(nickname):
             raise HTTPException(status_code=400, detail="Prezývka musí mať 3–20 znakov: písmená bez diakritiky, čísla, bodku, pomlčku alebo podčiarkovník.")
+        if not nicknames.is_allowed(nickname):
+            raise HTTPException(status_code=400, detail="Táto prezývka nie je povolená. Vyber si inú.")
         taken = db.query(User.id).filter(func.lower(User.nickname) == nickname.lower(), User.id != user.id).first()
         if taken:
             raise HTTPException(status_code=400, detail="Táto prezývka je už obsadená.")

@@ -6,6 +6,7 @@ import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import { api } from "../api";
 import { Card } from "../components/Card";
 import SignalList from "../components/SignalList";
+import SmallSampleNote from "../components/SmallSampleNote";
 import { SkeletonLines } from "../components/Skeleton";
 import { useLanguage } from "../context/LanguageContext";
 import { formatPrice } from "../utils/formatPrice";
@@ -100,16 +101,17 @@ export default function CoinPage() {
 
           <Card title={t("coin.accuracyTitle", { coin: meta.coin })} icon={Target} style={{ marginTop: 16 }}>
             {data.accuracy.length === 0 ? <p className="text-sub" style={{ margin: 0 }}>{t("coin.accuracyEmpty")}</p> : (
+              <>{data.accuracy.some((r) => r.forecasts < RELIABLE_SAMPLE) && <SmallSampleNote n={RELIABLE_SAMPLE} />}
               <div className="table-scroll"><table className="lb-table lb-table-wrap-first">
                 <thead><tr><th>{t("leaderboard.colProvider")}</th><th>{t("leaderboard.colEvaluated")}</th><th>{t("leaderboard.colDirection")}</th></tr></thead>
                 <tbody>
                   {data.accuracy.map((r) => (
                     <tr key={r.provider}><td>{r.provider === QUANT_LABEL || r.provider === "Statistical model" ? t("provider.quantLabel") : r.provider}
-                      {r.forecasts < RELIABLE_SAMPLE && <span className="text-sub"> · {t("leaderboard.fewData")}</span>}</td>
+                      {r.forecasts < RELIABLE_SAMPLE && <span className="badge badge-mock few-data"> {t("leaderboard.fewData")}</span>}</td>
                       <td>{r.forecasts}</td><td>{r.hit_pct}%</td></tr>
                   ))}
                 </tbody>
-              </table></div>
+              </table></div></>
             )}
           </Card>
         </>

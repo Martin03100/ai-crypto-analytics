@@ -223,7 +223,9 @@ def tipsters(period: Literal["week", "all"] = Query(default="week"), db: Session
         settled = settled & (PriceTip.created_at >= since)
     wins = func.sum(case((PriceTip.outcome == "win", 1), else_=0))
     rows = (db.query(User, func.count(PriceTip.id), wins).join(PriceTip, PriceTip.user_id == User.id)
-            .filter(settled, User.nickname.isnot(None)).group_by(User.id)
+            # Only confirmed, active accounts: throwaway accounts made to push someone up the board do not count.
+            .filter(settled, User.nickname.isnot(None), User.email_verified.isnot(False), User.disabled.isnot(True))
+            .group_by(User.id)
             .order_by(wins.desc(), func.count(PriceTip.id).asc()).limit(10).all())
     outcomes = dict(db.query(PriceTip.outcome, func.count()).filter(settled).group_by(PriceTip.outcome).all())
     return {

@@ -351,3 +351,28 @@ def test_emails_follow_user_language(client, monkeypatch):
     _register(client, "czech1", lang="cs")
     _register(client, "english1")
     assert sent == ["Ověř si e-mail — AI Crypto Analytics", "Verify your email — AI Crypto Analytics"]
+
+
+def test_offensive_and_staff_nicknames_are_refused(registered):
+    from app.services.nicknames import is_allowed
+    for bad in ("Adm1n", "a.d.m.i.n", "SUPP0RT_team", "kokot123", "Kurwa", "fuckyou", "s3x", "AICrypto", "nazi"):
+        assert not is_allowed(bad), bad
+    for fine in ("Therapist", "Picasso", "Pedalpower", "Ignazio", "CryptoKing", "systematic", "satoshi"):
+        assert is_allowed(fine), fine
+    c, _u, _p = registered
+    res = c.put("/api/account/nickname", json={"nickname": "Admin_1"}, headers=csrf_headers(c))
+    assert res.status_code == 400 and "nie je povolená" in res.json()["detail"]
+
+
+def test_tipster_board_ignores_unconfirmed_and_blocked_accounts(client):
+    _register(client, "tipper3")
+    client.put("/api/account/nickname", json={"nickname": "Ghost"}, headers=csrf_headers(client))
+    _add_tip(_db_user("tipper3").id, "win", 1)
+    assert [r["nickname"] for r in client.get("/api/public/tipsters").json()["leaders"]] == ["Ghost"]
+    db = SessionLocal()
+    try:
+        db.query(User).filter(User.username == "tipper3").update({"email_verified": False})
+        db.commit()
+    finally:
+        db.close()
+    assert client.get("/api/public/tipsters").json()["leaders"] == []

@@ -58,6 +58,7 @@ const KNOWN_BACKEND_PATTERNS = [
   { test: /pr[ií]stup len pre administr[aá]tora/i, key: "errors.adminOnly" },
   { test: /prez[yý]vka mus[ií] ma[tť] 3/i, key: "errors.nicknameInvalid" },
   { test: /t[aá]to prez[yý]vka je u[zž] obsaden[aá]/i, key: "errors.nicknameTaken" },
+  { test: /t[aá]to prez[yý]vka nie je povolen[aá]/i, key: "errors.nicknameBlocked" },
   { test: /platby za premium zatia[lľ] nie s[uú] spusten[eé]/i, key: "errors.billingOff" },
   { test: /platobn[uú] br[aá]nu sa nepodarilo otvori[tť]/i, key: "errors.billingFailed" },
   { test: /m[oô][zž]e[sš] ma[tť] najviac (\d+) pl[aá]nov/i, key: "errors.scheduleLimit", params: (m) => ({ max: m[1] }) },

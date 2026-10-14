@@ -45,8 +45,9 @@ test("coin page accuracy table fits a phone screen and marks small samples", asy
   } }));
   await page.goto("/de/prognose/bitcoin");
   await expect(page.locator("table.lb-table")).toBeVisible();
-  await expect(page.locator("table.lb-table tr", { hasText: "25%" })).toContainText("·");   // 4 forecasts: few data
-  await expect(page.locator("table.lb-table tr", { hasText: "55%" })).not.toContainText("·");
+  await expect(page.getByTestId("small-sample-note")).toBeVisible();
+  await expect(page.locator("table.lb-table tr", { hasText: "25%" }).locator(".few-data")).toHaveCount(1);   // 4 forecasts
+  await expect(page.locator("table.lb-table tr", { hasText: "55%" }).locator(".few-data")).toHaveCount(0);   // 40
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 });
