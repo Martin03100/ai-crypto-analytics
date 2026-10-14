@@ -73,7 +73,8 @@ def test_smart_alerts_fire_on_their_own_signal(registered, monkeypatch):
         assert {(a.kind, a.coin) for a in db.query(PriceAlert).filter(PriceAlert.active.is_(True)).all()} == {("move", "ETH")}
     finally:
         db.close()
-    assert "🔔 Alert: BTC moved -6.2% in 24 hours" in sent and "🔔 Alert: Fear & Greed index is 15" in sent
+    assert len(sent) == 1      # every alert of the user that fired in one run arrives as one message
+    assert "🔔 Alert: BTC moved -6.2% in 24 hours" in sent[0] and "🔔 Alert: Fear & Greed index is 15" in sent[0]
     kinds = {n["data"]["alert_kind"] for n in client.get("/api/account/notifications").json()["items"]}
     assert kinds == {"move", "rsi", "fear_greed"}
 
@@ -148,3 +149,31 @@ def test_telegram_errors_never_log_the_bot_token(monkeypatch, caplog):
     monkeypatch.setattr(telegram.requests, "post", boom)
     assert telegram.send("42", "hi") is False
     assert "SECRET" not in caplog.text
+
+
+def test_alert_emails_can_be_switched_off_and_arrive_as_one_message(registered, monkeypatch):
+    from app.database import SessionLocal
+    from app.models import PriceAlert, User
+    from app.services import alerts, push
+    client, username, _p = registered
+    emails = []
+    monkeypatch.setattr(alerts, "is_email_configured", lambda: True)
+    monkeypatch.setattr(alerts, "send_email", lambda to, subject, text, html: emails.append(subject))
+    monkeypatch.setattr(alerts, "_current_values", lambda _alerts: {("price", "BTC"): 80_000.0, ("price", "ETH"): 5_000.0})
+
+    def fire():
+        with SessionLocal() as db:
+            uid = db.query(User).filter(User.username == username).one().id
+            for coin in ("BTC", "ETH"):
+                db.add(PriceAlert(user_id=uid, kind="price", coin=coin, direction="above", target_price=1.0))
+            db.commit()
+            alerts.check_alerts(db)
+
+    fire()
+    assert len(emails) == 1 and emails[0].endswith("(+1)")
+    with SessionLocal() as db:
+        user = db.query(User).filter(User.username == username).one()
+        push.set_prefs(user, {"email_alerts": False})
+        db.commit()
+    fire()
+    assert len(emails) == 1

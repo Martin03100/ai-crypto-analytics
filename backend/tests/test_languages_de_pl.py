@@ -118,7 +118,7 @@ def test_alert_email_is_translated(lang, expected, cta):
     alert = PriceAlert(coin="BTC", kind="price", direction="above", target_price=70_000.0)
     text = alerts.describe(alert, 71_000.0, lang)
     assert text == expected
-    subject, _text, html = alerts._email(User(id=1, username="x", lang=lang), text)
+    subject, _text, html = alerts._email(User(id=1, username="x", lang=lang), [text])
     assert subject == expected and cta in html and "Open AI Crypto Analytics" not in html
     move = PriceAlert(coin="ETH", kind="move", direction="below", target_price=5.0)
     assert "-6.0%" in alerts.describe(move, -6.0, lang)

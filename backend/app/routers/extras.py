@@ -199,6 +199,7 @@ class NotifyPrefsIn(BaseModel):
     flips: Optional[bool] = None
     results: Optional[bool] = None
     events: Optional[bool] = None
+    email_alerts: Optional[bool] = None
 
 
 @router.get("/api/account/notify-prefs")

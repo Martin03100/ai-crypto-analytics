@@ -154,7 +154,8 @@ def test_push_subscribe_validation_prefs_and_delivery(registered, monkeypatch):
     assert extras.valid_push_endpoint("https://web.push.apple.com/QWERTY")
     res = client.post("/api/push/subscribe", json={"endpoint": FCM, "keys": KEYS}, headers=h)
     assert res.status_code == 201 and res.json()["devices"] == 1
-    assert client.get("/api/account/notify-prefs").json() == {"prefs": {c: True for c in push.CATEGORIES}, "devices": 1}
+    assert client.get("/api/account/notify-prefs").json() == {
+        "prefs": {c: True for c in (*push.CATEGORIES, *push.EMAIL_SWITCHES)}, "devices": 1}
 
     sent = []
     monkeypatch.setattr(push, "send", lambda sub, payload: sent.append(payload) or 201)

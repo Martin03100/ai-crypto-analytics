@@ -28,6 +28,8 @@ from app.security import decrypt_secret, encrypt_secret
 logger = logging.getLogger(__name__)
 
 CATEGORIES = ("alerts", "flips", "results", "events")
+# Delivery by e-mail, switched separately from the browser categories (on unless the user turns it off).
+EMAIL_SWITCHES = ("email_alerts",)
 KIND_CATEGORY = {"price_alert": "alerts", "direction_flip": "flips", "forecast_evaluated": "results",
                  "duel_settled": "results", "challenge_won": "results", "event_reminder": "events"}
 KEY_ROW = "vapid_keys"
@@ -46,12 +48,12 @@ def prefs(user: User) -> Dict[str, bool]:
         stored = json.loads(user.notify_prefs_json) if user.notify_prefs_json else {}
     except (json.JSONDecodeError, TypeError):
         stored = {}
-    return {c: bool(stored.get(c, True)) for c in CATEGORIES}
+    return {c: bool(stored.get(c, True)) for c in (*CATEGORIES, *EMAIL_SWITCHES)}
 
 
 def set_prefs(user: User, changes: Dict[str, bool]) -> Dict[str, bool]:
     current = prefs(user)
-    current.update({k: bool(v) for k, v in changes.items() if k in CATEGORIES})
+    current.update({k: bool(v) for k, v in changes.items() if k in CATEGORIES or k in EMAIL_SWITCHES})
     user.notify_prefs_json = json.dumps(current)
     return current
 

@@ -20,7 +20,8 @@ export default function NotificationSettings() {
   const denied = supported && Notification.permission === "denied";
 
   const load = useCallback(() => {
-    api.notifyPrefs().then((r) => setPrefs(r.prefs)).catch(() => setPrefs({ alerts: true, flips: true, results: true, events: true }));
+    api.notifyPrefs().then((r) => setPrefs(r.prefs))
+      .catch(() => setPrefs({ alerts: true, flips: true, results: true, events: true, email_alerts: true }));
     currentSubscription().then((s) => setOn(Boolean(s))).catch(() => setOn(false));
   }, []);
   useEffect(load, [load]);
@@ -93,6 +94,16 @@ export default function NotificationSettings() {
               <span><strong>{t(`notify.cat_${c}`)}</strong><span className="text-sub" style={{ display: "block" }}>{t(`notify.cat_${c}Text`)}</span></span>
             </label>
           ))}
+        </fieldset>
+      )}
+      {prefs && (
+        <fieldset className="notify-cats">
+          <legend className="text-sub">{t("notify.emailTitle")}</legend>
+          <label className="toggle-row">
+            <input type="checkbox" checked={prefs.email_alerts !== false} onChange={() => toggleCategory("email_alerts")}
+              data-testid="email-alerts" />
+            <span><strong>{t("notify.emailAlerts")}</strong><span className="text-sub" style={{ display: "block" }}>{t("notify.emailAlertsText")}</span></span>
+          </label>
         </fieldset>
       )}
     </Card>

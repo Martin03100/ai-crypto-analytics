@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.config import APP_PUBLIC_URL, DEFAULT_COIN_IDS
 from app.models import PriceAlert, User
-from app.services import app_settings, market_data, telegram
+from app.services import app_settings, market_data, push, telegram
 from app.services.email_service import email_lang, email_shell, is_email_configured, send_email
 from app.services.notifications import notify
 from app.services.premium import has_premium_features
@@ -70,14 +70,17 @@ def describe(alert: PriceAlert, value: float, lang: Optional[str]) -> str:
     return f"{label}: " + _SUBJECT[lang][alert.kind].format(**params)
 
 
-def _email(user: User, text: str) -> tuple[str, str, str]:
+def _email(user: User, texts: list[str]) -> tuple[str, str, str]:
+    """One e-mail for every alert of the user that fired in this run; the subject names the first one."""
     cta = _WORDS[email_lang(user.lang)][3]
     link = f"{APP_PUBLIC_URL}/dashboard?utm_source=alert&utm_medium=email"
-    body = email_shell(lang=user.lang, preheader=text, inner_html=f"""
-        <h1 style="margin:0 0 18px; font-size:19px; color:#0f172a;">{html.escape(text)}</h1>
+    subject = texts[0] if len(texts) == 1 else f"{texts[0]} (+{len(texts) - 1})"
+    text = "\n".join(texts)
+    body = email_shell(lang=user.lang, preheader=subject, inner_html=f"""
+        <h1 style="margin:0 0 18px; font-size:19px; color:#0f172a;">{"<br>".join(html.escape(t) for t in texts)}</h1>
         <p style="margin:0;"><a href="{link}" style="display:inline-block; background:#0f172a; color:#ffffff;
            padding:11px 18px; border-radius:10px; font-size:14px; font-weight:600; text-decoration:none;">{cta}</a></p>""")
-    return text, f"{text}\n\n{link}", body
+    return subject, f"{text}\n\n{link}", body
 
 
 def _current_values(alerts: list[PriceAlert]) -> Dict[tuple, float]:
@@ -140,9 +143,14 @@ def check_alerts(db: Session) -> int:
                target=alert.target_price, price=value)
         deliveries.append((user, describe(alert, value, user.lang)))
     db.commit()
+    by_user: Dict[int, tuple[User, list[str]]] = {}
     for user, text in deliveries:
-        if user.email and user.email_verified is not False and is_email_configured():
-            send_email(user.email, *_email(user, text))
+        by_user.setdefault(user.id, (user, []))[1].append(text)
+    # One message per user and run (every few minutes), however many alerts fired at once: no flood of e-mails.
+    for user, texts in by_user.values():
+        if (user.email and user.email_verified is not False and is_email_configured()
+                and push.prefs(user).get("email_alerts", True)):
+            send_email(user.email, *_email(user, texts))
         if user.telegram_chat_id and has_premium_features(user):
-            telegram.send(user.telegram_chat_id, f"🔔 {text}")
+            telegram.send(user.telegram_chat_id, "\n".join(f"🔔 {t}" for t in texts))
     return len(deliveries)
