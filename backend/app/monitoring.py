@@ -70,3 +70,7 @@ def capture_exception(exc: BaseException) -> None:
         sentry_sdk.capture_exception(exc)
     except Exception:  # noqa: BLE001
         pass
+
+
+def is_enabled() -> bool:
+    return _enabled

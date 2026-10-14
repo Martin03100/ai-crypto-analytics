@@ -60,6 +60,13 @@ def stats(db: Session = Depends(get_db)) -> dict:
     }
 
 
+@router.get("/system")
+def system(db: Session = Depends(get_db)) -> dict:
+    from app.services import system_check
+
+    return system_check.report(db)
+
+
 def _user_row(u: User) -> dict:
     return {"id": u.id, "username": u.username, "email": u.email, "created_at": _iso(u.created_at),
             "email_verified": u.email_verified, "premium": is_premium(u), "premium_until": _iso(u.premium_until),

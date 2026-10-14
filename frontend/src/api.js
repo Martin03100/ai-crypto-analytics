@@ -301,6 +301,7 @@ export const api = {
   billingPortal: () => request("/billing/portal", { method: "POST" }),
   publicConfig: () => request("/public/config").then(obj),
   adminStats: () => request("/admin/stats").then(obj),
+  adminSystem: () => request("/admin/system").then(obj),
   adminUsers: (q, page) => request(`/admin/users?q=${encodeURIComponent(q || "")}&page=${page || 1}`).then((r) => withArrays(r, ["items"])),
   adminUpdateUser: (id, changes) => request(`/admin/users/${encodeURIComponent(id)}`, { method: "PATCH", body: changes }),
   adminWaitlist: () => request("/admin/waitlist").then((r) => withArrays(r, ["items"])),

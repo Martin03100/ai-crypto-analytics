@@ -158,6 +158,13 @@ alembic upgrade head
 
 ## Backup and restore
 
+**Automatic:** the `Database backup` workflow saves an encrypted copy every Monday as a GitHub Actions artifact
+(kept 90 days). Set the repository secrets `BACKUP_DATABASE_URL` (the database's external connection string) and
+`BACKUP_PASSPHRASE` (keep a copy elsewhere). Decrypt a downloaded artifact with
+`openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -in backup.json.gz.enc -out backup.json.gz`.
+`python -m app.services.backup dump FILE` writes the same file locally.
+
+**Manual:**
 The admin panel downloads the whole database as a gzipped JSON file (Admin → Backup). To restore it into an empty
 database with the current schema (for example a new PostgreSQL instance):
 

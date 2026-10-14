@@ -162,6 +162,8 @@ RATE_LIMIT_WAITLIST: Final[tuple] = (5, 300)
 RATE_LIMIT_RESET_CODE: Final[tuple] = (8, 300)
 RATE_LIMIT_MARKET_GLOBAL: Final[tuple] = (600, 60)
 TRUSTED_PROXY_HOPS: Final[int] = int(os.environ.get("TRUSTED_PROXY_HOPS", "0"))
+# "Sign in with Google": the OAuth client ID from Google Cloud (empty = the button is hidden).
+GOOGLE_CLIENT_ID: Final[str] = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
 # Same value as API_SIGNATURE_TOKEN on Netlify: the API then answers only requests signed by the Netlify proxy.
 PROXY_SIGNATURE_SECRET: Final[str] = os.environ.get("PROXY_SIGNATURE_SECRET", "").strip()
 

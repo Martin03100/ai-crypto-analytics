@@ -28,6 +28,9 @@ test("admin turns on 2FA, manages users and switches a feature off", async ({ pa
 
   await page.getByRole("link", { name: "Admin" }).click();
   await expect(page.getByText("users", { exact: true })).toBeVisible();
+  await expect(page.getByText("System check")).toBeVisible();
+  await expect(page.getByTestId("admin-db")).toContainText("sqlite");
+  await expect(page.getByText("Optional.").first()).toBeVisible();
   await page.getByRole("button", { name: "Payments" }).click();
   await expect(page.getByText("Ready to sell?")).toBeVisible();
   await expect(page.getByText("Paste your Stripe secret key below.")).toBeVisible();

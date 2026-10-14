@@ -1,4 +1,5 @@
-"""Database backup (admin download) and restore (command line: python -m app.services.backup restore FILE)."""
+"""Database backup (admin download, or: python -m app.services.backup dump FILE) and restore
+(python -m app.services.backup restore FILE)."""
 
 from __future__ import annotations
 
@@ -77,14 +78,24 @@ def restore_backup(engine: Engine, data: Dict[str, Any], force: bool = False) ->
 
 
 def main(argv=None) -> int:
-    parser = argparse.ArgumentParser(description="Restore an AI Crypto Analytics backup (.json.gz from the admin panel).")
+    parser = argparse.ArgumentParser(description="Back up or restore the AI Crypto Analytics database (.json.gz).")
     sub = parser.add_subparsers(dest="command", required=True)
+    dump_cmd = sub.add_parser("dump", help="write the whole database to FILE (read only, used by the backup workflow)")
+    dump_cmd.add_argument("file")
     restore = sub.add_parser("restore")
     restore.add_argument("file")
     restore.add_argument("--force", action="store_true", help="replace the contents of a database that is not empty")
     args = parser.parse_args(argv)
 
-    from app.database import engine, init_db
+    from app.database import SessionLocal, engine, init_db
+
+    if args.command == "dump":
+        with SessionLocal() as db:
+            data = build_backup(db)
+        with open(args.file, "wb") as fh:
+            fh.write(dump(data))
+        print(f"Saved {sum(len(rows) for rows in data['tables'].values())} rows in {len(data['tables'])} tables.")
+        return 0
 
     init_db()                                    # schema at the latest migration first
     with gzip.open(args.file, "rt", encoding="utf-8") as fh:

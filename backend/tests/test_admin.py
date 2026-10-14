@@ -186,3 +186,22 @@ def test_disabled_admin_loses_admin_role(admin):
     assert is_admin(user)
     user.disabled = True
     assert not is_admin(user)
+
+
+def test_system_check_reports_services_without_secrets(admin):
+    client, _username = admin
+    report = client.get("/api/admin/system").json()
+    assert report["database"]["engine"] == "sqlite"
+    assert set(report["checks"]) >= {"email", "captcha", "sentry_backend", "proxy_signature", "scheduler", "google_login"}
+    assert "sqlite:" not in str(report) and "postgres" not in str(report)
+
+
+def test_database_provider_is_recognised_from_the_host():
+    from app.services.system_check import database_info
+    assert database_info("postgresql://u:p@dpg-abc.frankfurt-postgres.render.com/db") == {
+        "engine": "postgresql", "provider": "Render", "render": True}
+    assert database_info("postgresql://u:p@ep-x.eu-central-1.aws.neon.tech/db")["provider"] == "Neon"
+
+
+def test_regular_user_cannot_see_the_system_check(registered):
+    assert registered[0].get("/api/admin/system").status_code == 403

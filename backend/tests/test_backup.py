@@ -49,3 +49,12 @@ def test_restore_refuses_a_database_that_is_in_use(registered):
     assert backup.restore_backup(engine, data, force=True)["users"] == 1
     with pytest.raises(ValueError):
         backup.restore_backup(engine, {"format": 99, "tables": {}}, force=True)
+
+
+def test_dump_command_writes_a_restorable_file(registered, tmp_path, capsys):
+    path = tmp_path / "backup.json.gz"
+    assert backup.main(["dump", str(path)]) == 0
+    assert "Saved" in capsys.readouterr().out
+    with gzip.open(path, "rt", encoding="utf-8") as fh:
+        data = json.load(fh)
+    assert data["format"] == backup.FORMAT and len(data["tables"]["users"]) == 1

@@ -6,6 +6,7 @@ import { Link, Navigate } from "react-router-dom";
 import { api } from "../api";
 import AdminFeedback from "../components/AdminFeedback";
 import AdminPayments from "../components/AdminPayments";
+import AdminSystem from "../components/AdminSystem";
 import { Card } from "../components/Card";
 import LoadError from "../components/LoadError";
 import { useAppConfig } from "../context/AppConfigContext";
@@ -48,6 +49,7 @@ function Overview() {
           <p className="text-sub">{t("admin.sources")}: {Object.entries(s.waitlist_by_source).map(([k, v]) => `${k} ${v}`).join(" · ")}</p>
         )}
       </Card>
+      <AdminSystem />
       <Card title={t("admin.backupTitle")} icon={Database} style={{ marginTop: 16 }}>
         <p className="text-sub" style={{ marginTop: 0 }}>{t("admin.backupText")}</p>
         <a className="btn btn-ghost btn-sm" href={api.adminBackupUrl()} download><Download size={14} /> {t("admin.backupButton")}</a>
