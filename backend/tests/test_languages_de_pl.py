@@ -4,7 +4,7 @@ import pytest
 
 from app import i18n_content
 from app.models import PriceAlert, User
-from app.services import alerts, briefing, demo_data, digest, email_service, signals, validators
+from app.services import alerts, briefing, demo_data, digest, email_service, signal_text, validators
 from tests.conftest import csrf_headers
 
 MODULES = (i18n_content, alerts, briefing, demo_data, digest, email_service, validators)
@@ -80,13 +80,13 @@ def test_helpers_translate_and_fall_back():
 
 
 def test_signal_labels_have_every_language_and_never_index_out_of_range():
-    for key, names in signals.LABELS.items():
+    for key, names in signal_text.LABELS.items():
         assert len(names) == len(i18n_content.SUPPORTED_LANGS), key
     items = [{"key": "liquidations", "tone": "bearish", "display": "$1B"},
              {"key": "unknown_signal", "tone": "bullish", "display": "1"}]
-    assert signals.headline(items, "de") == ["Liquidationen: $1B ▼", "unknown_signal: 1 ▲"]
-    assert signals.headline(items, "pl")[0] == "Likwidacje: $1B ▼"
-    assert signals.headline(items, "xx")[0] == "Liquidations: $1B ▼"
+    assert signal_text.headline(items, "de") == ["Liquidationen: $1B ▼", "unknown_signal: 1 ▲"]
+    assert signal_text.headline(items, "pl")[0] == "Likwidacje: $1B ▼"
+    assert signal_text.headline(items, "xx")[0] == "Liquidations: $1B ▼"
 
 
 _WEEK = {"total": 12, "hit": 58, "best": {"model": "Gemini", "n": 5, "hit": 80}, "tips_won": 3, "tips_total": 5}

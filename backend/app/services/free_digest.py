@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from app.i18n_content import normalize_lang
-from app.services import market_data, signals
+from app.services import market_data, signal_text, signals
 
 _MOOD = {
     "en": {"Extreme Fear": "extreme fear", "Fear": "fear", "Neutral": "neutral", "Greed": "greed", "Extreme Greed": "extreme greed"},
@@ -56,7 +56,7 @@ def _signal_lines(lang: str) -> List[str]:
         bundle = signals.latest("BTC") or signals.collect("BTC")
     except Exception:  # noqa: BLE001 - the overview works without signals
         return []
-    return signals.headline(bundle.get("items", []), lang, limit=3)
+    return signal_text.headline(bundle.get("items", []), lang, limit=3)
 
 
 def build(fg_value: Optional[int], fg_classification: Optional[str], lang: str = "en") -> Dict[str, Any]:

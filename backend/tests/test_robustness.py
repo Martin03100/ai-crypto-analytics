@@ -179,7 +179,7 @@ def test_forecast_tolerates_trailing_commas():
 def test_gemini_retries_without_thinking_config(monkeypatch):
     import sys
     import types as pytypes
-    from app.services import ai_engine
+    from app.services import ai_providers
 
     calls = []
 
@@ -204,6 +204,6 @@ def test_gemini_retries_without_thinking_config(monkeypatch):
     monkeypatch.setitem(sys.modules, "google", google_mod)
     monkeypatch.setitem(sys.modules, "google.genai", genai_mod)
     monkeypatch.setitem(sys.modules, "google.genai.types", fake_types)
-    ok, text, err = ai_engine._call_gemini("prompt", "key")
+    ok, text, err = ai_providers._call_gemini("prompt", "key")
     assert ok, err
     assert len(calls) == 2 and "thinking_config" not in calls[1]

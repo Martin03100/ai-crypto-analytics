@@ -7,7 +7,7 @@ import time
 import pytest
 import requests
 
-from app.services import coin_page, signals
+from app.services import coin_page, signal_text, signals
 
 pytestmark = pytest.mark.live_signals
 
@@ -80,8 +80,8 @@ def test_an_expired_coin_page_is_served_at_once(client, monkeypatch):
 
 
 def test_display_values_are_localized_for_emails():
-    assert signals.localize_display("+2.8% 1m", "sk") == "+2.8% 1 mes."
-    assert signals.localize_display("3.7% y/y", "de") == "3.7% ggü. Vorjahr"
-    assert signals.localize_display("0% long", "cs") == "0 % longů"
-    lines = signals.headline([{"key": "funding", "display": "+0.0450% / 8h", "tone": "bearish"}], "pl")
+    assert signal_text.localize_display("+2.8% 1m", "sk") == "+2.8% 1 mes."
+    assert signal_text.localize_display("3.7% y/y", "de") == "3.7% ggü. Vorjahr"
+    assert signal_text.localize_display("0% long", "cs") == "0 % longů"
+    lines = signal_text.headline([{"key": "funding", "display": "+0.0450% / 8h", "tone": "bearish"}], "pl")
     assert lines == ["Funding: +0.0450% / 8 h ▼"]

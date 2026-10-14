@@ -5,7 +5,7 @@ from datetime import date
 
 import pytest
 
-from app.services import ai_engine, signals
+from app.services import ai_engine, signal_text, signals
 
 pytestmark = pytest.mark.live_signals
 
@@ -160,4 +160,4 @@ def test_signals_endpoint_and_briefing_lines(client, monkeypatch):
     assert res.status_code == 200 and body["coin"] == "ETH" and [s["key"] for s in body["items"]] == ["btc_dominance", "vix", "event"]
     assert body["items"][-1]["meta"] == {"name": "CPI-sk", "days": 2} and all("note" not in s for s in body["items"])
     assert client.get("/api/market/signals?coin=FAKE").status_code == 400
-    assert signals.headline(bundle["items"], "sk") == ["VIX: 28.0 ▼"]
+    assert signal_text.headline(bundle["items"], "sk") == ["VIX: 28.0 ▼"]

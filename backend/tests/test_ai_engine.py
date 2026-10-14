@@ -6,12 +6,14 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.services import ai_engine  # noqa: E402
+from app.services import ai_providers
+from app.services import ai_context
 
 
 
 
 def test_fetch_market_context_returns_none_for_unknown_coin():
-    assert ai_engine._fetch_market_context("TOTALLY_UNKNOWN_COIN") is None
+    assert ai_context._fetch_market_context("TOTALLY_UNKNOWN_COIN") is None
 
 
 
@@ -78,10 +80,10 @@ def test_openai_compatible_payload_caps_tokens_and_temperature(monkeypatch):
         captured["payload"] = json
         return FakeResponse()
 
-    monkeypatch.setattr(ai_engine.requests, "post", fake_post)
-    ai_engine._call_openai_compatible("https://example.com/v1/chat", "some-model", "test prompt", "fake-key")
-    assert captured["payload"]["max_tokens"] == ai_engine._MAX_OUTPUT_TOKENS
-    assert captured["payload"]["temperature"] == ai_engine._TEMPERATURE
+    monkeypatch.setattr(ai_providers.requests, "post", fake_post)
+    ai_providers._call_openai_compatible("https://example.com/v1/chat", "some-model", "test prompt", "fake-key")
+    assert captured["payload"]["max_tokens"] == ai_providers._MAX_OUTPUT_TOKENS
+    assert captured["payload"]["temperature"] == ai_providers._TEMPERATURE
 
 
 def test_anthropic_payload_caps_tokens_and_temperature(monkeypatch):
@@ -100,10 +102,10 @@ def test_anthropic_payload_caps_tokens_and_temperature(monkeypatch):
         captured["payload"] = json
         return FakeResponse()
 
-    monkeypatch.setattr(ai_engine.requests, "post", fake_post)
-    ai_engine._call_anthropic("test prompt", "fake-key")
-    assert captured["payload"]["max_tokens"] == ai_engine._MAX_OUTPUT_TOKENS
-    assert captured["payload"]["temperature"] == ai_engine._TEMPERATURE
+    monkeypatch.setattr(ai_providers.requests, "post", fake_post)
+    ai_providers._call_anthropic("test prompt", "fake-key")
+    assert captured["payload"]["max_tokens"] == ai_providers._MAX_OUTPUT_TOKENS
+    assert captured["payload"]["temperature"] == ai_providers._TEMPERATURE
 
 
 def test_estimate_forecast_cost_scales_with_points():
@@ -155,7 +157,7 @@ def _fake_gemini(monkeypatch, text):
 
 def test_gemini_uses_low_thinking_no_temperature_and_enough_tokens(monkeypatch):
     captured = _fake_gemini(monkeypatch, '{"ok": 1}')
-    ok, text, err = ai_engine._call_gemini("prompt", "fake-key")
+    ok, text, err = ai_providers._call_gemini("prompt", "fake-key")
     assert ok is True and err is None
     cfg = captured["config"]
     assert cfg.temperature is None
@@ -165,7 +167,7 @@ def test_gemini_uses_low_thinking_no_temperature_and_enough_tokens(monkeypatch):
 
 def test_gemini_empty_response_returns_explicit_error(monkeypatch):
     _fake_gemini(monkeypatch, None)
-    ok, text, err = ai_engine._call_gemini("prompt", "fake-key")
+    ok, text, err = ai_providers._call_gemini("prompt", "fake-key")
     assert ok is False
     assert "prazdnu odpoved" in err
 
@@ -200,12 +202,12 @@ def _patch_sources(monkeypatch, coin_hist, btc_hist=None, fail=False, timeouts=N
                         lambda *a, **k: (True, [{"title": "Bitcoin ETF inflows rise"}], None))
     for name in ("coin_profile", "coin_news", "derivatives", "onchain", "chain_tvl", "macro_summary",
                  "world_news", "github_activity", "coin_subreddit"):
-        monkeypatch.setattr(ai_engine.data_sources, name, lambda *a, **k: None)
+        monkeypatch.setattr(ai_context.data_sources, name, lambda *a, **k: None)
 
 
 def test_market_context_includes_indicators_btc_mood_and_news(monkeypatch):
     _patch_sources(monkeypatch, _hist(100.0, 110.0), btc_hist=_hist(80000.0, 84000.0))
-    ctx = ai_engine._fetch_market_context("SOL")
+    ctx = ai_context._fetch_market_context("SOL")
     assert "SOL: cena $110.00" in ctx
     assert "30d +10.0%" in ctx
     assert "RSI(14)" in ctx and "vs SMA7" in ctx and "denna volatilita" in ctx and "objem 24h" in ctx
@@ -216,21 +218,21 @@ def test_market_context_includes_indicators_btc_mood_and_news(monkeypatch):
 
 def test_market_context_for_btc_has_no_duplicate_leader_line(monkeypatch):
     _patch_sources(monkeypatch, _hist(80000.0, 84000.0))
-    ctx = ai_engine._fetch_market_context("BTC")
+    ctx = ai_context._fetch_market_context("BTC")
     assert "BTC: cena" in ctx and "lider trhu" not in ctx
 
 
 def test_market_context_none_when_history_unavailable(monkeypatch):
     _patch_sources(monkeypatch, None, fail=True)
-    assert ai_engine._fetch_market_context("ETH") is None
+    assert ai_context._fetch_market_context("ETH") is None
 
 
 def test_market_context_uses_short_timeout(monkeypatch):
     timeouts = []
     _patch_sources(monkeypatch, _hist(1.0, 2.0), timeouts=timeouts)
-    ai_engine._fetch_market_context("ETH")
+    ai_context._fetch_market_context("ETH")
     assert timeouts and all(t == ai_engine._MARKET_CONTEXT_TIMEOUT for t in timeouts)
-    assert ai_engine._MARKET_CONTEXT_TIMEOUT < ai_engine.AI_REQUEST_TIMEOUT_SECONDS
+    assert ai_context._MARKET_CONTEXT_TIMEOUT < ai_providers.AI_REQUEST_TIMEOUT_SECONDS
 
 
 def test_market_context_never_raises(monkeypatch):
@@ -239,14 +241,14 @@ def test_market_context_never_raises(monkeypatch):
     for fn in ("get_market_history", "get_fear_greed_index", "get_crypto_headlines"):
         monkeypatch.setattr(ai_engine.market_data, fn, boom)
     for fn in ("coin_profile", "coin_news", "derivatives", "onchain", "chain_tvl", "macro_summary", "world_news"):
-        monkeypatch.setattr(ai_engine.data_sources, fn, boom)
-    assert ai_engine._fetch_market_context("ETH") is None
+        monkeypatch.setattr(ai_context.data_sources, fn, boom)
+    assert ai_context._fetch_market_context("ETH") is None
 
 
 def test_rsi_extremes():
-    assert ai_engine._rsi([float(i) for i in range(20)]) == 100.0
-    assert ai_engine._rsi([float(20 - i) for i in range(20)]) == 0.0
-    assert ai_engine._rsi([1.0, 2.0]) is None
+    assert ai_context._rsi([float(i) for i in range(20)]) == 100.0
+    assert ai_context._rsi([float(20 - i) for i in range(20)]) == 0.0
+    assert ai_context._rsi([1.0, 2.0]) is None
 
 
 def test_real_forecast_prompt_requests_user_language(monkeypatch):
@@ -261,9 +263,9 @@ def test_real_forecast_prompt_requests_user_language(monkeypatch):
 
 def test_market_context_adds_type_guidance_and_lists_sources(monkeypatch):
     _patch_sources(monkeypatch, _hist(0.1, 0.12))
-    monkeypatch.setattr(ai_engine.data_sources, "coin_profile",
+    monkeypatch.setattr(ai_context.data_sources, "coin_profile",
                         lambda cid: {"categories": ["Meme", "Dog-Themed"], "rank": 9, "github": "", "subreddit": ""})
-    monkeypatch.setattr(ai_engine.data_sources, "derivatives", lambda s: "Derivaty (Hyperliquid perp): funding +0.0010%/h")
+    monkeypatch.setattr(ai_context.data_sources, "derivatives", lambda s: "Derivaty (Hyperliquid perp): funding +0.0010%/h")
     text, sources = ai_engine._build_market_context("DOGE")
     assert "MEME coin" in text and "Derivaty (Hyperliquid perp)" in text
     assert "hyperliquid" in sources and "coingecko_profile" in sources
@@ -288,7 +290,7 @@ def test_portfolio_context_computes_values_and_weights(monkeypatch):
 def test_custom_provider_call_revalidates_and_blocks_redirects(monkeypatch):
     import json as _json
     captured = {}
-    monkeypatch.setattr(ai_engine, "validate_custom_base_url", lambda url: None)
+    monkeypatch.setattr(ai_providers, "validate_custom_base_url", lambda url: None)
 
     class Resp:
         is_redirect = False
@@ -304,7 +306,7 @@ def test_custom_provider_call_revalidates_and_blocks_redirects(monkeypatch):
                         adapter=type(self.get_adapter("https://api.example.com")).__name__, trust_env=self.trust_env)
         return Resp()
 
-    monkeypatch.setattr(ai_engine.requests.Session, "post", fake_post)
+    monkeypatch.setattr(ai_providers.requests.Session, "post", fake_post)
     secret = _json.dumps({"base_url": "https://api.example.com/v1/", "model": "m1", "key": "k"})
     assert ai_engine.call_ai_provider("custom", "hi", secret) == (True, "OK", None)
     assert captured == {"url": "https://api.example.com/v1/chat/completions", "allow_redirects": False,
@@ -346,9 +348,9 @@ def _scripted_gemini(monkeypatch, script):
             self.models = FakeModels()
 
     monkeypatch.setattr(genai, "Client", FakeClient)
-    monkeypatch.setattr(ai_engine.time, "sleep", lambda s: sleeps.append(s))
-    monkeypatch.setattr(ai_engine, "GEMINI_MODEL", "main-model")
-    monkeypatch.setattr(ai_engine, "GEMINI_FALLBACK_MODELS", ["lite-model"])
+    monkeypatch.setattr(ai_providers.time, "sleep", lambda s: sleeps.append(s))
+    monkeypatch.setattr(ai_providers, "GEMINI_MODEL", "main-model")
+    monkeypatch.setattr(ai_providers, "GEMINI_FALLBACK_MODELS", ["lite-model"])
     return calls, sleeps
 
 
@@ -358,13 +360,13 @@ INTERNAL = RuntimeError("500 INTERNAL. {'error': {'code': 500, 'message': 'Inter
 
 def test_gemini_retries_transient_errors_with_backoff(monkeypatch):
     calls, sleeps = _scripted_gemini(monkeypatch, {"main-model": [INTERNAL, OVERLOADED, '{"ok": 1}']})
-    ok, text, err = ai_engine._call_gemini("p", "k")
+    ok, text, err = ai_providers._call_gemini("p", "k")
     assert ok and text == '{"ok": 1}' and calls == ["main-model"] * 3 and sleeps == [2, 5]
 
 
 def test_gemini_switches_to_the_fallback_model_when_the_main_one_stays_overloaded(monkeypatch):
     calls, _ = _scripted_gemini(monkeypatch, {"main-model": [OVERLOADED] * 4, "lite-model": ['{"ok": 2}']})
-    ok, text, _err = ai_engine._call_gemini("p", "k")
+    ok, text, _err = ai_providers._call_gemini("p", "k")
     assert ok and text == '{"ok": 2}' and calls[-1] == "lite-model"
 
 
@@ -372,7 +374,7 @@ def test_gemini_waits_the_suggested_delay_once_on_rate_limit(monkeypatch):
     rate = RuntimeError("429 RESOURCE_EXHAUSTED. {'details': [{'@type': 'type.googleapis.com/google.rpc.RetryInfo', "
                         "'retryDelay': '12s'}]}")
     calls, sleeps = _scripted_gemini(monkeypatch, {"main-model": [rate, '{"ok": 3}']})
-    ok, _text, _err = ai_engine._call_gemini("p", "k")
+    ok, _text, _err = ai_providers._call_gemini("p", "k")
     assert ok and sleeps == [12.0] and calls == ["main-model", "main-model"]
 
 
@@ -380,7 +382,7 @@ def test_gemini_daily_quota_goes_straight_to_the_fallback_model(monkeypatch):
     daily = RuntimeError("429 RESOURCE_EXHAUSTED. quotaId: GenerateRequestsPerDayPerProjectPerModel-FreeTier, "
                          "'retryDelay': '20s'")
     calls, sleeps = _scripted_gemini(monkeypatch, {"main-model": [daily], "lite-model": [daily]})
-    ok, _text, err = ai_engine._call_gemini("p", "k")
+    ok, _text, err = ai_providers._call_gemini("p", "k")
     assert not ok and sleeps == [] and calls == ["main-model", "lite-model"]
     assert err.startswith("Gemini API chyba: 429")
 
@@ -388,12 +390,12 @@ def test_gemini_daily_quota_goes_straight_to_the_fallback_model(monkeypatch):
 def test_gemini_invalid_key_is_not_retried_on_other_models(monkeypatch):
     bad_key = RuntimeError("400 INVALID_ARGUMENT. API key not valid. Please pass a valid API key.")
     calls, sleeps = _scripted_gemini(monkeypatch, {"main-model": [bad_key], "lite-model": ['{"x": 1}']})
-    ok, _text, err = ai_engine._call_gemini("p", "k")
+    ok, _text, err = ai_providers._call_gemini("p", "k")
     assert not ok and calls == ["main-model"] and sleeps == [] and "API key not valid" in err
 
 
 def test_gemini_unknown_model_falls_back_without_retrying(monkeypatch):
     gone = RuntimeError("404 NOT_FOUND. models/main-model is not found for API version v1beta")
     calls, sleeps = _scripted_gemini(monkeypatch, {"main-model": [gone], "lite-model": ['{"ok": 4}']})
-    ok, text, _err = ai_engine._call_gemini("p", "k")
+    ok, text, _err = ai_providers._call_gemini("p", "k")
     assert ok and text == '{"ok": 4}' and calls == ["main-model", "lite-model"] and sleeps == []

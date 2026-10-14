@@ -223,13 +223,13 @@ def test_development_allows_default_secrets(monkeypatch):
 
 
 def test_custom_base_url_rejects_private_and_ipv6_scope_ids(monkeypatch):
-    from app.services import ai_engine
+    from app.services import ai_engine, ai_providers
     fake = lambda host, port, proto=0: [(2, 1, 6, "", ("127.0.0.1", 443))]
-    monkeypatch.setattr(ai_engine.socket, "getaddrinfo", fake)
+    monkeypatch.setattr(ai_providers.socket, "getaddrinfo", fake)
     assert ai_engine.validate_custom_base_url("https://evil.example/v1")
-    monkeypatch.setattr(ai_engine.socket, "getaddrinfo", lambda *a, **k: [(10, 1, 6, "", ("fe80::1%eth0", 443, 0, 2))])
+    monkeypatch.setattr(ai_providers.socket, "getaddrinfo", lambda *a, **k: [(10, 1, 6, "", ("fe80::1%eth0", 443, 0, 2))])
     assert ai_engine.validate_custom_base_url("https://evil.example/v1")
-    monkeypatch.setattr(ai_engine.socket, "getaddrinfo", lambda *a, **k: [(2, 1, 6, "", ("93.184.216.34", 443))])
+    monkeypatch.setattr(ai_providers.socket, "getaddrinfo", lambda *a, **k: [(2, 1, 6, "", ("93.184.216.34", 443))])
     assert ai_engine.validate_custom_base_url("https://ok.example/v1") is None
     assert ai_engine.validate_custom_base_url("http://ok.example/v1")
 
@@ -267,15 +267,15 @@ def test_totp_required_response_carries_machine_readable_code(registered):
 
 def test_custom_provider_blocks_dns_rebinding_and_never_sends_the_key(monkeypatch):
     import socket
-    from app.services import ai_engine
+    from app.services import ai_providers
     server = socket.socket()
     server.bind(("127.0.0.1", 0))
     server.listen(1)
     server.settimeout(3)
     port = server.getsockname()[1]
-    monkeypatch.setattr(ai_engine, "validate_custom_base_url", lambda url: None)
+    monkeypatch.setattr(ai_providers, "validate_custom_base_url", lambda url: None)
     secret = json.dumps({"base_url": f"https://127.0.0.1:{port}", "model": "m", "key": "SECRETKEY123"})
-    ok, _text, err = ai_engine._call_custom_provider("hello", secret)
+    ok, _text, err = ai_providers._call_custom_provider("hello", secret)
     assert ok is False and "internú sieť" in err
     conn, _ = server.accept()
     conn.settimeout(1)
@@ -288,7 +288,7 @@ def test_custom_provider_blocks_dns_rebinding_and_never_sends_the_key(monkeypatc
 
 
 def test_public_ip_helper():
-    from app.services.ai_engine import _is_public_ip
+    from app.services.ai_providers import _is_public_ip
     assert _is_public_ip("93.184.216.34")
     for bad in ("127.0.0.1", "10.0.0.5", "169.254.169.254", "::1", "fe80::1%eth0", "not-an-ip", ""):
         assert not _is_public_ip(bad), bad
@@ -424,7 +424,7 @@ def test_oversized_body_is_rejected_and_normal_body_still_works(registered):
 
 
 def test_deepseek_call_disables_thinking_mode_and_uses_current_model(monkeypatch):
-    from app.services import ai_engine
+    from app.services import ai_engine, ai_providers
     from app.config import DEEPSEEK_MODEL
     assert DEEPSEEK_MODEL != "deepseek-chat"
     captured = {}
@@ -440,7 +440,7 @@ def test_deepseek_call_disables_thinking_mode_and_uses_current_model(monkeypatch
         captured.update(url=url, payload=payload)
         return Resp()
 
-    monkeypatch.setattr(ai_engine, "_post_with_retry", fake_post)
+    monkeypatch.setattr(ai_providers, "_post_with_retry", fake_post)
     ok, text, err = ai_engine.call_ai_provider("deepseek", "hi", "sk-test")
     assert ok and text == "OK"
     assert captured["payload"]["model"] == DEEPSEEK_MODEL

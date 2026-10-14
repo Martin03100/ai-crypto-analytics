@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.config import APP_PUBLIC_URL
 from app.models import User
-from app.services import quant_engine, signals, telegram
+from app.services import quant_engine, signal_text, signals, telegram
 from app.services.alerts import fmt_price
 from app.services.email_service import email_lang, email_shell, is_email_configured, send_email
 from app.services.premium import has_premium_features
@@ -69,7 +69,7 @@ def coin_outlook(coin: str, cache: dict) -> Optional[dict]:
 def render_briefing(user: User, rows: list[dict], market: Optional[list[dict]] = None) -> tuple[str, str, str]:
     lang = email_lang(user.lang)
     t = _T[lang]
-    extra = signals.headline(market or [], lang)
+    extra = signal_text.headline(market or [], lang)
     lines = [t["row"].format(coin=r["coin"], price=fmt_price(r["price"]), target=fmt_price(r["target"]),
                              change=f"{r['change']:+.1f}%", low=fmt_price(r["low"]), high=fmt_price(r["high"])) for r in rows]
     link = f"{APP_PUBLIC_URL}/dashboard?utm_source=briefing&utm_medium=email"
