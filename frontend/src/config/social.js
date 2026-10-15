@@ -3,9 +3,9 @@
  * (e.g. "https://www.tiktok.com/@yourname"); until then the network shows as "link coming soon".
  */
 export const SOCIAL_LINKS = [
-  { id: "tiktok", label: "TikTok", url: "" },
-  { id: "instagram", label: "Instagram", url: "" },
-  { id: "youtube", label: "YouTube", url: "" },
+  { id: "tiktok", label: "TikTok", url: "https://www.tiktok.com/@ai_crypto_analyti" },
+  { id: "instagram", label: "Instagram", url: "https://www.instagram.com/ai_crypto_analytics/" },
+  { id: "youtube", label: "YouTube", url: "https://www.youtube.com/@AICryptoAnalytics" },
   { id: "x", label: "X (Twitter)", url: "" },
   { id: "reddit", label: "Reddit", url: "" },
   { id: "facebook", label: "Facebook", url: "" },

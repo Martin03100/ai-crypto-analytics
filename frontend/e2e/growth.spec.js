@@ -12,10 +12,11 @@ test("track record is public and reachable from the landing page", async ({ page
   await expect(page.getByText("Not financial advice.")).toBeVisible();
 });
 
-test("links page offers the app, track record and social placeholders", async ({ page }) => {
+test("links page offers the app, track record and social profiles", async ({ page }) => {
   await page.goto("/links");
   await expect(page.getByRole("heading", { name: "AI Crypto Analytics" })).toBeVisible();
-  await expect(page.getByText("Instagram · link coming soon")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Instagram" })).toHaveAttribute("href", "https://www.instagram.com/ai_crypto_analytics/");
+  await expect(page.getByText("X (Twitter) · link coming soon")).toBeVisible();
   await expect(page.getByRole("link", { name: "Live AI track record" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Premium" })).toHaveCount(0);
 });
