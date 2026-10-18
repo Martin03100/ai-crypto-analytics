@@ -127,3 +127,7 @@ def _warm_in_background() -> None:
     from app.services import signals
 
     threading.Thread(target=signals.warm, args=(list(DEFAULT_COIN_IDS),), name="warm-signals", daemon=True).start()
+    # The calendar's token unlocks are large downloads: fetched here, so visitors find them ready.
+    from app.services import event_calendar
+    threading.Thread(target=event_calendar.token_unlocks, args=(datetime.now(timezone.utc).date(),),
+                     name="warm-calendar", daemon=True).start()

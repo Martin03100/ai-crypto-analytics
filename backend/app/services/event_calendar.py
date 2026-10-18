@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import calendar as _cal
 import logging
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -145,8 +146,18 @@ def unlocks_from_series(coin: str, data: Any, today: date, days: int = UNLOCK_DA
     return out
 
 
-def token_unlocks(today: date) -> List[Dict[str, Any]]:
-    return _cache.get_or_set(f"unlocks:{today}", lambda: _fetch_unlocks(today))
+def token_unlocks(today: date, wait: bool = True) -> List[Dict[str, Any]]:
+    """Large token unlocks (DefiLlama). With wait=False an empty cache does not hold up the caller: the download of
+    eight large datasets runs in the background (it can take longer than the 26 s the web proxy waits) and this call
+    returns no unlocks until it has finished."""
+    key = f"unlocks:{today}"
+    if wait:
+        return _cache.get_or_set(key, lambda: _fetch_unlocks(today))
+    cached = _cache.get(key)
+    if cached is not None:
+        return cached
+    threading.Thread(target=token_unlocks, args=(today,), name="calendar-unlocks", daemon=True).start()
+    return []
 
 
 def _fetch_unlocks(today: date) -> List[Dict[str, Any]]:
@@ -159,12 +170,12 @@ def _fetch_unlocks(today: date) -> List[Dict[str, Any]]:
     return out
 
 
-def upcoming(days: int = 60, now: Optional[datetime] = None, network: bool = True) -> Dict[str, Any]:
+def upcoming(days: int = 60, now: Optional[datetime] = None, network: bool = True, wait: bool = False) -> Dict[str, Any]:
     now = now or datetime.now(timezone.utc).replace(tzinfo=None)
     end = now + timedelta(days=days)
     items = macro_events() + option_expiries(now.date())
     if network:
-        items += token_unlocks(now.date())
+        items += token_unlocks(now.date(), wait=wait)
     items = [e for e in items if now - timedelta(hours=2) <= _at(e) <= end]
     items.sort(key=_at)
     halving = halving_event(now) if network else None
@@ -177,7 +188,7 @@ def _at(event: Dict[str, Any]) -> datetime:
 
 def find(event_id: str, now: Optional[datetime] = None) -> Optional[Dict[str, Any]]:
     """An event the user may set a reminder for (from the next 120 days, no network needed for macro/options)."""
-    for e in upcoming(120, now)["events"]:
+    for e in upcoming(120, now, wait=True)["events"]:
         if e["id"] == event_id:
             return e
     return None
