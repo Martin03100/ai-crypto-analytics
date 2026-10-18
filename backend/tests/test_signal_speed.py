@@ -66,7 +66,10 @@ def test_an_expired_bundle_is_served_at_once_and_refreshed_in_the_background(mon
 def test_warm_refreshes_every_coin(monkeypatch):
     seen = []
     monkeypatch.setattr(signals, "_collect", lambda symbol, timeout: seen.append(symbol) or {"items": []})
+    pauses = []
+    monkeypatch.setattr(signals.time, "sleep", lambda s: pauses.append(s))
     assert signals.warm(["btc", "eth"]) == 2
+    assert pauses == [signals._WARM_PAUSE_SECONDS]      # a breather between coins, none before the first
     assert seen == ["BTC", "ETH"]
 
 
@@ -85,3 +88,22 @@ def test_display_values_are_localized_for_emails():
     assert signal_text.localize_display("0% long", "cs") == "0 % longů"
     lines = signal_text.headline([{"key": "funding", "display": "+0.0450% / 8h", "tone": "bearish"}], "pl")
     assert lines == ["Funding: +0.0450% / 8 h ▼"]
+
+
+def test_a_country_blocked_source_is_skipped_for_hours(monkeypatch):
+    import requests
+    calls = []
+
+    class Blocked:
+        status_code = 451
+
+        def raise_for_status(self):
+            raise requests.HTTPError("451 Client Error", response=self)
+
+    monkeypatch.setattr(signals.requests, "get", lambda *a, **k: calls.append(1) or Blocked())
+    signals._down_until.clear()
+    assert signals._get("https://fapi.blocked.example.com/premiumIndex", signals._fast) is None
+    assert signals._get("https://fapi.blocked.example.com/premiumIndex?symbol=ETH", signals._fast) is None
+    assert len(calls) == 1
+    assert signals._down_until["fapi.blocked.example.com"] - time.monotonic() > 3600
+    signals._down_until.clear()

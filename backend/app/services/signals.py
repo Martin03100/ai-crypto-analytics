@@ -30,6 +30,9 @@ _TIMEOUT = 5
 # A source that timed out or refused the connection is skipped for a while, so one blocked or hanging API
 # (e.g. a service unreachable from the server's region) cannot slow down every page that shows signals.
 _HOST_BACKOFF_SECONDS = 600
+_BLOCKED_BACKOFF_SECONDS = 6 * 3600   # a host that refuses us (403/451, e.g. a country block)
+# Pause between coins in the background warm-up: on a small server it must not take all the CPU from visitors.
+_WARM_PAUSE_SECONDS = 1.5
 _down_until: Dict[str, float] = {}
 _fast = TTLCache(ttl_seconds=300)        # derivatives, prices
 _medium = TTLCache(ttl_seconds=900)      # options, stablecoins, network, regulators
@@ -85,7 +88,10 @@ def _get(url: str, cache: TTLCache, params: Optional[dict] = None, as_text: bool
         logger.info("Signal source %s unreachable (%s), skipped for %d s", host, type(exc).__name__, _HOST_BACKOFF_SECONDS)
         return cache.get(key, allow_stale=True)
     except Exception as exc:  # noqa: BLE001 - any failure just skips the source
-        logger.info("Signal source %s unavailable: %s", url.split("?")[0], type(exc).__name__)
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        if status in (403, 451):   # e.g. Binance and Bybit refuse servers in the USA: that will not change soon
+            _down_until[host] = time.monotonic() + _BLOCKED_BACKOFF_SECONDS
+        logger.info("Signal source %s unavailable: %s %s", url.split("?")[0], type(exc).__name__, status or "")
         return cache.get(key, allow_stale=True)
     cache.set(key, data)
     return data
@@ -535,7 +541,9 @@ def _refresh_in_background(symbol: str, timeout: float) -> None:
 def warm(symbols) -> int:
     """Refresh the bundles of these coins now (background job), so visitors never wait for the sources."""
     done = 0
-    for symbol in symbols:
+    for i, symbol in enumerate(symbols):
+        if i:
+            time.sleep(_WARM_PAUSE_SECONDS)
         try:
             _collect_locked(symbol.upper(), 6.0)
             done += 1
