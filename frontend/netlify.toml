@@ -32,15 +32,15 @@
   [headers.values]
     Cache-Control = "no-cache"
 
-# API proxy to the backend. To make the backend accept only requests that came this way, set API_SIGNATURE_TOKEN in
-# the Netlify site settings, then add  signed = "API_SIGNATURE_TOKEN"  below (Netlify then sends an x-nf-sign JWT), and
-# finally set PROXY_SIGNATURE_SECRET (same value) on Render. These rules live here, not in _redirects, because only
-# netlify.toml supports `signed`.
+# API proxy to the backend. `signed` adds an x-nf-sign JWT made with the API_SIGNATURE_TOKEN site variable; the backend
+# (PROXY_SIGNATURE_SECRET, same value) refuses requests without it, so nobody can call it directly and fake their IP.
+# These rules live here, not in _redirects, because only netlify.toml supports `signed`.
 [[redirects]]
   from = "/api/*"
   to = "https://ai-crypto-analytics.onrender.com/api/:splat"
   status = 200
   force = true
+  signed = "API_SIGNATURE_TOKEN"
 
 # Single-page app: every other path is rendered by the app (unknown ones show its "page not found" page).
 [[redirects]]
