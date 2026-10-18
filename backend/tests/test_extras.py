@@ -79,7 +79,7 @@ def test_halving_and_unlock_detection(monkeypatch):
 def test_calendar_endpoint_and_reminders(registered, monkeypatch):
     client, username, _p = registered
     monkeypatch.setattr(event_calendar, "token_unlocks", lambda today, wait=True: [])
-    monkeypatch.setattr(event_calendar, "halving_event", lambda now: None)
+    monkeypatch.setattr(event_calendar, "halving_event", lambda now, wait=True: None)
     data = client.get("/api/public/calendar?days=120").json()
     assert data["events"] and all(e["category"] in ("macro", "crypto", "unlock") for e in data["events"])
     event = data["events"][0]
@@ -385,7 +385,7 @@ def test_calendar_does_not_wait_for_slow_unlock_downloads(monkeypatch):
     from app.services import event_calendar
     gate = threading.Event()
     monkeypatch.setattr(event_calendar, "_fetch_unlocks", lambda today: gate.wait(5) and [])
-    monkeypatch.setattr(event_calendar, "halving_event", lambda now: None)
+    monkeypatch.setattr(event_calendar, "block_height", lambda: gate.wait(5) and 0)
     event_calendar._cache.clear()
     started = time.monotonic()
     data = event_calendar.upcoming(60, NOW)

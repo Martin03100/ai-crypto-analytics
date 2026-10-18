@@ -131,3 +131,4 @@ def _warm_in_background() -> None:
     from app.services import event_calendar
     threading.Thread(target=event_calendar.token_unlocks, args=(datetime.now(timezone.utc).date(),),
                      name="warm-calendar", daemon=True).start()
+    threading.Thread(target=event_calendar.current_height, name="warm-height", daemon=True).start()

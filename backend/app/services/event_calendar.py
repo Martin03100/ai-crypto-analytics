@@ -102,9 +102,20 @@ def block_height() -> Optional[int]:
     return None
 
 
-def halving_event(now: datetime) -> Optional[Dict[str, Any]]:
-    # 0 = unreachable; remembered too, so a dead API is not retried each time
-    height = _cache.get_or_set("height", lambda: block_height() or 0)
+def current_height() -> int:
+    """The Bitcoin block height, 0 when unreachable (remembered too, so a dead API is not asked every time)."""
+    return _cache.get_or_set("height", lambda: block_height() or 0)
+
+
+def halving_event(now: datetime, wait: bool = True) -> Optional[Dict[str, Any]]:
+    # The block explorers can hang for long (DNS lookups are outside the request timeout); without wait the page
+    # does not wait for them: the height is fetched in the background and the halving appears on the next visit.
+    height = _cache.get("height")
+    if height is None:
+        if not wait:
+            threading.Thread(target=current_height, name="calendar-height", daemon=True).start()
+            return None
+        height = current_height()
     if not height:
         return None
     blocks = HALVING_HEIGHT - height
@@ -178,7 +189,7 @@ def upcoming(days: int = 60, now: Optional[datetime] = None, network: bool = Tru
         items += token_unlocks(now.date(), wait=wait)
     items = [e for e in items if now - timedelta(hours=2) <= _at(e) <= end]
     items.sort(key=_at)
-    halving = halving_event(now) if network else None
+    halving = halving_event(now, wait=wait) if network else None
     return {"events": items, "halving": halving, "days": days, "generated_at": now.isoformat() + "Z"}
 
 
