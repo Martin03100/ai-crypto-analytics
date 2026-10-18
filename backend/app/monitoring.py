@@ -51,8 +51,13 @@ def init_monitoring() -> bool:
         return False
     try:
         import sentry_sdk
+        from sentry_sdk.integrations.google_genai import GoogleGenAIIntegration
+
         sentry_sdk.init(
             dsn=SENTRY_DSN, environment=APP_ENV, send_default_pii=False, before_send=_before_send,
+            # The Gemini integration reports every failed call, also the ones the app retries or answers with a
+            # fallback model; those are expected and handled, so only real unhandled errors reach Sentry.
+            disabled_integrations=[GoogleGenAIIntegration()],
             traces_sample_rate=float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0") or 0),
         )
         _enabled = True

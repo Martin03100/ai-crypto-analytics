@@ -399,3 +399,20 @@ def test_gemini_unknown_model_falls_back_without_retrying(monkeypatch):
     calls, sleeps = _scripted_gemini(monkeypatch, {"main-model": [gone], "lite-model": ['{"ok": 4}']})
     ok, text, _err = ai_providers._call_gemini("p", "k")
     assert ok and text == '{"ok": 4}' and calls == ["main-model", "lite-model"] and sleeps == []
+
+
+def test_gemini_never_sends_a_deadline_below_ten_seconds(monkeypatch):
+    calls, _ = _scripted_gemini(monkeypatch, {"main-model": ['{"ok": 1}'], "lite-model": ['{"ok": 2}']})
+    ok, _text, err = ai_providers._call_gemini_model("main-model", "p", "k", deadline=ai_providers.time.monotonic() + 9)
+    assert not ok and "timeout" in err and calls == []      # Gemini would answer "minimum allowed deadline is 10s"
+
+
+def test_sentry_ignores_the_gemini_integration(monkeypatch):
+    import sentry_sdk
+    from app import monitoring
+    seen = {}
+    monkeypatch.setattr(monitoring, "SENTRY_DSN", "https://key@o1.ingest.de.sentry.io/1")
+    monkeypatch.setattr(sentry_sdk, "init", lambda **kw: seen.update(kw))
+    assert monitoring.init_monitoring() is True
+    assert [type(i).__name__ for i in seen["disabled_integrations"]] == ["GoogleGenAIIntegration"]
+    monkeypatch.setattr(monitoring, "_enabled", False)

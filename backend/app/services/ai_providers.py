@@ -80,6 +80,7 @@ _GEMINI_BACKOFF_SECONDS = (2, 5, 10)
 
 
 _GEMINI_BUDGET_SECONDS = 110          # all attempts and models together
+_GEMINI_MIN_DEADLINE_SECONDS = 10     # the shortest request timeout the Gemini API accepts
 
 
 _GEMINI_MAX_RATE_WAIT_SECONDS = 30
@@ -111,7 +112,7 @@ def _call_gemini_model(model: str, prompt: str, api_key: str, deadline: float) -
     waited_for_rate = False
     while True:
         remaining = deadline - time.monotonic()
-        if remaining <= 1:
+        if remaining < _GEMINI_MIN_DEADLINE_SECONDS:   # Gemini refuses a shorter deadline ("minimum allowed is 10s")
             return False, "", "timeout: casovy limit na odpoved AI vyprsal"
         try:
             timeout_ms = int(min(AI_REQUEST_TIMEOUT_SECONDS, remaining) * 1000)

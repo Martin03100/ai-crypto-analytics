@@ -130,3 +130,24 @@ def test_github_and_reddit_url_parsing(monkeypatch):
     assert "42 commitov" in data_sources.github_activity("https://github.com/solana-labs/solana")
     assert data_sources.github_activity("https://evil.example.com/x/y") is None
     assert data_sources.coin_subreddit("https://example.com/r/x") is None
+
+
+def test_a_source_that_refuses_access_is_left_alone_for_a_while(monkeypatch):
+    import requests
+    from app.services import data_sources
+    from app.utils.ttl_cache import TTLCache
+    calls = []
+
+    class Refused:
+        status_code = 401
+
+        def raise_for_status(self):
+            raise requests.HTTPError("401 Client Error: Unauthorized", response=self)
+
+    monkeypatch.setattr(data_sources.requests, "get", lambda *a, **k: calls.append(1) or Refused())
+    data_sources._denied_until.clear()
+    cache = TTLCache(ttl_seconds=60)
+    assert data_sources._get_json("https://paid.example.com/news", cache, "a") is None
+    assert data_sources._get_json("https://paid.example.com/news", cache, "b") is None
+    assert len(calls) == 1          # the second analysis did not ask the source again
+    data_sources._denied_until.clear()

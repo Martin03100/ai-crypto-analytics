@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
@@ -37,11 +38,19 @@ def _redact(text: str) -> str:
     return text
 
 
+# Sources that answered 401/403 are left alone for a while instead of being asked on every analysis.
+_DENIED_PAUSE_SECONDS = 6 * 3600
+_denied_until: Dict[str, float] = {}
+
+
 def _get_json(url: str, cache: TTLCache, key: str, params: Optional[Dict[str, Any]] = None,
               headers: Optional[Dict[str, str]] = None, method: str = "GET", body: Any = None) -> Any:
     hit = cache.get(key)
     if hit is not None:
         return hit
+    base = url.split("?")[0]
+    if _denied_until.get(base, 0) > time.monotonic():      # refused us recently: do not ask again yet
+        return cache.get(key, allow_stale=True)
     try:
         if method == "POST":
             response = requests.post(url, json=body, headers=headers or {}, timeout=_TIMEOUT)
@@ -50,7 +59,10 @@ def _get_json(url: str, cache: TTLCache, key: str, params: Optional[Dict[str, An
         response.raise_for_status()
         data = response.json()
     except Exception as exc:  # noqa: BLE001
-        logger.info("Zdroj %s nedostupny: %s", url.split("?")[0], _redact(str(exc))[:200])
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        if status in (401, 403):   # e.g. an endpoint the free API plan does not include: it will not start working
+            _denied_until[base] = time.monotonic() + _DENIED_PAUSE_SECONDS
+        logger.info("Zdroj %s nedostupny: %s", base, _redact(str(exc))[:200])
         return cache.get(key, allow_stale=True)
     cache.set(key, data)
     return data
