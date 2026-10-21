@@ -18,7 +18,8 @@ _IS_SQLITE = DATABASE_URL.startswith("sqlite")
 _connect_args = {"check_same_thread": False} if _IS_SQLITE else {}
 # A hosted PostgreSQL drops idle connections (the free server sleeps between visits): test each pooled connection
 # before use and renew it every few minutes, so the first request after a pause does not fail.
-_pool_args = {} if _IS_SQLITE else {"pool_pre_ping": True, "pool_recycle": 280}
+# At most 10 connections: the free Supabase pooler allows 15 per project, and the weekly backup needs one too.
+_pool_args = {} if _IS_SQLITE else {"pool_pre_ping": True, "pool_recycle": 280, "pool_size": 5, "max_overflow": 5}
 engine = create_engine(DATABASE_URL, connect_args=_connect_args, **_pool_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
